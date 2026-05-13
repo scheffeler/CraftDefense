@@ -7,7 +7,7 @@ import { ITEMS } from "./config/items";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -39,6 +39,15 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
       path = `<rect x="6" y="6" width="20" height="20" fill="${color}"/>
                <rect x="10" y="4" width="5" height="4" fill="${color}"/>
                <rect x="17" y="4" width="5" height="4" fill="${color}"/>`;
+      break;
+    case "hoe":
+      path = `<rect x="13" y="8" width="4" height="20" fill="#5c3a1a"/>
+               <rect x="8" y="4" width="16" height="5" fill="${color}"/>
+               <rect x="8" y="8" width="5" height="4" fill="${color}"/>`;
+      break;
+    case "shovel":
+      path = `<rect x="13" y="4" width="6" height="22" fill="#5c3a1a"/>
+               <rect x="10" y="4" width="12" height="12" rx="3" fill="${color}"/>`;
       break;
     default: // material / block
       path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
@@ -72,6 +81,8 @@ function getItemIcon(itemId: string): string {
   if (def.category === "weapon") shape = "sword";
   else if (def.toolCategory === "pickaxe") shape = "pick";
   else if (def.toolCategory === "axe") shape = "axe";
+  else if (def.toolCategory === "shovel") shape = "shovel";
+  else if (def.id.endsWith("_hoe")) shape = "hoe";
   else if (def.id === "bow") shape = "bow";
   else if (def.category === "food") shape = "food";
   else if (def.category === "armor") shape = "armor";

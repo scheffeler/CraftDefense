@@ -64,9 +64,10 @@ export class SceneManager {
   private sunLight!: THREE.DirectionalLight;
   private ambientLight!: THREE.AmbientLight;
 
-  // Night sky elements
+  // Sky elements
   private readonly stars: THREE.Points;
   private readonly moon: THREE.Mesh;
+  private readonly sun:  THREE.Mesh;
 
   // Clouds
   private readonly cloudMeshes: THREE.Mesh[] = [];
@@ -99,8 +100,8 @@ export class SceneManager {
     this.scene.fog = new THREE.Fog(0xaad4e8, 48, 130);
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(32, 2.62, 32);
-    this.camera.lookAt(32, 2.62, 18);
+    this.camera.position.set(32, 2.62, 34);
+    this.camera.lookAt(32, 5, 50); // look south toward open terrain at slight upward angle
 
     this.controls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.controls.addEventListener("lock",   () => this.onPointerLockChange(true));
@@ -110,6 +111,7 @@ export class SceneManager {
     this.buildClouds();
     this.stars = this.buildStars();
     this.moon  = this.buildMoon();
+    this.sun   = this.buildSun();
 
     // Arm scene — rendered after main scene with depth cleared
     this.armScene = new THREE.Scene();
@@ -174,7 +176,7 @@ export class SceneManager {
     // Tone mapping exposure: brighter at noon, dimmer at night
     this.renderer.toneMappingExposure = 0.5 + frame.ambientInt * 0.8;
 
-    // Stars and moon: visible at night (dayTime ~0-0.25 and ~0.75-1)
+    // Stars and moon: visible at night
     const nightness = Math.max(0, 1 - frame.ambientInt * 4);
     (this.stars.material as THREE.PointsMaterial).opacity = nightness * 0.9;
     (this.moon.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
@@ -185,6 +187,18 @@ export class SceneManager {
     this.moon.position.set(
       Math.cos(moonAngle) * mr + 32,
       Math.abs(Math.sin(moonAngle)) * mr,
+      20,
+    );
+
+    // Sun: follows sun light direction
+    const sunOpacity = Math.min(1, Math.max(0, frame.ambientInt * 1.8 - 0.4));
+    (this.sun.material as THREE.MeshBasicMaterial).opacity = sunOpacity;
+    // Tint: warm yellow at noon, orange-red at dawn/dusk
+    const sunColor = lerpHex(0xff8833, 0xffee88, Math.min(1, (frame.ambientInt - 0.4) * 5));
+    (this.sun.material as THREE.MeshBasicMaterial).color.setHex(sunColor);
+    this.sun.position.set(
+      Math.cos(angle) * 130 + 32,
+      Math.abs(Math.sin(angle)) * 130,
       20,
     );
 
@@ -281,6 +295,14 @@ export class SceneManager {
     return mesh;
   }
 
+  private buildSun(): THREE.Mesh {
+    const geo = new THREE.SphereGeometry(6, 10, 10);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffee88, transparent: true, opacity: 0, fog: false });
+    const mesh = new THREE.Mesh(geo, mat);
+    this.scene.add(mesh);
+    return mesh;
+  }
+
   private buildClouds(): void {
     this.cloudMat = new THREE.MeshLambertMaterial({
       color: 0xffffff, transparent: true, opacity: 0.85,
@@ -347,8 +369,8 @@ export class SceneManager {
   }
 
   resetCamera(): void {
-    this.camera.position.set(32, 2.62, 32);
-    this.camera.lookAt(32, 2.62, 18);
+    this.camera.position.set(32, 2.62, 34);
+    this.camera.lookAt(32, 5, 50);
   }
 
   private setupLighting(): void {
