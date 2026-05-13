@@ -54,7 +54,7 @@ export class Game {
   private lastTime = 0;
 
   // Initial build phase before wave 1 (seconds)
-  private buildPhaseTimer = 120;
+  private buildPhaseTimer = 60;
 
   // Torch point lights keyed by "wx,wy,wz"
   private readonly torchLights = new Map<string, THREE.PointLight>();
@@ -83,6 +83,15 @@ export class Game {
   }>();
   private openFurnaceKey: string | null = null;
 
+  // Item entity drops — floating 3D items in the world
+  private readonly itemEntities: Array<{
+    group: THREE.Group;
+    itemId: string;
+    life: number;
+    bobPhase: number;
+    pullTimer: number;
+  }> = [];
+
   private particles!:        ParticleSystem;
   private scene!:            SceneManager;
   private gameMap!:          GameMap;
@@ -101,6 +110,8 @@ export class Game {
 
   start(): void {
     this.buildSystems();
+    // Expose camera for screenshot tooling
+    (window as any).__GAME_CAMERA__ = this.scene.camera;
     requestAnimationFrame(t => this.loop(t));
   }
 
@@ -179,16 +190,40 @@ export class Game {
   private wireCallbacks(): void {
     // Pointer lock
     this.scene.onPointerLockChange = (locked) => {
-      this.ui.showPointerLockPrompt(!locked);
-      if (!locked) this.ui.showInventory(false);
+      if (!locked) {
+        // Show pause menu only if game is in progress (pointer was locked and user pressed Esc)
+        if (this.phase !== "gameover" && this.phase !== "win" &&
+            !this.ui.isInventoryOpen() && !this.ui.isWorkbenchOpen() &&
+            !this.ui.isChestOpen() && !this.ui.isFurnaceOpen()) {
+          this.ui.showPause(true);
+        }
+        this.ui.showInventory(false);
+      } else {
+        this.ui.showPause(false);
+        this.ui.showPointerLockPrompt(false);
+      }
     };
     const requestLock = () => {
-      if (!this.scene.isPointerLocked && !this.ui.isInventoryOpen()) {
+      if (!this.scene.isPointerLocked && !this.ui.isInventoryOpen() && !this.ui.isPauseOpen()) {
         this.scene.lockPointer();
       }
     };
     this.ui.onPointerLockRequest = requestLock;
     document.addEventListener("click", requestLock);
+
+    // Pause menu callbacks
+    this.ui.onPauseResume = () => {
+      this.scene.lockPointer();
+    };
+    this.ui.onPauseReturnTitle = () => {
+      this.ui.showPointerLockPrompt(true);
+      // Reset game state for mode re-selection
+      this.phase = "wave_clear";
+      this.waves = new WaveManager();
+      this.enemies.reset();
+      this.buildPhaseTimer = 60;
+      this._titleAngle = Math.PI * 1.25;
+    };
 
     // Hotbar slot selection
     this.input.onSlotChange = (slot) => {
@@ -354,9 +389,8 @@ export class Game {
         const behavior = BLOCK_BEHAVIORS[id];
         const drops    = behavior?.drops ?? [id];
         for (const drop of drops) {
-          if (ITEMS[drop]) this.inventory.addItem(drop, 1);
+          if (ITEMS[drop]) this.spawnItemEntity(wx + 0.5, wy + 0.7, wz + 0.5, drop);
         }
-        this.refreshHotbar();
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
       if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
@@ -666,12 +700,28 @@ export class Game {
     requestAnimationFrame(t => this.loop(t));
   }
 
+  private _titleAngle = Math.PI * 1.25; // start angle for title camera orbit
+
   private update(dt: number): void {
     // Apply underwater fog before day/night (uses previous frame's water state)
     this.scene.setUnderwaterEffect(this._wasInWater);
     // Day/night cycle runs even while paused/locked
     this.scene.updateDayNight(dt);
     this.audio.updateAmbient(dt, this.scene.daylight);
+
+    // Title screen orbit: slowly rotate camera around fortress when pointer not locked
+    if (!this.scene.isPointerLocked && this.phase !== "gameover" && this.phase !== "win") {
+      this._titleAngle += dt * 0.06;
+      const r = 35, h = 26;
+      const cx = 32, cz = 32;
+      const cam = this.scene.camera;
+      cam.position.set(
+        cx + Math.cos(this._titleAngle) * r,
+        h,
+        cz + Math.sin(this._titleAngle) * r,
+      );
+      cam.lookAt(cx, 7, cz);
+    }
 
     if (this.phase === "gameover" || this.phase === "win") return;
 
@@ -794,6 +844,9 @@ export class Game {
     // Particles
     this.particles.update(dt);
 
+    // Item entity drops
+    this.updateItemEntities(dt);
+
     // Crop growth
     this.updateCrops(dt);
 
@@ -829,6 +882,98 @@ export class Game {
       this.ui.showBlockTooltip(blockName);
     } else {
       this.ui.showBlockTooltip(null);
+    }
+  }
+
+  // ─── Item entity drops ─────────────────────────────────────────────────────
+
+  private spawnItemEntity(x: number, y: number, z: number, itemId: string): void {
+    const def = ITEMS[itemId];
+    if (!def) return;
+
+    const size = 0.28;
+    const color = def.color ?? 0x888888;
+    const inner = new THREE.Mesh(
+      new THREE.BoxGeometry(size, size, size),
+      new THREE.MeshLambertMaterial({ color }),
+    );
+    // Spin offset so items don't all start at the same angle
+    inner.rotation.y = Math.random() * Math.PI * 2;
+
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+    group.add(inner);
+    this.scene.scene.add(group);
+
+    // Random sideways pop-out velocity
+    const popAngle = Math.random() * Math.PI * 2;
+    const spread = 0.6 + Math.random() * 0.6;
+    const baseY = y;
+    this.itemEntities.push({
+      group,
+      itemId,
+      life: 0,
+      bobPhase: Math.random() * Math.PI * 2,
+      pullTimer: 0,
+    });
+    (group as any).__vx = Math.cos(popAngle) * spread;
+    (group as any).__vz = Math.sin(popAngle) * spread;
+    (group as any).__vy = 2.0;
+    (group as any).__baseY = baseY;
+  }
+
+  private updateItemEntities(dt: number): void {
+    const COLLECT_RADIUS = 1.6;
+    const AUTO_COLLECT_TIME = 25;
+    const pp = this.player.position;
+
+    for (let i = this.itemEntities.length - 1; i >= 0; i--) {
+      const e = this.itemEntities[i];
+      e.life += dt;
+
+      const g = e.group as any;
+      // Pop-out physics for first 0.55 s — arc out and land back at baseY
+      if (e.life < 0.55) {
+        g.__vy -= 14 * dt;
+        g.position.x += g.__vx * dt;
+        g.position.z += g.__vz * dt;
+        g.position.y += g.__vy * dt;
+        // Clamp to baseY once gravity pulls below
+        if (g.position.y < g.__baseY) {
+          g.position.y = g.__baseY;
+          g.__vy = 0;
+        }
+      }
+
+      // Bob and spin
+      e.bobPhase += dt * 2.5;
+      const inner = e.group.children[0] as THREE.Mesh;
+      inner.position.y = Math.sin(e.bobPhase) * 0.06;
+      inner.rotation.y += dt * 2.2;
+
+      // Pull toward player when close enough
+      const dx = pp.x - e.group.position.x;
+      const dy = pp.y + 0.5 - e.group.position.y;
+      const dz = pp.z - e.group.position.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (dist < COLLECT_RADIUS) {
+        e.pullTimer += dt;
+        const t = Math.min(1, e.pullTimer / 0.25);
+        e.group.position.x += dx * t * dt * 12;
+        e.group.position.y += dy * t * dt * 12;
+        e.group.position.z += dz * t * dt * 12;
+      }
+
+      if (dist < 0.4 || e.life > AUTO_COLLECT_TIME) {
+        this.inventory.addItem(e.itemId, 1);
+        this.audio.play("pickup", 0.45);
+        this.scene.scene.remove(e.group);
+        inner.geometry.dispose();
+        (inner.material as THREE.Material).dispose();
+        this.itemEntities.splice(i, 1);
+        this.refreshHotbar();
+      }
     }
   }
 

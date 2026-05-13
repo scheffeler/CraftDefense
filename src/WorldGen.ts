@@ -32,6 +32,7 @@ function inFortressBounds(x: number, z: number): boolean {
 // ---------------------------------------------------------------------------
 export function generateWorld(world: VoxelWorld): void {
   generateTerrain(world);
+  generateCaves(world);
   generateFortress(world);
   generateInterior(world);
   generateTrees(world);
@@ -416,6 +417,55 @@ function generateMineShafts(world: VoxelWorld): void {
       world.setBlock(tx, midY,     sz + 1, "air");
       world.setBlock(tx, midY + 1, sz + 1, "air");
       if (dx % 6 === 5) world.setBlock(tx, midY + 1, sz, "torch");
+    }
+  }
+}
+
+function generateCaves(world: VoxelWorld): void {
+  const NUM_WORMS = 30;
+  for (let w = 0; w < NUM_WORMS; w++) {
+    // Random underground start
+    let x = 4 + (hash(w * 7 + 100, 0) % (WORLD_WIDTH - 8));
+    let y = 1 + (hash(w * 3 + 200, 1) % (G - 2));
+    let z = 4 + (hash(w * 11 + 300, 2) % (WORLD_DEPTH - 8));
+
+    // Direction — mostly horizontal
+    let dx = ((hash(w, 10) % 200) / 100 - 1) * 0.7;
+    let dy = ((hash(w, 11) % 40) / 100 - 0.2) * 0.4;
+    let dz = ((hash(w, 12) % 200) / 100 - 1) * 0.7;
+    const hLen = Math.sqrt(dx * dx + dz * dz);
+    if (hLen > 0.01) { dx /= hLen; dz /= hLen; }
+
+    const steps = 12 + (hash(w, 20) % 16);
+    for (let s = 0; s < steps; s++) {
+      const radius = 1.1 + (hash(w * 100 + s, 5) % 6) / 10;
+      const ry = radius * 0.55; // vertically squished
+      for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+        for (let by = Math.floor(y - ry); by <= Math.ceil(y + ry); by++) {
+          for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+            if (bx < 1 || bx >= WORLD_WIDTH - 1) continue;
+            if (bz < 1 || bz >= WORLD_DEPTH - 1) continue;
+            if (by <= 0 || by >= G) continue; // preserve bedrock and surface
+            const d2 = ((bx - x) / radius) ** 2 + ((by - y) / ry) ** 2 + ((bz - z) / radius) ** 2;
+            if (d2 <= 1) world.setBlock(bx, by, bz, "air");
+          }
+        }
+      }
+      // Occasional torch on cave floor
+      if (s % 8 === 4) {
+        const fx = Math.round(x), fz = Math.round(z);
+        const floor = Math.floor(y - ry) - 1;
+        if (floor >= 1 && floor < G) {
+          const cur = world.getBlock(fx, floor, fz);
+          const above = world.getBlock(fx, floor + 1, fz);
+          if (cur !== "air" && above === "air") world.setBlock(fx, floor + 1, fz, "torch");
+        }
+      }
+      // Advance with slight wander
+      x += dx + ((hash(w * 100 + s, 30) % 100) / 100 - 0.5) * 0.5;
+      y += dy + ((hash(w * 100 + s, 31) % 100) / 100 - 0.5) * 0.25;
+      z += dz + ((hash(w * 100 + s, 32) % 100) / 100 - 0.5) * 0.5;
+      y = Math.max(1, Math.min(G - 1, y));
     }
   }
 }

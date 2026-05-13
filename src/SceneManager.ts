@@ -100,8 +100,8 @@ export class SceneManager {
     this.scene.fog = new THREE.Fog(0xaad4e8, 48, 130);
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(32, 8.62, 8);
-    this.camera.lookAt(32, 8, 30); // look south toward fortress from outside north gate
+    this.camera.position.set(18, 28, 18);
+    this.camera.lookAt(32, 7, 32); // title screen: aerial view of fortress
 
     this.controls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.controls.addEventListener("lock",   () => this.onPointerLockChange(true));

@@ -96,6 +96,8 @@ export class UI {
   onRestart: () => void = () => {};
   onPointerLockRequest: () => void = () => {};
   onModeSelect: (mode: "helmsdeep" | "freeplay") => void = () => {};
+  onPauseResume: () => void = () => {};
+  onPauseReturnTitle: () => void = () => {};
   onCraftingSlotClick: (row: number, col: number) => void = () => {};
   onCraftingResultClick: () => void = () => {};
   onWorkbenchSlotClick: (row: number, col: number) => void = () => {};
@@ -126,6 +128,7 @@ export class UI {
   private elWaveInfo!: HTMLElement;
   private elObjective!: HTMLElement;
   private lockPrompt!: HTMLElement;
+  private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
   private deathOverlay!: HTMLElement;
   private endOverlay!: HTMLElement;
@@ -445,6 +448,7 @@ export class UI {
     this.buildChestOverlay();
     this.buildFurnaceOverlay();
     this.buildRecipeBookOverlay();
+    this.buildPauseOverlay();
     this.buildDeathOverlay();
     this.buildEndOverlay();
   }
@@ -843,6 +847,34 @@ export class UI {
     this.recipeBookOverlay.style.display = open ? "flex" : "none";
   }
 
+  private buildPauseOverlay(): void {
+    const ov = div("overlay");
+    ov.style.display = "none";
+    ov.innerHTML = `
+      <div class="overlay-box" style="min-width:280px">
+        <div class="overlay-title" style="font-size:22px;margin-bottom:24px;color:#ffff55;text-shadow:2px 2px 0 #3f3f00">PAUSED</div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+          <button class="overlay-btn" id="pause-resume" style="width:200px">Resume</button>
+          <button class="overlay-btn" id="pause-title" style="width:200px">Return to Title</button>
+        </div>
+      </div>`;
+    ov.querySelector("#pause-resume")!.addEventListener("click", () => {
+      this.showPause(false);
+      this.onPauseResume();
+    });
+    ov.querySelector("#pause-title")!.addEventListener("click", () => {
+      this.showPause(false);
+      this.onPauseReturnTitle();
+    });
+    this.pauseOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  showPause(show: boolean): void {
+    this.pauseOverlay.style.display = show ? "flex" : "none";
+  }
+  isPauseOpen(): boolean { return this.pauseOverlay.style.display !== "none"; }
+
   private buildDeathOverlay(): void {
     const ov = div("overlay");
     ov.style.display = "none";
@@ -1121,17 +1153,17 @@ const FPS_CSS = `
   color: #fff; text-shadow: 1px 1px 0 #000;
 }
 
-/* Pointer lock splash — Minecraft title screen style */
+/* Pointer lock splash — 3D world visible behind frosted overlay */
 .fps-lock-prompt {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: #000;
+  background: rgba(0,0,0,0.55);
   z-index: 60;
 }
 .fps-lock-box {
   text-align: center;
   padding: 40px 56px;
-  background: #1a1a1a;
+  background: rgba(0,0,0,0.82);
   border: 3px solid #555;
   max-width: 520px;
 }

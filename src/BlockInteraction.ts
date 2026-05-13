@@ -19,6 +19,8 @@ export class BlockInteraction {
   private readonly raycaster = new THREE.Raycaster();
   private readonly targetHighlight: THREE.LineSegments;
   private readonly breakOverlay: THREE.Mesh;
+  private readonly crackTextures: THREE.CanvasTexture[];
+  private lastCrackStage = -1;
 
   private targetBlock:   { wx: number; wy: number; wz: number } | null = null;
   private adjacentBlock: { wx: number; wy: number; wz: number } | null = null;
@@ -44,14 +46,55 @@ export class BlockInteraction {
     this.targetHighlight.visible = false;
     scene.add(this.targetHighlight);
 
+    this.crackTextures = this.buildCrackTextures();
+
     const breakGeo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
     const breakMat = new THREE.MeshBasicMaterial({
-      color: 0x000000, transparent: true, opacity: 0, depthWrite: false,
+      map: this.crackTextures[0],
+      transparent: true, opacity: 0, depthWrite: false,
     });
     this.breakOverlay = new THREE.Mesh(breakGeo, breakMat);
     this.breakOverlay.renderOrder = 998;
     this.breakOverlay.visible = false;
     scene.add(this.breakOverlay);
+  }
+
+  private buildCrackTextures(): THREE.CanvasTexture[] {
+    // Each crack stage adds arms radiating from center
+    const crackArms: [number, number][][] = [
+      [[8,8],[13,3]],
+      [[8,8],[3,3]],
+      [[8,8],[14,14]],
+      [[8,8],[3,14]],
+      [[8,8],[14,8]],
+      [[8,8],[2,8]],
+      [[8,8],[8,2]],
+      [[8,8],[8,15]],
+      [[3,3],[6,8],[3,13]],
+      [[13,4],[11,9],[13,13]],
+    ];
+    const textures: THREE.CanvasTexture[] = [];
+    for (let stage = 0; stage < 10; stage++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16; canvas.height = 16;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = `rgba(0,0,0,${0.08 + stage * 0.06})`;
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.lineWidth = 1;
+      for (let c = 0; c <= stage && c < crackArms.length; c++) {
+        const pts = crackArms[c];
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let p = 1; p < pts.length; p++) ctx.lineTo(pts[p][0], pts[p][1]);
+        ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      textures.push(tex);
+    }
+    return textures;
   }
 
   setActiveItem(item: ItemStack | null): void {
@@ -66,7 +109,7 @@ export class BlockInteraction {
   }
 
   startBreaking(): void { this.isBreaking = true; this.breakTimer = 0; }
-  stopBreaking():  void { this.isBreaking = false; this.breakTimer = 0; }
+  stopBreaking():  void { this.isBreaking = false; this.breakTimer = 0; this.lastCrackStage = -1; }
 
   getBreakProgress(): number {
     return this.breakHardness > 0 ? Math.min(1, this.breakTimer / this.breakHardness) : 0;
@@ -94,7 +137,13 @@ export class BlockInteraction {
       const { wx, wy, wz } = this.targetBlock;
       this.breakOverlay.position.set(wx + 0.5, wy + 0.5, wz + 0.5);
       this.breakOverlay.visible = true;
-      (this.breakOverlay.material as THREE.MeshBasicMaterial).opacity = progress * 0.65;
+      const stage = Math.min(9, Math.floor(progress * 10));
+      if (stage !== this.lastCrackStage) {
+        this.lastCrackStage = stage;
+        (this.breakOverlay.material as THREE.MeshBasicMaterial).map = this.crackTextures[stage];
+        (this.breakOverlay.material as THREE.MeshBasicMaterial).needsUpdate = true;
+      }
+      (this.breakOverlay.material as THREE.MeshBasicMaterial).opacity = 0.3 + progress * 0.5;
 
       if (this.breakTimer >= this.breakHardness) {
         const id = this.world.getBlock(wx, wy, wz);

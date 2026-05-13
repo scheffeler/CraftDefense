@@ -79,17 +79,233 @@ class Chunk {
 }
 
 // ---------------------------------------------------------------------------
+// Block texture atlas index
+// ---------------------------------------------------------------------------
+function getBlockTexIndex(id: BlockId, normalY: number): number {
+  const isTop = normalY > 0;
+  const isBot = normalY < 0;
+  switch (id as string) {
+    case "stone":        return 0;
+    case "cobblestone":  return 1;
+    case "dirt":
+    case "farmland":     return 2;
+    case "grass":        return isTop ? 3 : (isBot ? 2 : 4);
+    case "sand":         return 5;
+    case "wood":         return (isTop || isBot) ? 7 : 6;
+    case "planks":       return 8;
+    case "leaves":       return 9;
+    case "iron_ore":     return 10;
+    case "coal_ore":     return 11;
+    case "bedrock":      return 12;
+    case "gold_ore":     return 14;
+    case "diamond_ore":  return 15;
+    default:             return 13;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Voxel world
 // ---------------------------------------------------------------------------
 export class VoxelWorld {
   private readonly chunks = new Map<string, Chunk>();
   readonly scene: THREE.Scene;
   private readonly chunkMeshGroup: THREE.Group;
+  private readonly blockTex: THREE.Texture;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.chunkMeshGroup = new THREE.Group();
     scene.add(this.chunkMeshGroup);
+    this.blockTex = VoxelWorld.makeBlockTexture();
+  }
+
+  private static makeBlockTexture(): THREE.Texture {
+    // 16 textures × 16px wide = 256px atlas, 16px tall
+    const ATLAS_TILES = 16;
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = ATLAS_TILES * S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+
+    // Seeded RNG per tile for deterministic pixel art
+    const rng = (seed: number) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; }; };
+
+    const pixel = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
+    const border = (ox: number) => {
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(ox, 0, S, 1); ctx.fillRect(ox, S-1, S, 1);
+      ctx.fillRect(ox, 0, 1, S); ctx.fillRect(ox+S-1, 0, 1, S);
+    };
+    const fill = (ox: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(ox, 0, S, S); };
+    const noise = (ox: number, baseR: number, baseG: number, baseB: number, variance: number, seed: number) => {
+      const r = rng(seed);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * variance;
+        const cr = Math.max(0, Math.min(255, baseR + v * 255)) | 0;
+        const cg = Math.max(0, Math.min(255, baseG + v * 255)) | 0;
+        const cb = Math.max(0, Math.min(255, baseB + v * 255)) | 0;
+        pixel(ox + x, y, `rgb(${cr},${cg},${cb})`);
+      }
+    };
+
+    // 0: stone — gray with subtle noise
+    noise(0 * S, 136, 136, 136, 0.08, 1001);
+    border(0 * S);
+
+    // 1: cobblestone — gray with stone shapes
+    noise(1 * S, 136, 128, 112, 0.1, 1002);
+    { const r = rng(2002);
+      for (let i = 0; i < 6; i++) {
+        const bx = (r() * 12 + 1) | 0, by = (r() * 12 + 1) | 0, bw = (r() * 3 + 2) | 0, bh = (r() * 2 + 2) | 0;
+        ctx.fillStyle = "rgba(80,72,60,0.35)"; ctx.fillRect(1 * S + bx, by, bw, bh);
+        ctx.fillStyle = "rgba(180,172,155,0.3)"; ctx.fillRect(1 * S + bx + 1, by + 1, bw, bh);
+      }
+    }
+    border(1 * S);
+
+    // 2: dirt — brown with noise
+    noise(2 * S, 139, 92, 42, 0.1, 1003);
+    border(2 * S);
+
+    // 3: grass top — bright green
+    noise(3 * S, 93, 158, 58, 0.1, 1004);
+    border(3 * S);
+
+    // 4: grass side — green strip top 3px, dirt below
+    noise(4 * S, 139, 92, 42, 0.08, 1005);
+    { ctx.fillStyle = "rgba(93,158,58,0.9)"; ctx.fillRect(4 * S, 0, S, 3); }
+    { const r = rng(2005);
+      for (let x = 0; x < S; x++) for (let y = 3; y < 5; y++)
+        if (r() > 0.5) { ctx.fillStyle = `rgba(93,158,58,${0.4 + r() * 0.3})`; ctx.fillRect(4 * S + x, y, 1, 1); }
+    }
+    border(4 * S);
+
+    // 5: sand — sandy with noise
+    noise(5 * S, 212, 196, 132, 0.08, 1006);
+    border(5 * S);
+
+    // 6: wood side — brown with vertical grain
+    fill(6 * S, "#6b4c2a");
+    { const r = rng(2006);
+      for (let x = 1; x < S - 1; x++) {
+        const dark = r() > 0.6;
+        for (let y = 1; y < S - 1; y++) {
+          const v = (r() - 0.5) * 30;
+          const b = dark ? -20 : 0;
+          const cr = Math.max(0, Math.min(255, 107 + b + v)) | 0;
+          const cg = Math.max(0, Math.min(255, 76 + b + v)) | 0;
+          const cb = Math.max(0, Math.min(255, 42 + b + v * 0.5)) | 0;
+          pixel(6 * S + x, y, `rgb(${cr},${cg},${cb})`);
+        }
+      }
+    }
+    border(6 * S);
+
+    // 7: wood top — annular ring pattern
+    fill(7 * S, "#b8905a");
+    { const cx = 8, cy = 8;
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+        const ring = Math.abs(Math.sin(dist * 0.8)) * 0.2 + 0.9;
+        const cr = Math.min(255, Math.round(184 * ring)) | 0;
+        const cg = Math.min(255, Math.round(144 * ring)) | 0;
+        const cb = Math.min(255, Math.round(90 * ring)) | 0;
+        pixel(7 * S + x, y, `rgb(${cr},${cg},${cb})`);
+      }
+    }
+    border(7 * S);
+
+    // 8: planks — tan with plank seams
+    fill(8 * S, "#c8a060");
+    { const r = rng(2008);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel(8 * S + x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
+      }
+      // horizontal seams every 4px
+      for (let y = 3; y < S; y += 4) { ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(8 * S, y, S, 1); }
+      // vertical offset seam
+      ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.fillRect(8 * S + 8, 0, 1, 4); ctx.fillRect(8 * S + 8, 8, 1, 4);
+    }
+    border(8 * S);
+
+    // 9: leaves — dark green mottled
+    fill(9 * S, "transparent");
+    { const r = rng(2009);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = r();
+        if (v < 0.15) { pixel(9 * S + x, y, "rgba(0,0,0,0)"); continue; }
+        const brightness = 0.6 + r() * 0.5;
+        pixel(9 * S + x, y, `rgb(${(58 * brightness) | 0},${(122 * brightness) | 0},${(37 * brightness) | 0})`);
+      }
+    }
+    border(9 * S);
+
+    // 10: iron ore — stone base with orange flecks
+    noise(10 * S, 136, 136, 136, 0.07, 1010);
+    { const r = rng(2010);
+      for (let i = 0; i < 5; i++) {
+        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
+        ctx.fillStyle = "#cc8844"; ctx.fillRect(10 * S + ox2, oy2, 2, 2);
+        ctx.fillStyle = "#dd9955"; ctx.fillRect(10 * S + ox2, oy2, 1, 1);
+      }
+    }
+    border(10 * S);
+
+    // 11: coal ore — stone base with dark spots
+    noise(11 * S, 136, 136, 136, 0.07, 1011);
+    { const r = rng(2011);
+      for (let i = 0; i < 5; i++) {
+        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
+        ctx.fillStyle = "#222222"; ctx.fillRect(11 * S + ox2, oy2, 2, 2);
+        ctx.fillStyle = "#333333"; ctx.fillRect(11 * S + ox2 + 1, oy2, 1, 1);
+      }
+    }
+    border(11 * S);
+
+    // 12: bedrock — very dark irregular
+    noise(12 * S, 51, 51, 51, 0.15, 1012);
+    { const r = rng(2012);
+      for (let i = 0; i < 8; i++) {
+        const ox2 = (r() * 12 + 1) | 0, oy2 = (r() * 12 + 1) | 0;
+        ctx.fillStyle = "#111111"; ctx.fillRect(12 * S + ox2, oy2, 2, 2);
+      }
+    }
+    border(12 * S);
+
+    // 13: generic/default — white with border (vertex color controls appearance)
+    fill(13 * S, "#ffffff");
+    border(13 * S);
+
+    // 14: gold ore — stone base with gold flecks
+    noise(14 * S, 136, 136, 136, 0.07, 1014);
+    { const r = rng(2014);
+      for (let i = 0; i < 5; i++) {
+        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
+        ctx.fillStyle = "#ddaa00"; ctx.fillRect(14 * S + ox2, oy2, 2, 2);
+        ctx.fillStyle = "#eebb22"; ctx.fillRect(14 * S + ox2, oy2, 1, 1);
+      }
+    }
+    border(14 * S);
+
+    // 15: diamond ore — stone base with cyan diamonds
+    noise(15 * S, 136, 136, 136, 0.07, 1015);
+    { const r = rng(2015);
+      for (let i = 0; i < 4; i++) {
+        const ox2 = (r() * 10 + 3) | 0, oy2 = (r() * 10 + 3) | 0;
+        pixel(15 * S + ox2, oy2 + 1, "#00cccc"); pixel(15 * S + ox2 + 1, oy2, "#00cccc");
+        pixel(15 * S + ox2 + 1, oy2 + 2, "#00cccc"); pixel(15 * S + ox2 + 2, oy2 + 1, "#00cccc");
+        pixel(15 * S + ox2 + 1, oy2 + 1, "#55ffff");
+      }
+    }
+    border(15 * S);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
   }
 
   private key(cx: number, cz: number) { return `${cx},${cz}`; }
@@ -139,8 +355,16 @@ export class VoxelWorld {
     const positions: number[] = [];
     const normals: number[]   = [];
     const colors: number[]    = [];
+    const uvs: number[]       = [];
     const indices: number[]   = [];
     let vi = 0;
+
+    const isSolidAO = (bx: number, by: number, bz: number): boolean => {
+      const bid = this.getBlock(bx, by, bz);
+      return bid !== "air" && !BLOCK_DEFS[bid].transparent;
+    };
+    const vertAO = (s1: boolean, s2: boolean, c: boolean): number =>
+      s1 && s2 ? 0.5 : 1.0 - (s1 ? 0.2 : 0) - (s2 ? 0.2 : 0) - (c ? 0.1 : 0);
 
     const addFace = (
       ox: number, oy: number, oz: number,
@@ -148,13 +372,27 @@ export class VoxelWorld {
       bx: number, by: number, bz: number,
       nx: number, ny: number, nz: number,
       r: number, g: number, b: number,
-      shade: number
+      shade: number,
+      texIdx = 13,
+      ao0 = 1.0, ao1 = 1.0, ao2 = 1.0, ao3 = 1.0
     ) => {
-      const sr = r * shade, sg = g * shade, sb = b * shade;
       positions.push(ox, oy, oz, ox+ax, oy+ay, oz+az, ox+bx, oy+by, oz+bz, ox+ax+bx, oy+ay+by, oz+az+bz);
       for (let i = 0; i < 4; i++) normals.push(nx, ny, nz);
-      for (let i = 0; i < 4; i++) colors.push(sr, sg, sb);
-      indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2);
+      const s = shade;
+      colors.push(
+        r*s*ao0, g*s*ao0, b*s*ao0,
+        r*s*ao1, g*s*ao1, b*s*ao1,
+        r*s*ao2, g*s*ao2, b*s*ao2,
+        r*s*ao3, g*s*ao3, b*s*ao3,
+      );
+      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
+      // Flip quad diagonal when AO values require it to avoid seam artifacts
+      if (ao0 + ao3 > ao1 + ao2) {
+        indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2);
+      } else {
+        indices.push(vi+1, vi+3, vi, vi+3, vi+2, vi);
+      }
       vi += 4;
     };
 
@@ -208,6 +446,23 @@ export class VoxelWorld {
             const nbId = this.getBlock(wx + nx, wy + ny, wz + nz);
             if (nbId !== "air" && !BLOCK_DEFS[nbId].transparent) continue;
             const f = faces[fi];
+            const fTexIdx = getBlockTexIndex(id, f.n[1]);
+            // For textured blocks, use white vertex color so atlas texture defines color
+            let fr = f.cr, fg = f.cg, fb = f.cb;
+            if (fTexIdx !== 13) fr = fg = fb = 1.0;
+
+            // Per-vertex AO: check adjacent blocks in tangent directions only
+            const [tax, tay, taz] = f.a;
+            const [tbx, tby, tbz] = f.b;
+            const s1n = isSolidAO(wx - tax, wy - tay, wz - taz);
+            const s1p = isSolidAO(wx + tax, wy + tay, wz + taz);
+            const s2n = isSolidAO(wx - tbx, wy - tby, wz - tbz);
+            const s2p = isSolidAO(wx + tbx, wy + tby, wz + tbz);
+            const ao0 = vertAO(s1n, s2n, isSolidAO(wx - tax - tbx, wy - tay - tby, wz - taz - tbz));
+            const ao1 = vertAO(s1p, s2n, isSolidAO(wx + tax - tbx, wy + tay - tby, wz + taz - tbz));
+            const ao2 = vertAO(s1n, s2p, isSolidAO(wx - tax + tbx, wy - tay + tby, wz - taz + tbz));
+            const ao3 = vertAO(s1p, s2p, isSolidAO(wx + tax + tbx, wy + tay + tby, wz + taz + tbz));
+
             addFace(
               wx + (f.n[0] < 0 ? 0 : f.n[0] > 0 ? 1 : 0),
               wy + (f.n[1] < 0 ? 0 : f.n[1] > 0 ? 1 : 0),
@@ -215,8 +470,9 @@ export class VoxelWorld {
               f.a[0] * BLOCK_SIZE, f.a[1] * BLOCK_SIZE, f.a[2] * BLOCK_SIZE,
               f.b[0] * BLOCK_SIZE, f.b[1] * BLOCK_SIZE, f.b[2] * BLOCK_SIZE,
               f.n[0], f.n[1], f.n[2],
-              f.cr, f.cg, f.cb,
-              f.shade
+              fr, fg, fb,
+              f.shade, fTexIdx,
+              ao0, ao1, ao2, ao3
             );
           }
         }
@@ -229,10 +485,15 @@ export class VoxelWorld {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     geo.setAttribute("normal",   new THREE.Float32BufferAttribute(normals, 3));
     geo.setAttribute("color",    new THREE.Float32BufferAttribute(colors, 3));
+    geo.setAttribute("uv",       new THREE.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeBoundsTree();
 
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.FrontSide });
+    const mat = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      map: this.blockTex,
+      side: THREE.FrontSide,
+    });
     chunk.mesh = new THREE.Mesh(geo, mat);
     chunk.mesh.receiveShadow = true;
     chunk.mesh.castShadow = false;

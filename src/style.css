@@ -19,10 +19,9 @@ canvas { display: block; position: absolute; inset: 0; }
   align-items: center;
   gap: 20px;
   padding: 8px 16px;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.7);
   z-index: 10;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .hud-stat {
@@ -44,9 +43,8 @@ canvas { display: block; position: absolute; inset: 0; }
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.7);
+  border-top: 1px solid rgba(255,255,255,0.1);
   z-index: 10;
 }
 
@@ -195,17 +193,15 @@ canvas { display: block; position: absolute; inset: 0; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.72);
-  backdrop-filter: blur(6px);
+  background: rgba(0,0,0,0.75);
   z-index: 50;
 }
 
 .overlay.hidden { display: none; }
 
 .overlay-box {
-  background: rgba(10,15,25,0.95);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
+  background: #1a1a1a;
+  border: 3px solid #555;
   padding: 36px 44px;
   text-align: center;
   max-width: 520px;
@@ -261,20 +257,20 @@ canvas { display: block; position: absolute; inset: 0; }
 
 .overlay-btn {
   padding: 11px 32px;
-  background: #2a6e2a;
-  border: 2px solid #44aa44;
-  border-radius: 8px;
+  background: #555;
+  border: 3px solid #888;
   color: #fff;
   cursor: pointer;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 11px;
   font-weight: bold;
   margin-top: 4px;
-  transition: background 0.15s;
+  transition: background 0.1s;
   letter-spacing: 0.04em;
+  text-shadow: 1px 1px 0 #000;
 }
 
-.overlay-btn:hover { background: #3a8e3a; }
+.overlay-btn:hover { background: #777; border-color: #fff; }
 
 .controls-hint {
   margin-top: 18px;
