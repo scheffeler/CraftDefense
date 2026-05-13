@@ -11,7 +11,6 @@ const context = await browser.newContext({
 await context.clearCookies();
 const page = await context.newPage();
 
-// Intercept all requests and force no-cache
 await page.route('**/*', route => {
   const headers = {
     ...route.request().headers(),
@@ -21,23 +20,49 @@ await page.route('**/*', route => {
   route.continue({ headers });
 });
 
-// Cache-bust the URL with a timestamp
 const ts = Date.now();
 await page.goto(`http://localhost:5175/?_t=${ts}`, { waitUntil: 'load' });
-
-// Wait for Three.js canvas to appear and render first frame
 await page.waitForSelector('canvas', { timeout: 10000 });
-await page.waitForTimeout(4000); // let the title orbit camera settle
+await page.waitForTimeout(3500);
 
 await page.addStyleTag({ content: `
   #app { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
   canvas { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
 ` });
 await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-await page.waitForTimeout(600);
+await page.waitForTimeout(400);
 
-// Capture the title screen with 3D world visible behind it
+// Hide the title/lock overlay to capture the in-game HUD
+await page.evaluate(() => {
+  document.querySelectorAll('.fps-lock-prompt').forEach(el => {
+    el.style.display = 'none';
+  });
+});
+
+// Move camera to interior player POV — standing inside fortress looking north toward gate
+await page.evaluate(() => {
+  const game = window.__game;
+  if (!game || !game.scene) return;
+  const cam = game.scene.camera;
+  cam.position.copy = () => cam.position; // freeze position
+  cam.position.set(32, 8.62, 36);
+  cam.lookAt(32, 8.0, 18);
+});
+
+await page.waitForTimeout(500);
 await page.screenshot({ path: 'screenshots/current.png' });
-await browser.close();
 
-console.log('Screenshot saved to screenshots/current.png');
+// Also save title screen shot
+await page.evaluate(() => {
+  document.querySelectorAll('.fps-lock-prompt').forEach(el => {
+    el.style.display = '';
+  });
+  // unfreeze camera
+  const game = window.__game;
+  if (game?.scene?.camera) delete game.scene.camera.position.copy;
+});
+await page.waitForTimeout(200);
+await page.screenshot({ path: 'screenshots/title.png' });
+
+await browser.close();
+console.log('Screenshots saved: current.png (gameplay), title.png (title screen)');

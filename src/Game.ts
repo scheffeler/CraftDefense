@@ -83,6 +83,9 @@ export class Game {
   }>();
   private openFurnaceKey: string | null = null;
 
+  // Enemy melee cooldown per enemy id
+  private readonly enemyMeleeCooldown = new Map<number, number>();
+
   // Item entity drops — floating 3D items in the world
   private readonly itemEntities: Array<{
     group: THREE.Group;
@@ -434,6 +437,7 @@ export class Game {
       this.player.damage(state.config.damage);
       this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
       this.ui.showDamageVignette();
+      this.scene.shake(0.08, 0.4);
       this.audio.play("player_hurt", 0.7);
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
@@ -822,6 +826,7 @@ export class Game {
       } else {
         this.player.damage(1);
         this.ui.showDamageVignette();
+        this.scene.shake(0.05, 0.25);
       }
     }
 
@@ -837,6 +842,7 @@ export class Game {
 
     // Sprint FOV
     this.scene.setFOV(input.sprint && isMovingH ? 85 : 75, dt);
+    this.scene.updateShake(dt);
 
     // Sync armor value each frame
     this.player.armorValue = this.inventory.getArmorValue();
@@ -1077,6 +1083,32 @@ export class Game {
 
   private updateCombat(dt: number): void {
     this.enemies.update(dt);
+
+    // Enemy melee — damage player when within 1.8 blocks, once per 1.5 s
+    const pp = this.player.position;
+    for (const state of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(state.id);
+      if (!pos) continue;
+      const dx = pp.x - pos.x, dz = pp.z - pos.z;
+      if (dx * dx + dz * dz < 1.8 * 1.8) {
+        const cd = this.enemyMeleeCooldown.get(state.id) ?? 0;
+        if (cd <= 0) {
+          this.player.damage(state.config.damage);
+          this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+          this.ui.showDamageVignette();
+          this.scene.shake(0.07, 0.3);
+          this.audio.play("player_hurt", 0.65);
+          this.enemyMeleeCooldown.set(state.id, 1.5);
+        } else {
+          this.enemyMeleeCooldown.set(state.id, cd - dt);
+        }
+      }
+    }
+    // Clean up cooldowns for dead/removed enemies
+    for (const [id] of this.enemyMeleeCooldown) {
+      if (!this.enemies.getEnemy(id)) this.enemyMeleeCooldown.delete(id);
+    }
+
     this.projectiles.update(
       dt,
       (id)         => this.enemies.getEnemyPosition(id),

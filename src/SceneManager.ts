@@ -76,6 +76,10 @@ export class SceneManager {
   // Underwater effect
   private _underwaterEffect = false;
 
+  // Screen shake
+  private _shakeTimer = 0;
+  private _shakeMagnitude = 0;
+
   // First-person arm + swing animation
   private readonly armScene: THREE.Scene;
   private readonly armGroup: THREE.Group;
@@ -356,6 +360,23 @@ export class SceneManager {
     this.armGroup.quaternion.copy(worldQuat).multiply(tiltQ);
 
     this.renderer.render(this.armScene, this.camera);
+  }
+
+  /** Trigger a camera shake (e.g., on player damage). */
+  shake(magnitude = 0.06, duration = 0.35): void {
+    this._shakeMagnitude = Math.max(this._shakeMagnitude, magnitude);
+    this._shakeTimer = Math.max(this._shakeTimer, duration);
+  }
+
+  /** Apply and decay screen shake. Call every frame. */
+  updateShake(dt: number): void {
+    if (this._shakeTimer <= 0) return;
+    this._shakeTimer = Math.max(0, this._shakeTimer - dt);
+    const t = this._shakeTimer > 0 ? (this._shakeTimer / 0.35) : 0;
+    const m = this._shakeMagnitude * t;
+    this.camera.position.x += (Math.random() - 0.5) * m;
+    this.camera.position.y += (Math.random() - 0.5) * m;
+    if (this._shakeTimer <= 0) this._shakeMagnitude = 0;
   }
 
   /** Smoothly transition FOV. Call every frame with target (75 normal, 85 sprint). */
