@@ -11,6 +11,7 @@ export interface SweepResult {
   newPos:   THREE.Vector3;
   newVel:   THREE.Vector3;
   onGround: boolean;
+  inWater:  boolean;
 }
 
 /** Half-extents of the player AABB. */
@@ -29,6 +30,10 @@ function isSolid(world: VoxelWorld, wx: number, wy: number, wz: number): boolean
   const id = world.getBlock(wx, wy, wz);
   if (id === "air") return false;
   return !BLOCK_DEFS[id].transparent;
+}
+
+function isWater(world: VoxelWorld, wx: number, wy: number, wz: number): boolean {
+  return world.getBlock(wx, wy, wz) === "water";
 }
 
 /**
@@ -65,8 +70,24 @@ export function sweepAABBWorld(
   let cur = pos.clone();
   let onGround = false;
 
-  // Gravity
-  newVel.y -= 22 * dt;
+  // Water detection at feet and chest height
+  const px = Math.floor(pos.x), pz = Math.floor(pos.z);
+  const feetInWater = isWater(world, px, Math.floor(pos.y + 0.1), pz);
+  const midInWater  = isWater(world, px, Math.floor(pos.y + 0.9), pz);
+  const inWater     = feetInWater || midInWater;
+
+  // Gravity (greatly reduced in water)
+  newVel.y -= (inWater ? 3.5 : 22) * dt;
+
+  if (inWater) {
+    // Water drag on all axes
+    const drag = Math.pow(0.7, dt * 15);
+    newVel.x *= drag;
+    newVel.z *= drag;
+    newVel.y *= Math.pow(0.75, dt * 15);
+    // Buoyancy when chest is submerged — float toward surface
+    if (midInWater) newVel.y += 5 * dt;
+  }
 
   // --- Y axis ---
   const dy = newVel.y * dt;
@@ -120,5 +141,5 @@ export function sweepAABBWorld(
     cur = tryZ;
   }
 
-  return { newPos: cur, newVel, onGround };
+  return { newPos: cur, newVel, onGround, inWater };
 }

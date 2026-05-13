@@ -55,6 +55,8 @@ export class Game {
   private _regenTimer = 0;
   private _stepTimer  = 0;
   private _headBob    = 0;
+  private _wasInWater     = false;
+  private _nightSpawnTimer = 0;
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
   private openChestKey: string | null = null;
@@ -514,6 +516,8 @@ export class Game {
   }
 
   private update(dt: number): void {
+    // Apply underwater fog before day/night (uses previous frame's water state)
+    this.scene.setUnderwaterEffect(this._wasInWater);
     // Day/night cycle runs even while paused/locked
     this.scene.updateDayNight(dt);
     this.audio.updateAmbient(dt, this.scene.daylight);
@@ -526,9 +530,14 @@ export class Game {
     const input = this.input.getMovementInput();
     this.player.update(dt, input);
 
+    // Water entry/exit effects
+    const nowInWater = this.player.inWater;
+    if (nowInWater && !this._wasInWater) this.audio.play("splash", 0.8);
+    this._wasInWater = nowInWater;
+
     // Footstep sounds + head bob
     const isMovingH = input.forward || input.backward || input.left || input.right;
-    if (isMovingH && this.player.onGround) {
+    if (isMovingH && this.player.onGround && !nowInWater) {
       const stepInterval = input.sprint ? 0.32 : 0.45;
       this._stepTimer += dt;
       if (this._stepTimer >= stepInterval) {
@@ -558,7 +567,7 @@ export class Game {
     }
     this.blockInteraction.update(dt);
 
-    // Wave + enemy logic (Helm's Deep mode only)
+    // Wave + enemy logic
     if (this.mode === "helmsdeep") {
       if (this.phase === "wave_clear") {
         if (this.waves.wave === 0) {
@@ -576,20 +585,25 @@ export class Game {
         }
       } else if (this.phase === "playing") {
         this.waves.update(dt);
-        this.enemies.update(dt);
-        this.projectiles.update(
-          dt,
-          (id)         => this.enemies.getEnemyPosition(id),
-          (id, d, s, dur) => this.enemies.damage(id, d, s, dur),
-          (c, r)       => this.enemies.getAliveEnemies()
-            .filter(e => {
-              const p = this.enemies.getEnemyPosition(e.id);
-              return p ? p.distanceTo(c) <= r : false;
-            }).map(e => e.id),
-          ()           => this.enemies.getAliveEnemies().map(e => e.id),
-        );
+        this.updateCombat(dt);
         const count = this.enemies.getAliveEnemies().length;
         this.ui.setObjective(`Defend the fortress! ${count} enemies remaining.`);
+      }
+    } else if (this.mode === "freeplay") {
+      // Night mob spawning
+      if (!this.scene.isDay) {
+        this._nightSpawnTimer += dt;
+        if (this._nightSpawnTimer >= 20 && this.enemies.getAliveEnemies().length < 8) {
+          this._nightSpawnTimer = 0;
+          this.spawnNightMob();
+        }
+      } else {
+        this._nightSpawnTimer = 0;
+      }
+      if (this.enemies.getAliveEnemies().length > 0) {
+        this.updateCombat(dt);
+        const count = this.enemies.getAliveEnemies().length;
+        this.ui.setObjective(`Night! ${count} hostile${count === 1 ? "" : "s"} nearby!`);
       }
     }
 
@@ -642,8 +656,31 @@ export class Game {
 
   // ─── Combat ────────────────────────────────────────────────────────────────
 
+  private updateCombat(dt: number): void {
+    this.enemies.update(dt);
+    this.projectiles.update(
+      dt,
+      (id)         => this.enemies.getEnemyPosition(id),
+      (id, d, s, dur) => this.enemies.damage(id, d, s, dur),
+      (c, r)       => this.enemies.getAliveEnemies()
+        .filter(e => { const p = this.enemies.getEnemyPosition(e.id); return p ? p.distanceTo(c) <= r : false; })
+        .map(e => e.id),
+      ()           => this.enemies.getAliveEnemies().map(e => e.id),
+    );
+  }
+
+  private spawnNightMob(): void {
+    const types: EnemyTypeName[] = ["zombie", "spider", "goblin"];
+    const type  = types[Math.floor(Math.random() * types.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const r     = 12 + Math.random() * 8;
+    const sx    = Math.max(2, Math.min(61, this.player.position.x + Math.cos(angle) * r));
+    const sz    = Math.max(2, Math.min(61, this.player.position.z + Math.sin(angle) * r));
+    this.enemies.spawn(type, sx, sz);
+  }
+
   private tryMeleeAttack(): void {
-    if (this.phase !== "playing") return;
+    if (this.phase !== "playing" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
     const damage  = itemDef?.damage ?? 1;

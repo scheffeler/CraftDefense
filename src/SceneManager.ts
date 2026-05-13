@@ -68,6 +68,13 @@ export class SceneManager {
   private readonly stars: THREE.Points;
   private readonly moon: THREE.Mesh;
 
+  // Clouds
+  private readonly cloudMeshes: THREE.Mesh[] = [];
+  private cloudMat!: THREE.MeshLambertMaterial;
+
+  // Underwater effect
+  private _underwaterEffect = false;
+
   // First-person arm + swing animation
   private readonly armScene: THREE.Scene;
   private readonly armGroup: THREE.Group;
@@ -136,8 +143,18 @@ export class SceneManager {
     this.dayTime = (this.dayTime + dt / this.DAY_DURATION) % 1;
     const frame = sampleDayCycle(this.dayTime);
 
-    (this.scene.background as THREE.Color).setHex(frame.sky);
-    (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
+    // Underwater overrides sky/fog
+    if (this._underwaterEffect) {
+      (this.scene.background as THREE.Color).setHex(0x083560);
+      (this.scene.fog as THREE.Fog).color.setHex(0x083560);
+      (this.scene.fog as THREE.Fog).near = 1;
+      (this.scene.fog as THREE.Fog).far  = 6;
+    } else {
+      (this.scene.background as THREE.Color).setHex(frame.sky);
+      (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
+      (this.scene.fog as THREE.Fog).near = 48;
+      (this.scene.fog as THREE.Fog).far  = 130;
+    }
 
     this.ambientLight.color.setHex(frame.ambientColor);
     this.ambientLight.intensity = frame.ambientInt;
@@ -170,6 +187,20 @@ export class SceneManager {
       Math.abs(Math.sin(moonAngle)) * mr,
       20,
     );
+
+    // Drift clouds and tint them with day cycle
+    for (const cloud of this.cloudMeshes) {
+      cloud.position.x += 0.8 * dt;
+      if (cloud.position.x > 80) cloud.position.x = -16;
+    }
+    if (this.cloudMat) {
+      this.cloudMat.opacity = 0.5 + frame.ambientInt * 0.4;
+    }
+  }
+
+  /** Enable/disable the underwater fog effect. */
+  setUnderwaterEffect(inWater: boolean): void {
+    this._underwaterEffect = inWater;
   }
 
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
@@ -251,7 +282,7 @@ export class SceneManager {
   }
 
   private buildClouds(): void {
-    const cloudMat = new THREE.MeshLambertMaterial({
+    this.cloudMat = new THREE.MeshLambertMaterial({
       color: 0xffffff, transparent: true, opacity: 0.85,
     });
     const positions: [number, number][] = [
@@ -262,9 +293,10 @@ export class SceneManager {
     for (const [cx, cz] of positions) {
       const w = 5 + (cx % 7);
       const d = 3 + (cz % 5);
-      const cloud = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, d), cloudMat);
+      const cloud = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, d), this.cloudMat);
       cloud.position.set(cx, 22, cz);
       this.scene.add(cloud);
+      this.cloudMeshes.push(cloud);
     }
   }
 

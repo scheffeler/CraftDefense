@@ -12,6 +12,11 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     color: 0x3a7a3a,
     headColor: 0xc8b090,
     scale: 1.0,
+    xpReward: 5,
+    drops: [
+      { itemId: "planks", chance: 0.4, count: 2 },
+      { itemId: "apple",  chance: 0.2, count: 1 },
+    ],
   },
   spider: {
     type: "spider",
@@ -23,6 +28,11 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     color: 0x1a1a1a,
     headColor: 0x1a1a1a,
     scale: 0.75,
+    xpReward: 8,
+    drops: [
+      { itemId: "stick", chance: 0.5, count: 2 },
+      { itemId: "flint", chance: 0.3, count: 1 },
+    ],
   },
   golem: {
     type: "golem",
@@ -34,6 +44,11 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     color: 0x888888,
     headColor: 0x666666,
     scale: 1.5,
+    xpReward: 50,
+    drops: [
+      { itemId: "cobblestone", chance: 0.9, count: 8 },
+      { itemId: "iron_ingot",  chance: 0.6, count: 3 },
+    ],
   },
 
   // ── Helm's Deep enemies (flow-field AI) ───────────────────────────────────

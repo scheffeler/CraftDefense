@@ -7,6 +7,9 @@ const WALK_SPEED      = 5.0;
 const SPRINT_MULT     = 1.6;
 const CROUCH_MULT     = 0.35;
 const JUMP_IMPULSE    = 7.5;
+const WATER_SPEED     = 0.5;   // fraction of normal speed in water
+const SWIM_ACCEL      = 18;    // upward accel when holding jump in water
+const SWIM_MAX_UP     = 3.5;   // max upward swim velocity
 const EYE_HEIGHT      = 1.62;
 const MELEE_COOLDOWN  = 0.5;
 const BOW_CHARGE_TIME = 1.5;  // seconds to reach full charge
@@ -17,6 +20,7 @@ export class Player {
   position: THREE.Vector3;    // feet position
   velocity: THREE.Vector3 = new THREE.Vector3();
   onGround = false;
+  inWater  = false;
 
   health    = 20;
   maxHealth = 20;
@@ -128,6 +132,7 @@ export class Player {
 
     let speed = WALK_SPEED;
     if (input.sprint) speed *= SPRINT_MULT;
+    if (this.inWater) speed *= WATER_SPEED;
 
     // Build horizontal move vector relative to camera yaw
     const move = new THREE.Vector3();
@@ -143,14 +148,19 @@ export class Player {
     this.velocity.x = move.x;
     this.velocity.z = move.z;
 
-    if (input.jump && this.onGround) {
-      this.velocity.y = JUMP_IMPULSE;
+    if (input.jump) {
+      if (this.onGround) {
+        this.velocity.y = JUMP_IMPULSE;
+      } else if (this.inWater) {
+        this.velocity.y = Math.min(this.velocity.y + SWIM_ACCEL * dt, SWIM_MAX_UP);
+      }
     }
 
     const result = sweepAABBWorld(this.world, this.position, this.velocity, dt);
     this.position.copy(result.newPos);
     this.velocity.copy(result.newVel);
     this.onGround = result.onGround;
+    this.inWater  = result.inWater;
 
     // Clamp position inside world bounds
     this.position.x = Math.max(0.31, Math.min(63.69, this.position.x));

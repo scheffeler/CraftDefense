@@ -8,7 +8,8 @@ type SoundName =
   | "swing" | "bow_charge" | "arrow_release"
   | "block_break" | "block_place" | "pickup"
   | "eat" | "player_hurt" | "player_death"
-  | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand";
+  | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
+  | "splash";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -324,6 +325,14 @@ export class AudioManager {
       case "step_sand": {
         // soft hiss
         noiseBurst(0.09, 3000 + Math.random() * 1000, 0.04);
+        break;
+      }
+
+      case "splash": {
+        // low thud + high water spray
+        noiseBurst(0.22, 180, 0.1);
+        noiseBurst(0.14, 3500, 0.06);
+        tone(220, 0.12, "sine", 0.3);
         break;
       }
     }
