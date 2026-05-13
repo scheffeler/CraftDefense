@@ -51,10 +51,36 @@ export function getSpawnPositions(gate: "north" | "south"): Array<[number, numbe
 function generateTerrain(world: VoxelWorld): void {
   for (let x = 0; x < WORLD_WIDTH; x++) {
     for (let z = 0; z < WORLD_DEPTH; z++) {
-      // Surface block: stone inside fortress bounds, grass outside
-      world.setBlock(x, 0, z, inFortressBounds(x, z) ? "stone" : "grass");
+      if (inFortressBounds(x, z)) {
+        world.setBlock(x, 0, z, "stone");
+        continue;
+      }
+
+      // Keep enemy spawn zones flat
+      if (z <= 8 || z >= WORLD_DEPTH - 9) {
+        world.setBlock(x, 0, z, "grass");
+        continue;
+      }
+
+      // Gentle hills outside fortress: up to 2 blocks of dirt under grass
+      const n = smoothNoise(x, z);
+      const hillHeight = Math.floor(n * 2.5); // 0, 1, or 2
+      if (hillHeight > 0) {
+        for (let y = 0; y < hillHeight; y++) {
+          world.setBlock(x, y, z, "dirt");
+        }
+      }
+      world.setBlock(x, hillHeight, z, "grass");
     }
   }
+}
+
+function smoothNoise(x: number, z: number): number {
+  // 3-octave hash-based noise, range ~[0,1]
+  const n1 = (hash(Math.floor(x / 6), Math.floor(z / 6)) % 1000) / 1000;
+  const n2 = (hash(Math.floor(x / 3), Math.floor(z / 3)) % 1000) / 1000 * 0.5;
+  const n3 = (hash(x, z) % 1000) / 1000 * 0.1;
+  return (n1 + n2 + n3) / 1.6;
 }
 
 function generateFortress(world: VoxelWorld): void {
@@ -108,18 +134,33 @@ function buildCornerTowers(world: VoxelWorld): void {
 function generateTrees(world: VoxelWorld): void {
   for (let x = 2; x < WORLD_WIDTH - 2; x++) {
     for (let z = 2; z < WORLD_DEPTH - 2; z++) {
-      // Skip buffer around fortress and spawn zones
-      if (x >= WX1 - 4 && x <= WX2 + 4 && z >= WZ1 - 4 && z <= WZ2 + 4) continue;
+      if (x >= WX1 - 8 && x <= WX2 + 8 && z >= WZ1 - 8 && z <= WZ2 + 8) continue;
       if (z <= 7 || z >= WORLD_DEPTH - 8) continue;
-      if (hash(x, z) % 18 !== 0) continue;
+      if (hash(x, z) % 16 !== 0) continue;
 
-      world.setBlock(x, 1, z, "wood");
-      world.setBlock(x, 2, z, "wood");
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          world.setBlock(x + dx, 3, z + dz, "leaves");
+      const h = hash(x * 3, z * 7);
+      const trunkHeight = 4 + (h % 3); // 4–6 blocks
+
+      for (let y = 1; y <= trunkHeight; y++) {
+        world.setBlock(x, y, z, "wood");
+      }
+
+      // Wide 3-layer canopy
+      for (let ly = trunkHeight - 1; ly <= trunkHeight + 1; ly++) {
+        const radius = ly <= trunkHeight ? 2 : 1;
+        for (let dx = -radius; dx <= radius; dx++) {
+          for (let dz = -radius; dz <= radius; dz++) {
+            if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
+            const bx = x + dx, bz = z + dz;
+            if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
+            if (world.getBlock(bx, ly, bz) === "air") {
+              world.setBlock(bx, ly, bz, "leaves");
+            }
+          }
         }
       }
+      // Top cap
+      world.setBlock(x, trunkHeight + 2, z, "leaves");
     }
   }
 }

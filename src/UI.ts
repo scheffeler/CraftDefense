@@ -6,9 +6,71 @@ import { ITEMS } from "./config/items";
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Maps item IDs to SVG data URIs for pixel-art style hotbar icons
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material"): string {
+  const s = 32;
+  let path = "";
+  switch (shape) {
+    case "sword":
+      path = `<rect x="13" y="4" width="6" height="18" fill="${color}"/>
+               <rect x="8" y="8" width="16" height="4" fill="${color}"/>
+               <rect x="13" y="22" width="6" height="6" fill="#5c3a1a"/>`;
+      break;
+    case "pick":
+      path = `<rect x="4" y="8" width="24" height="6" fill="${color}"/>
+               <rect x="4" y="8" width="6" height="14" fill="${color}"/>
+               <rect x="14" y="14" width="4" height="12" fill="#5c3a1a"/>`;
+      break;
+    case "axe":
+      path = `<rect x="4" y="6" width="14" height="12" fill="${color}"/>
+               <rect x="14" y="6" width="4" height="20" fill="#5c3a1a"/>`;
+      break;
+    case "bow":
+      path = `<rect x="6" y="4" width="4" height="24" fill="#8b6914"/>
+               <rect x="10" y="4" width="12" height="2" fill="#8b6914"/>
+               <rect x="10" y="26" width="12" height="2" fill="#8b6914"/>
+               <rect x="10" y="15" width="12" height="2" fill="#c8a060"/>`;
+      break;
+    case "food":
+      path = `<rect x="8" y="8" width="16" height="16" fill="${color}"/>
+               <rect x="10" y="6" width="4" height="4" fill="#3a7a25"/>`;
+      break;
+    case "armor":
+      path = `<rect x="6" y="6" width="20" height="20" fill="${color}"/>
+               <rect x="10" y="4" width="5" height="4" fill="${color}"/>
+               <rect x="17" y="4" width="5" height="4" fill="${color}"/>`;
+      break;
+    default: // material / block
+      path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
+               <rect x="4" y="4" width="24" height="4" fill="${color}cc"/>`;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">${path}</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+const ITEM_ICONS: Record<string, string> = {};
+function getItemIcon(itemId: string): string {
+  if (ITEM_ICONS[itemId]) return ITEM_ICONS[itemId];
+  const def = ITEMS[itemId];
+  if (!def) return "";
+  const hex = hexColor(def.color);
+  let shape: Parameters<typeof makeItemIcon>[1] = "material";
+  if (def.category === "weapon") shape = "sword";
+  else if (def.toolCategory === "pickaxe") shape = "pick";
+  else if (def.toolCategory === "axe") shape = "axe";
+  else if (def.id === "bow") shape = "bow";
+  else if (def.category === "food") shape = "food";
+  else if (def.category === "armor") shape = "armor";
+  else if (def.category === "block") shape = "block";
+  ITEM_ICONS[itemId] = makeItemIcon(hex, shape);
+  return ITEM_ICONS[itemId];
+}
+
 export class UI {
   // FPS callbacks
   onRestart: () => void = () => {};
+  onPointerLockRequest: () => void = () => {};
+  onModeSelect: (mode: "helmsdeep" | "freeplay") => void = () => {};
   onCraftingSlotClick: (row: number, col: number) => void = () => {};
   onCraftingResultClick: () => void = () => {};
 
@@ -22,6 +84,8 @@ export class UI {
   private crosshair!: HTMLElement;
   private hotbarSlots: HTMLElement[] = [];
   private heartEls: HTMLElement[] = [];
+  private hungerEls: HTMLElement[] = [];
+  private xpBarFill!: HTMLElement;
   private elWaveInfo!: HTMLElement;
   private elObjective!: HTMLElement;
   private lockPrompt!: HTMLElement;
@@ -57,9 +121,24 @@ export class UI {
       const el = this.heartEls[i];
       if (i >= totalHearts) { el.style.display = "none"; continue; }
       el.style.display = "";
-      if (hp >= 2) { el.textContent = "♥"; el.style.color = "#ff4444"; }
-      else if (hp === 1) { el.textContent = "♥"; el.style.color = "#884444"; }
-      else { el.textContent = "♡"; el.style.color = "#553333"; }
+      if (hp >= 2) { el.textContent = "♥"; el.style.color = "#c00000"; }
+      else if (hp === 1) { el.textContent = "♥"; el.style.color = "#7a0000"; }
+      else { el.textContent = "♡"; el.style.color = "#373737"; }
+    }
+  }
+
+  updateXP(current: number, max: number): void {
+    const pct = max > 0 ? Math.min(1, current / max) * 100 : 0;
+    this.xpBarFill.style.width = `${pct}%`;
+  }
+
+  updateHunger(current: number, _max: number): void {
+    for (let i = 0; i < this.hungerEls.length; i++) {
+      const food = current - i * 2;
+      const el = this.hungerEls[i];
+      if (food >= 2) { el.textContent = "🍖"; el.style.opacity = "1"; }
+      else if (food === 1) { el.textContent = "🍖"; el.style.opacity = "0.5"; }
+      else { el.textContent = "🍖"; el.style.opacity = "0.2"; }
     }
   }
 
@@ -74,7 +153,7 @@ export class UI {
 
   updateWaveInfo(wave: number, total: number, enemyCount: number): void {
     this.elWaveInfo.innerHTML =
-      `Wave ${wave}/${total}<br><span style="color:#ffaa44">${enemyCount} enemies</span>`;
+      `Wave ${wave}/${total}<br>${enemyCount} enemies`;
   }
 
   setObjective(text: string): void {
@@ -164,6 +243,10 @@ export class UI {
   private build(): void {
     this.container.style.cssText = "position:relative;width:100vw;height:100vh;overflow:hidden;";
 
+    // Screen vignette
+    const vignette = div("fps-vignette");
+    this.container.appendChild(vignette);
+
     this.crosshair = div("fps-crosshair");
     this.crosshair.innerHTML = `<span class="fps-ch-h"></span><span class="fps-ch-v"></span>`;
     this.container.appendChild(this.crosshair);
@@ -176,6 +259,8 @@ export class UI {
     this.container.appendChild(this.elWaveInfo);
 
     this.buildHearts();
+    this.buildHungerBar();
+    this.buildXPBar();
     this.buildHotbar();
 
     this.floatingContainer = div("floating-container");
@@ -185,14 +270,35 @@ export class UI {
     this.lockPrompt.innerHTML = `
       <div class="fps-lock-box">
         <div class="fps-lock-title">HELM'S DEEP</div>
-        <div class="fps-lock-sub">Mine · Craft · Survive</div>
-        <div class="fps-lock-cta">Click to Play</div>
+        <div class="fps-lock-sub">A Minecraft-Style Fortress Survival</div>
+        <div class="fps-mode-row">
+          <button class="fps-mode-btn" id="btn-helmsdeep">
+            <span class="fps-mode-icon">⚔</span>
+            <span class="fps-mode-name">Helm's Deep</span>
+            <span class="fps-mode-desc">Defend across 10 waves</span>
+          </button>
+          <button class="fps-mode-btn" id="btn-freeplay">
+            <span class="fps-mode-icon">🏗</span>
+            <span class="fps-mode-name">Free Play</span>
+            <span class="fps-mode-desc">Mine, build, explore</span>
+          </button>
+        </div>
         <div class="fps-lock-controls">
           WASD: move &nbsp;|&nbsp; Mouse: look &nbsp;|&nbsp;
           LClick: mine/attack &nbsp;|&nbsp; RClick: place &nbsp;|&nbsp;
           E: inventory &nbsp;|&nbsp; 1-9: hotbar &nbsp;|&nbsp; Esc: unlock
         </div>
       </div>`;
+    this.lockPrompt.querySelector("#btn-helmsdeep")!.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.onModeSelect("helmsdeep");
+      this.onPointerLockRequest();
+    });
+    this.lockPrompt.querySelector("#btn-freeplay")!.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.onModeSelect("freeplay");
+      this.onPointerLockRequest();
+    });
     this.container.appendChild(this.lockPrompt);
 
     this.buildInventoryOverlay();
@@ -209,6 +315,25 @@ export class UI {
       this.heartEls.push(h);
     }
     this.container.appendChild(wrap);
+  }
+
+  private buildHungerBar(): void {
+    const wrap = div("fps-hunger");
+    for (let i = 0; i < 10; i++) {
+      const h = div("fps-hunger-icon");
+      h.textContent = "🍖";
+      wrap.appendChild(h);
+      this.hungerEls.push(h);
+    }
+    this.container.appendChild(wrap);
+  }
+
+  private buildXPBar(): void {
+    const track = div("fps-xp-track");
+    this.xpBarFill = div("fps-xp-fill");
+    this.xpBarFill.style.width = "0%";
+    track.appendChild(this.xpBarFill);
+    this.container.appendChild(track);
   }
 
   private buildHotbar(): void {
@@ -385,14 +510,20 @@ export class UI {
     }
 
     const def = ITEMS[itemId];
-    const color = def ? hexColor(def.color) : "#888888";
     const name  = def?.name ?? itemId;
 
+    const icon = def ? getItemIcon(itemId) : null;
     if (iconEl) {
-      iconEl.style.backgroundColor = color;
+      iconEl.style.backgroundImage = icon ? `url("${icon}")` : "";
+      iconEl.style.backgroundSize = "contain";
+      iconEl.style.backgroundRepeat = "no-repeat";
+      iconEl.style.backgroundPosition = "center";
+      iconEl.style.backgroundColor = "rgba(0,0,0,0.2)";
+      iconEl.style.boxShadow = "";
+      iconEl.textContent = "";
       iconEl.title = name;
     } else {
-      el.style.background = `linear-gradient(135deg, ${color}cc, ${color}66)`;
+      el.style.backgroundImage = icon ? `url("${icon}")` : "";
       el.title = name;
     }
     if (countEl && count !== undefined && count > 1) {
@@ -431,7 +562,14 @@ function armorIcon(slot: string): string {
 // ─── FPS-specific CSS ─────────────────────────────────────────────────────────
 
 const FPS_CSS = `
-/* Crosshair */
+/* Vignette overlay */
+.fps-vignette {
+  position: absolute; inset: 0;
+  pointer-events: none; z-index: 5;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.55) 100%);
+}
+
+/* Crosshair — Minecraft pixel + */
 .fps-crosshair {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -439,218 +577,257 @@ const FPS_CSS = `
 }
 .fps-ch-h {
   position: absolute;
-  width: 16px; height: 2px;
-  background: rgba(255,255,255,0.85);
-  box-shadow: 0 0 4px rgba(0,0,0,0.8);
+  width: 14px; height: 2px;
+  background: #fff;
 }
 .fps-ch-v {
   position: absolute;
-  width: 2px; height: 16px;
-  background: rgba(255,255,255,0.85);
-  box-shadow: 0 0 4px rgba(0,0,0,0.8);
+  width: 2px; height: 14px;
+  background: #fff;
 }
 
-/* Objective banner */
+/* Objective banner — flat, no blur, pixel shadow */
 .fps-objective {
   position: absolute;
-  top: 14px; left: 50%; transform: translateX(-50%);
+  top: 8px; left: 50%; transform: translateX(-50%);
   font-size: 13px; font-weight: bold;
   color: #fff;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.9);
-  background: rgba(0,0,0,0.45);
-  padding: 5px 14px;
-  border-radius: 20px;
+  text-shadow: 1px 1px 0 #000, 2px 2px 0 #000;
+  background: rgba(0,0,0,0.6);
+  padding: 4px 10px;
   pointer-events: none; z-index: 15;
-  transition: opacity 0.3s;
   white-space: nowrap;
 }
 
-/* Wave info (top right) */
+/* Wave info — flat, white text */
 .fps-wave-info {
   position: absolute;
-  top: 10px; right: 14px;
-  font-size: 13px; font-weight: bold;
-  color: #88ccff;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-  background: rgba(0,0,0,0.45);
-  padding: 6px 12px;
-  border-radius: 6px;
+  top: 8px; right: 8px;
+  font-size: 12px; font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, 2px 2px 0 #000;
+  background: rgba(0,0,0,0.5);
+  padding: 4px 8px;
   pointer-events: none; z-index: 15;
   line-height: 1.4; text-align: right;
 }
 
-/* Health hearts */
+/* Health hearts — left of center, above hotbar */
 .fps-hearts {
   position: absolute;
-  bottom: 68px; left: 50%;
-  transform: translateX(-50%);
-  display: flex; gap: 3px;
+  bottom: 68px; right: calc(50% + 6px);
+  display: flex; gap: 1px;
   pointer-events: none; z-index: 15;
 }
 .fps-heart {
-  font-size: 18px;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  font-size: 14px;
+  color: #c00000;
+  text-shadow: 1px 1px 0 #000;
 }
 
-/* Hotbar */
+/* Hunger bar — right of center, above hotbar */
+.fps-hunger {
+  position: absolute;
+  bottom: 68px; left: calc(50% + 6px);
+  display: flex; gap: 1px; flex-direction: row-reverse;
+  pointer-events: none; z-index: 15;
+}
+.fps-hunger-icon {
+  font-size: 13px;
+  text-shadow: 1px 1px 0 #000;
+}
+
+/* XP bar — sits just above hotbar */
+.fps-xp-track {
+  position: absolute;
+  bottom: 62px; left: 50%; transform: translateX(-50%);
+  width: 430px; height: 7px;
+  background: #000;
+  border: 1px solid #333;
+  pointer-events: none; z-index: 15;
+}
+.fps-xp-fill {
+  height: 100%;
+  background: #80ff20;
+  transition: width 0.3s;
+}
+
+/* Hotbar — Minecraft dark gray, square slots */
 .fps-hotbar {
   position: absolute;
   bottom: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 4px;
-  background: rgba(0,0,0,0.55);
-  padding: 5px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
+  display: flex; gap: 2px;
+  background: #000;
+  padding: 3px;
+  border: 2px solid #555;
   z-index: 15;
 }
 .fps-hotbar-slot {
   position: relative;
-  width: 44px; height: 44px;
-  background: rgba(255,255,255,0.06);
-  border: 2px solid rgba(255,255,255,0.15);
-  border-radius: 4px;
+  width: 46px; height: 46px;
+  background: #373737;
+  border: 2px solid #555;
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
 .fps-hotbar-slot.active {
-  border-color: #fff;
-  background: rgba(255,255,255,0.12);
-  box-shadow: 0 0 8px rgba(255,255,255,0.3);
+  border: 3px solid #fff;
+  background: #555;
 }
 .fps-hotbar-slot .fps-slot-num {
-  position: absolute; top: 2px; left: 4px;
-  font-size: 9px; color: rgba(255,255,255,0.4);
+  position: absolute; top: 1px; left: 3px;
+  font-size: 8px; color: rgba(255,255,255,0.7);
   pointer-events: none;
+  text-shadow: 1px 1px 0 #000;
 }
 .fps-hotbar-slot .fps-slot-icon {
-  width: 30px; height: 30px;
-  border-radius: 3px;
+  width: 32px; height: 32px;
   display: block;
+  image-rendering: pixelated;
 }
 .fps-hotbar-slot .fps-slot-count {
-  position: absolute; bottom: 2px; right: 3px;
+  position: absolute; bottom: 1px; right: 2px;
   font-size: 9px; font-weight: bold;
-  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+  color: #fff; text-shadow: 1px 1px 0 #000;
 }
 
-/* Pointer lock prompt */
+/* Pointer lock splash — Minecraft title screen style */
 .fps-lock-prompt {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.75);
-  backdrop-filter: blur(6px);
+  background: #000;
   z-index: 60;
 }
 .fps-lock-box {
   text-align: center;
-  padding: 48px 56px;
-  background: rgba(10,15,25,0.95);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
+  padding: 40px 56px;
+  background: #1a1a1a;
+  border: 3px solid #555;
   max-width: 520px;
 }
 .fps-lock-title {
-  font-size: 40px; font-weight: bold;
-  letter-spacing: 0.1em;
-  color: #ffdd44;
-  text-shadow: 0 0 24px rgba(255,200,0,0.5);
-  margin-bottom: 8px;
+  font-size: 42px; font-weight: bold;
+  letter-spacing: 0.08em;
+  color: #ffff55;
+  text-shadow: 3px 3px 0 #3f3f00;
+  margin-bottom: 6px;
 }
 .fps-lock-sub {
-  font-size: 16px; color: rgba(255,255,255,0.65);
-  margin-bottom: 28px;
+  font-size: 14px; color: #aaa;
+  text-shadow: 1px 1px 0 #000;
+  margin-bottom: 24px;
 }
 .fps-lock-cta {
-  font-size: 20px; font-weight: bold;
-  color: #88ee88;
-  padding: 12px 32px;
-  border: 2px solid #44aa44;
-  border-radius: 8px;
-  background: rgba(40,100,40,0.4);
+  font-size: 18px; font-weight: bold;
+  color: #fff;
+  padding: 10px 28px;
+  border: 2px solid #888;
+  background: #555;
   cursor: pointer;
   display: inline-block;
   margin-bottom: 20px;
+  text-shadow: 1px 1px 0 #000;
 }
+.fps-lock-cta:hover { background: #777; }
 .fps-lock-controls {
-  font-size: 11px; color: rgba(255,255,255,0.35);
-  line-height: 1.8;
+  font-size: 8px; color: rgba(255,255,255,0.3);
+  line-height: 2;
 }
+.fps-mode-row {
+  display: flex; gap: 16px; justify-content: center;
+  margin-bottom: 24px;
+}
+.fps-mode-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 16px 24px;
+  background: #373737;
+  border: 3px solid #555;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 160px;
+  transition: background 0.1s, border-color 0.1s;
+}
+.fps-mode-btn:hover { background: #555; border-color: #fff; }
+.fps-mode-icon { font-size: 28px; }
+.fps-mode-name { font-size: 11px; font-weight: bold; color: #ffff55; text-shadow: 2px 2px 0 #3f3f00; }
+.fps-mode-desc { font-size: 7px; color: rgba(255,255,255,0.5); }
 
-/* Inventory overlay */
+/* Inventory overlay — Minecraft gray panel */
 .fps-inventory {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.72);
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.5);
   z-index: 50;
 }
 .fps-inv-box {
-  background: rgba(10,14,22,0.97);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
-  padding: 20px 24px;
-  display: flex; flex-direction: column; gap: 14px;
+  background: #c6c6c6;
+  border: 3px solid #555;
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 10px;
   min-width: 420px;
 }
 .fps-inv-top {
   display: flex; gap: 20px; align-items: flex-start;
 }
 .fps-inv-label {
-  font-size: 11px; color: rgba(255,255,255,0.4);
-  text-transform: uppercase; letter-spacing: 0.08em;
-  margin-bottom: 6px;
+  font-size: 10px; color: #555; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 4px;
 }
 .fps-inv-armor { display: flex; flex-direction: column; }
 .fps-armor-grid {
-  display: grid; grid-template-columns: repeat(2, 40px); gap: 4px;
+  display: grid; grid-template-columns: repeat(2, 40px); gap: 3px;
 }
 .fps-inv-craft { display: flex; flex-direction: column; }
 .fps-craft-area {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 6px;
 }
-.fps-craft-grid { display: grid; gap: 4px; }
+.fps-craft-grid { display: grid; gap: 3px; }
 .fps-grid-2x2  { grid-template-columns: repeat(2, 40px); }
-.fps-craft-arrow { font-size: 18px; color: rgba(255,255,255,0.5); }
+.fps-craft-arrow { font-size: 18px; color: #555; }
 .fps-craft-result { width: 40px; height: 40px; cursor: pointer; }
-.fps-craft-result:hover { border-color: #88ee88 !important; }
+.fps-craft-result:hover { border-color: #fff !important; }
 .fps-inv-grid {
-  display: grid; grid-template-columns: repeat(9, 40px); gap: 4px;
+  display: grid; grid-template-columns: repeat(9, 40px); gap: 3px;
 }
 .fps-inv-hotbar-row {
-  display: grid; grid-template-columns: repeat(9, 40px); gap: 4px;
-  padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08);
+  display: grid; grid-template-columns: repeat(9, 40px); gap: 3px;
+  padding-top: 4px; border-top: 2px solid #555;
 }
-.fps-slot-hotbar { border-color: rgba(255,255,255,0.3) !important; }
+.fps-slot-hotbar { border-color: #555 !important; }
 .fps-inv-hint {
-  font-size: 10px; color: rgba(255,255,255,0.25);
+  font-size: 9px; color: #555;
   text-align: center;
 }
 
-/* Generic inventory slot */
+/* Generic slot — Minecraft beveled gray */
 .fps-slot {
   width: 40px; height: 40px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 3px;
+  background: #8b8b8b;
+  border: 2px solid #373737;
+  border-top-color: #fff;
+  border-left-color: #fff;
   display: flex; align-items: center; justify-content: center;
   cursor: default; position: relative; overflow: hidden;
 }
-.fps-slot:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); }
+.fps-slot:hover { background: #9f9f9f; }
 .fps-armor-slot { width: 40px; height: 40px; cursor: default; }
 .fps-craft-cell { cursor: pointer; }
 .fps-slot-icon-inner {
   font-size: 20px; pointer-events: none;
 }
 
-/* Floating numbers */
+/* Floating damage numbers */
 .floating-container {
   position: absolute; inset: 0;
   pointer-events: none; z-index: 15;
 }
 .float-num {
   position: absolute;
-  font-size: 16px; font-weight: bold;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  font-size: 14px; font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
   pointer-events: none;
   animation: floatUp 1.1s ease-out forwards;
   transform: translateX(-50%);

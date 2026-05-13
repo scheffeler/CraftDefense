@@ -167,14 +167,18 @@ export class VoxelWorld {
           const tg = ((topC >> 8)  & 0xff) / 255;
           const tb = (topC         & 0xff) / 255;
 
+          // Per-block brightness noise — breaks up flat monotone look
+          const n = (Math.sin(wx * 127.1 + wy * 311.7 + wz * 74.7) * 0.5 + 0.5 - 0.5) * 0.07;
+          const clamp = (v: number) => Math.max(0, Math.min(1, v));
+
           const neighbors: [number,number,number][] = [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]];
           const faces = [
-            { n:[0,1,0],  a:[1,0,0], b:[0,0,1], shade:1.0,  cr:tr, cg:tg, cb:tb },
-            { n:[0,-1,0], a:[0,0,1], b:[1,0,0], shade:0.5,  cr:r,  cg:g,  cb:b  },
-            { n:[1,0,0],  a:[0,0,1], b:[0,1,0], shade:0.75, cr:r,  cg:g,  cb:b  },
-            { n:[-1,0,0], a:[0,1,0], b:[0,0,1], shade:0.75, cr:r,  cg:g,  cb:b  },
-            { n:[0,0,1],  a:[0,1,0], b:[1,0,0], shade:0.65, cr:r,  cg:g,  cb:b  },
-            { n:[0,0,-1], a:[1,0,0], b:[0,1,0], shade:0.65, cr:r,  cg:g,  cb:b  },
+            { n:[0,1,0],  a:[1,0,0], b:[0,0,1], shade:1.0,  cr:clamp(tr+n), cg:clamp(tg+n), cb:clamp(tb+n) },
+            { n:[0,-1,0], a:[0,0,1], b:[1,0,0], shade:0.45, cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
+            { n:[1,0,0],  a:[0,0,1], b:[0,1,0], shade:0.8,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
+            { n:[-1,0,0], a:[0,1,0], b:[0,0,1], shade:0.7,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
+            { n:[0,0,1],  a:[0,1,0], b:[1,0,0], shade:0.6,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
+            { n:[0,0,-1], a:[1,0,0], b:[0,1,0], shade:0.6,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
           ];
 
           for (let fi = 0; fi < 6; fi++) {

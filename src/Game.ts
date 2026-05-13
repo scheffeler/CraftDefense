@@ -19,6 +19,7 @@ import type { ItemStack } from "./Inventory";
 
 export class Game {
   private phase: GamePhase = "wave_clear";
+  private mode: "helmsdeep" | "freeplay" = "helmsdeep";
   private lastTime = 0;
 
   // Initial build phase before wave 1 (seconds)
@@ -55,6 +56,7 @@ export class Game {
 
     this.player    = new Player(this.gameMap.world, this.scene.camera, 32, 48);
     this.inventory = new Inventory();
+    this.inventory.addItem("wood_sword", 1);
     this.inventory.addItem("wood", 16);
     this.inventory.addItem("dirt", 16);
 
@@ -91,11 +93,13 @@ export class Game {
       this.ui.showPointerLockPrompt(!locked);
       if (!locked) this.ui.showInventory(false);
     };
-    this.scene.renderer.domElement.addEventListener("click", () => {
+    const requestLock = () => {
       if (!this.scene.isPointerLocked && !this.ui.isInventoryOpen()) {
         this.scene.lockPointer();
       }
-    });
+    };
+    this.ui.onPointerLockRequest = requestLock;
+    document.addEventListener("click", requestLock);
 
     // Hotbar slot selection
     this.input.onSlotChange = (slot) => {
@@ -175,7 +179,7 @@ export class Game {
 
     // Enemy events
     this.enemies.onEnemyDied = (state) => {
-      if (state.config.xpReward) this.player.addXP(state.config.xpReward);
+      if (state.config.xpReward) { this.player.addXP(state.config.xpReward); this.refreshXPBar(); }
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
         this.waves.wave, this.waves.totalWaves, this.enemies.getAliveEnemies().length,
@@ -236,6 +240,18 @@ export class Game {
       }
     };
 
+    // Mode selection
+    this.ui.onModeSelect = (mode) => {
+      this.mode = mode;
+      if (mode === "freeplay") {
+        this.ui.setObjective("Free Play — Mine, Build, Explore!");
+        this.ui.updateWaveInfo(0, 10, 0);
+      } else {
+        this.ui.setObjective(`Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`);
+        this.ui.updateWaveInfo(0, this.waves.totalWaves, 0);
+      }
+    };
+
     // UI restart
     this.ui.onRestart = () => this.resetGame();
   }
@@ -258,6 +274,7 @@ export class Game {
 
   private resetGame(): void {
     this.phase            = "wave_clear";
+    this.mode             = "helmsdeep";
     this.buildPhaseTimer  = 120;
     this.enemies.reset();
     this.projectiles.reset();
@@ -265,15 +282,13 @@ export class Game {
     this.player.health    = this.player.maxHealth;
     this.player.xp        = 0;
     this.player.level     = 0;
-    this.player.onDeath   = this.player.onDeath; // keep callback
+    this.player.hunger    = 20;
+    this.player.onDeath   = this.player.onDeath;
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
     this.ui.hideDeathScreen();
     this.ui.hideEnd();
     this.refreshHUD();
-    this.ui.setObjective(
-      `Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`,
-    );
-    this.scene.lockPointer();
+    this.ui.showPointerLockPrompt(true);
   }
 
   // ─── Main loop ─────────────────────────────────────────────────────────────
@@ -304,44 +319,39 @@ export class Game {
     }
     this.blockInteraction.update(dt);
 
-    // Wave + enemy logic
-    if (this.phase === "wave_clear") {
-      if (this.waves.wave === 0) {
-        // Initial build phase
-        this.buildPhaseTimer = Math.max(0, this.buildPhaseTimer - dt);
-        const secs = Math.ceil(this.buildPhaseTimer);
-        if (secs > 0) {
-          if (Math.ceil(this.buildPhaseTimer + dt) !== secs) {
-            // Tick changed — update objective
-            this.ui.setObjective(
-              `Build fortifications! Wave 1 begins in ${secs}s.`,
-            );
+    // Wave + enemy logic (Helm's Deep mode only)
+    if (this.mode === "helmsdeep") {
+      if (this.phase === "wave_clear") {
+        if (this.waves.wave === 0) {
+          this.buildPhaseTimer = Math.max(0, this.buildPhaseTimer - dt);
+          const secs = Math.ceil(this.buildPhaseTimer);
+          if (secs > 0) {
+            if (Math.ceil(this.buildPhaseTimer + dt) !== secs) {
+              this.ui.setObjective(`Build fortifications! Wave 1 begins in ${secs}s.`);
+            }
+          } else {
+            this.startNextWave();
           }
         } else {
-          this.startNextWave();
+          this.waves.update(dt);
         }
-      } else {
-        // Between-wave countdown handled by WaveManager
+      } else if (this.phase === "playing") {
         this.waves.update(dt);
+        this.enemies.update(dt);
+        this.projectiles.update(
+          dt,
+          (id)         => this.enemies.getEnemyPosition(id),
+          (id, d, s, dur) => this.enemies.damage(id, d, s, dur),
+          (c, r)       => this.enemies.getAliveEnemies()
+            .filter(e => {
+              const p = this.enemies.getEnemyPosition(e.id);
+              return p ? p.distanceTo(c) <= r : false;
+            }).map(e => e.id),
+          ()           => this.enemies.getAliveEnemies().map(e => e.id),
+        );
+        const count = this.enemies.getAliveEnemies().length;
+        this.ui.setObjective(`Defend the fortress! ${count} enemies remaining.`);
       }
-    } else if (this.phase === "playing") {
-      this.waves.update(dt);
-      this.enemies.update(dt);
-      this.projectiles.update(
-        dt,
-        (id)         => this.enemies.getEnemyPosition(id),
-        (id, d, s, dur) => this.enemies.damage(id, d, s, dur),
-        (c, r)       => this.enemies.getAliveEnemies()
-          .filter(e => {
-            const p = this.enemies.getEnemyPosition(e.id);
-            return p ? p.distanceTo(c) <= r : false;
-          }).map(e => e.id),
-        ()           => this.enemies.getAliveEnemies().map(e => e.id),
-      );
-
-      // Update objective during wave
-      const count = this.enemies.getAliveEnemies().length;
-      this.ui.setObjective(`Defend the fortress! ${count} enemies remaining.`);
     }
 
     // Sync armor value each frame
@@ -379,6 +389,16 @@ export class Game {
     this.refreshHotbar();
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0);
+    this.ui.updateHunger(this.player.hunger, 20);
+    this.refreshXPBar();
+  }
+
+  private refreshXPBar(): void {
+    const thresholds = [0, 50, 150, 350, 700, 1200];
+    const lvl = this.player.level;
+    if (lvl >= thresholds.length - 1) { this.ui.updateXP(1, 1); return; }
+    const lo = thresholds[lvl], hi = thresholds[lvl + 1];
+    this.ui.updateXP(this.player.xp - lo, hi - lo);
   }
 
   private refreshHotbar(): void {
@@ -386,5 +406,7 @@ export class Game {
       this.inventory.hotbar as (ItemStack | null)[],
       this.inventory.activeSlot,
     );
+    const active = this.inventory.getActiveItem();
+    this.scene.updateArmItem(active?.itemId ?? null);
   }
 }
