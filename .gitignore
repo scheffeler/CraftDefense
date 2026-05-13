@@ -1,7 +1,7 @@
 node_modules/
 dist/
-src/main.js
-src/types.js
+src/**/*.js
+src/config/*.js
 *.tsbuildinfo
 .vite/
 .DS_Store
