@@ -1,126 +1,79 @@
-import * as THREE from "three";
-import type { TowerTypeName } from "./types";
-import type { GameMap } from "./Map";
-import type { TowerManager } from "./Tower";
-import type { GamePhase } from "./types";
+export interface MovementInput {
+  forward:  boolean;
+  backward: boolean;
+  left:     boolean;
+  right:    boolean;
+  jump:     boolean;
+  sprint:   boolean;
+}
 
 export class InputManager {
-  private readonly raycaster = new THREE.Raycaster();
-  private readonly mouse = new THREE.Vector2(-999, -999);
-  private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  private readonly planeTarget = new THREE.Vector3();
-  private readonly hoverIndicator: THREE.Mesh;
+  private readonly keysHeld = new Set<string>();
+  private _activeSlot = 0;
+  private _leftDown  = false;
+  private _rightDown = false;
 
-  selectedTowerType: TowerTypeName | null = null;
+  onLeftClick:       () => void = () => {};
+  onRightClick:      () => void = () => {};
+  onRightRelease:    () => void = () => {};
+  onInventoryToggle: () => void = () => {};
+  onSlotChange:      (slot: number) => void = () => {};
 
-  onPlaceTower: (gx: number, gz: number, type: TowerTypeName) => void = () => {};
-  onSelectTower: (gx: number, gz: number) => void = () => {};
-  onDeselect: () => void = () => {};
-  getPhase: () => GamePhase = () => "menu";
-
-  constructor(
-    private readonly canvas: HTMLElement,
-    private readonly camera: THREE.Camera,
-    private readonly gameMap: GameMap,
-    private readonly towerManager: TowerManager,
-  ) {
-    // Hover cell highlight
-    const geo = new THREE.PlaneGeometry(0.95, 0.95);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.2,
-      side: THREE.DoubleSide, depthWrite: false,
-    });
-    this.hoverIndicator = new THREE.Mesh(geo, mat);
-    this.hoverIndicator.rotation.x = -Math.PI / 2;
-    this.hoverIndicator.visible = false;
-
-    canvas.addEventListener("mousemove", e => this.onMouseMove(e));
-    canvas.addEventListener("click",     e => this.onClick(e));
-    window.addEventListener("keydown",   e => this.onKey(e));
+  constructor(canvas: HTMLElement) {
+    window.addEventListener("keydown",   e => this.onKeyDown(e));
+    window.addEventListener("keyup",     e => this.onKeyUp(e));
+    canvas.addEventListener("mousedown", e => this.onMouseDown(e));
+    canvas.addEventListener("mouseup",   e => this.onMouseUp(e));
+    canvas.addEventListener("wheel",     e => this.onWheel(e), { passive: true });
   }
 
-  addHoverToScene(scene: THREE.Scene): void {
-    scene.add(this.hoverIndicator);
+  get activeSlot(): number { return this._activeSlot; }
+
+  getMovementInput(): MovementInput {
+    return {
+      forward:  this.keysHeld.has("KeyW")     || this.keysHeld.has("ArrowUp"),
+      backward: this.keysHeld.has("KeyS")     || this.keysHeld.has("ArrowDown"),
+      left:     this.keysHeld.has("KeyA")     || this.keysHeld.has("ArrowLeft"),
+      right:    this.keysHeld.has("KeyD")     || this.keysHeld.has("ArrowRight"),
+      jump:     this.keysHeld.has("Space"),
+      sprint:   this.keysHeld.has("ShiftLeft") || this.keysHeld.has("ShiftRight"),
+    };
   }
 
-  private onMouseMove(e: MouseEvent): void {
-    const rect = this.canvas.getBoundingClientRect();
-    this.mouse.set(
-      ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-      -((e.clientY - rect.top)  / rect.height) * 2 + 1,
-    );
+  isLeftMouseDown():  boolean { return this._leftDown; }
+  isRightMouseDown(): boolean { return this._rightDown; }
 
-    if (this.getPhase() !== "playing" && this.getPhase() !== "wave_clear") {
-      this.hoverIndicator.visible = false;
-      return;
-    }
+  private onKeyDown(e: KeyboardEvent): void {
+    this.keysHeld.add(e.code);
+    if (e.code === "KeyE") this.onInventoryToggle();
 
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    if (!this.raycaster.ray.intersectPlane(this.groundPlane, this.planeTarget)) {
-      this.hoverIndicator.visible = false;
-      return;
-    }
-
-    const gx = Math.floor(this.planeTarget.x);
-    const gz = Math.floor(this.planeTarget.z);
-
-    if (this.selectedTowerType !== null && this.gameMap.isBuildable(gx, gz)) {
-      this.hoverIndicator.position.set(gx + 0.5, 1.02, gz + 0.5);
-      (this.hoverIndicator.material as THREE.MeshBasicMaterial).color.setHex(0x88ff88);
-      this.hoverIndicator.visible = true;
-      this.towerManager.showPlacementRing(gx, gz, this.selectedTowerType);
-    } else if (this.selectedTowerType !== null) {
-      this.hoverIndicator.position.set(gx + 0.5, 1.02, gz + 0.5);
-      (this.hoverIndicator.material as THREE.MeshBasicMaterial).color.setHex(0xff4444);
-      this.hoverIndicator.visible = true;
-      this.towerManager.hidePlacementRing();
-    } else {
-      this.hoverIndicator.visible = false;
-      this.towerManager.hidePlacementRing();
-    }
-  }
-
-  private onClick(e: MouseEvent): void {
-    if (this.getPhase() !== "playing" && this.getPhase() !== "wave_clear") return;
-
-    const rect = this.canvas.getBoundingClientRect();
-    this.mouse.set(
-      ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-      -((e.clientY - rect.top)  / rect.height) * 2 + 1,
-    );
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    if (!this.raycaster.ray.intersectPlane(this.groundPlane, this.planeTarget)) return;
-
-    const gx = Math.floor(this.planeTarget.x);
-    const gz = Math.floor(this.planeTarget.z);
-
-    if (this.selectedTowerType !== null) {
-      this.onPlaceTower(gx, gz, this.selectedTowerType);
-    } else {
-      // Check if there's a tower at this cell
-      const tower = this.towerManager.getTowerAt(gx, gz);
-      if (tower) {
-        this.onSelectTower(gx, gz);
-      } else {
-        this.onDeselect();
+    const digit = e.code.match(/^Digit(\d)$/);
+    if (digit) {
+      const slot = parseInt(digit[1]) - 1;
+      if (slot >= 0 && slot <= 8) {
+        this._activeSlot = slot;
+        this.onSlotChange(slot);
       }
     }
   }
 
-  private onKey(e: KeyboardEvent): void {
-    if (e.key === "Escape") {
-      this.selectedTowerType = null;
-      this.towerManager.hidePlacementRing();
-      this.onDeselect();
-    }
-    if (e.key === "1") this.selectedTowerType = "arrow";
-    if (e.key === "2") this.selectedTowerType = "cannon";
-    if (e.key === "3") this.selectedTowerType = "ice";
+  private onKeyUp(e: KeyboardEvent): void {
+    this.keysHeld.delete(e.code);
   }
 
-  setSelectedType(type: TowerTypeName | null): void {
-    this.selectedTowerType = type;
-    if (!type) this.towerManager.hidePlacementRing();
+  private onMouseDown(e: MouseEvent): void {
+    if (e.button === 0) { this._leftDown  = true;  this.onLeftClick(); }
+    if (e.button === 2) { this._rightDown = true;  this.onRightClick(); }
+  }
+
+  private onMouseUp(e: MouseEvent): void {
+    if (e.button === 0) this._leftDown  = false;
+    if (e.button === 2) { this._rightDown = false; this.onRightRelease(); }
+  }
+
+  private onWheel(e: WheelEvent): void {
+    const dir = e.deltaY > 0 ? 1 : -1;
+    this._activeSlot = (this._activeSlot + dir + 9) % 9;
+    this.onSlotChange(this._activeSlot);
   }
 }

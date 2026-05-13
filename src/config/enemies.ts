@@ -1,6 +1,7 @@
 import type { EnemyConfig, EnemyTypeName } from "../types";
 
 export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
+  // ── Legacy TD enemies ──────────────────────────────────────────────────────
   zombie: {
     type: "zombie",
     name: "Zombie",
@@ -33,5 +34,56 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     color: 0x888888,
     headColor: 0x666666,
     scale: 1.5,
+  },
+
+  // ── Helm's Deep enemies (flow-field AI) ───────────────────────────────────
+  goblin: {
+    type: "goblin",
+    name: "Goblin",
+    maxHealth: 40,
+    speed: 3.8,
+    reward: 8,
+    damage: 1,
+    color: 0x3a6a1a,
+    headColor: 0x5a8a2a,
+    scale: 0.75,
+    xpReward: 5,
+  },
+  orc: {
+    type: "orc",
+    name: "Orc",
+    maxHealth: 150,
+    speed: 2.0,
+    reward: 18,
+    damage: 2,
+    color: 0x7a4a1a,
+    headColor: 0xaa6a30,
+    scale: 1.1,
+    xpReward: 15,
+  },
+  troll: {
+    type: "troll",
+    name: "Troll",
+    maxHealth: 400,
+    speed: 0.9,
+    reward: 45,
+    damage: 4,
+    color: 0x556644,
+    headColor: 0x445533,
+    scale: 1.6,
+    xpReward: 40,
+  },
+  goblin_miner: {
+    type: "goblin_miner",
+    name: "Goblin Miner",
+    maxHealth: 80,
+    speed: 1.5,
+    reward: 20,
+    damage: 1,
+    color: 0x886622,
+    headColor: 0xaa8844,
+    scale: 0.85,
+    canBreakWalls: true,
+    xpReward: 20,
   },
 };

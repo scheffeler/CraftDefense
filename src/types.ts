@@ -4,13 +4,14 @@
 
 export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win";
 
-export type EnemyTypeName = "zombie" | "spider" | "golem";
-export type TowerTypeName = "arrow" | "cannon" | "ice";
+export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner";
+export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat
 export type ProjectileType = "arrow" | "cannonball" | "icebolt";
 
 export type BlockId =
   | "air" | "grass" | "dirt" | "stone" | "wood"
-  | "planks" | "cobblestone" | "sand" | "glass" | "leaves" | "obsidian";
+  | "planks" | "cobblestone" | "sand" | "glass" | "leaves" | "obsidian"
+  | "iron_ore" | "coal_ore" | "iron_block" | "crafting_table" | "furnace";
 
 export interface BlockDef {
   id: BlockId;
@@ -21,30 +22,6 @@ export interface BlockDef {
   hardness: number;
   placeable: boolean;
   transparent: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Tower config
-// ---------------------------------------------------------------------------
-
-export interface TowerLevelConfig {
-  damage: number;
-  range: number;
-  fireRate: number;      // shots per second
-  cost: number;          // purchase cost (level 0) or upgrade cost (levels 1-2)
-  projectileSpeed: number;
-  aoeRadius?: number;    // cannon only
-  slowFactor?: number;   // ice only — fraction of normal speed
-  slowDuration?: number; // ice only — seconds
-}
-
-export interface TowerConfig {
-  type: TowerTypeName;
-  name: string;
-  description: string;
-  color: number;
-  projectile: ProjectileType;
-  levels: [TowerLevelConfig, TowerLevelConfig, TowerLevelConfig];
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +38,8 @@ export interface EnemyConfig {
   color: number;
   headColor: number;
   scale: number;
+  canBreakWalls?: boolean;
+  xpReward?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +50,7 @@ export interface WaveGroup {
   type: EnemyTypeName;
   count: number;
   spawnInterval: number;
+  gate?: "north" | "south"; // spawn gate (defaults to "north")
 }
 
 export interface WaveConfig {
@@ -94,8 +74,12 @@ export interface EnemyState {
   dying: boolean;
   dyingTimer: number;
   movePhase: number;
+  useFlowField?: boolean;
+  breakTarget?: { x: number; y: number; z: number } | null;
+  breakTimer?: number;
 }
 
+// TowerState kept as a stub type so UI.ts stubs compile without error
 export interface TowerState {
   id: number;
   type: TowerTypeName;
@@ -104,12 +88,4 @@ export interface TowerState {
   level: number;
   cooldown: number;
   totalSpent: number;
-}
-
-export interface GridCell {
-  x: number;
-  z: number;
-  isPath: boolean;
-  hasTower: boolean;
-  towerId: number | null;
 }
