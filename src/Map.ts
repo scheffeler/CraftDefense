@@ -168,18 +168,28 @@ export class VoxelWorld {
           const tg = ((topC >> 8)  & 0xff) / 255;
           const tb = (topC         & 0xff) / 255;
 
-          // Per-block brightness noise — breaks up flat monotone look
-          const n = Math.sin(wx * 127.1 + wy * 311.7 + wz * 74.7) * 0.10;
           const clamp = (v: number) => Math.max(0, Math.min(1, v));
+          // Hash-based noise with unique seed per face direction for texture variety
+          const hn = (ox: number, oz: number, oz2: number) => {
+            let h = (wx * 374761393 + wy * 1234567 + wz * 769 + ox * 31337 + oz * 91 + oz2 * 23) | 0;
+            h = ((h ^ (h >> 13)) * 1274126177) | 0;
+            return ((h >>> 0) % 1000) / 1000 * 0.18 - 0.09;
+          };
+          const nTop  = hn(1, 0, 0);
+          const nBot  = hn(2, 0, 0);
+          const nPosX = hn(3, 0, 0);
+          const nNegX = hn(4, 0, 0);
+          const nPosZ = hn(5, 0, 0);
+          const nNegZ = hn(6, 0, 0);
 
           const neighbors: [number,number,number][] = [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]];
           const faces = [
-            { n:[0,1,0],  a:[1,0,0], b:[0,0,1], shade:1.0,  cr:clamp(tr+n), cg:clamp(tg+n), cb:clamp(tb+n) },
-            { n:[0,-1,0], a:[0,0,1], b:[1,0,0], shade:0.45, cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
-            { n:[1,0,0],  a:[0,0,1], b:[0,1,0], shade:0.8,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
-            { n:[-1,0,0], a:[0,1,0], b:[0,0,1], shade:0.7,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
-            { n:[0,0,1],  a:[0,1,0], b:[1,0,0], shade:0.6,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
-            { n:[0,0,-1], a:[1,0,0], b:[0,1,0], shade:0.6,  cr:clamp(r+n),  cg:clamp(g+n),  cb:clamp(b+n)  },
+            { n:[0,1,0],  a:[1,0,0], b:[0,0,1], shade:1.0,  cr:clamp(tr+nTop),  cg:clamp(tg+nTop),  cb:clamp(tb+nTop)  },
+            { n:[0,-1,0], a:[0,0,1], b:[1,0,0], shade:0.45, cr:clamp(r+nBot),   cg:clamp(g+nBot),   cb:clamp(b+nBot)   },
+            { n:[1,0,0],  a:[0,0,1], b:[0,1,0], shade:0.8,  cr:clamp(r+nPosX),  cg:clamp(g+nPosX),  cb:clamp(b+nPosX)  },
+            { n:[-1,0,0], a:[0,1,0], b:[0,0,1], shade:0.7,  cr:clamp(r+nNegX),  cg:clamp(g+nNegX),  cb:clamp(b+nNegX)  },
+            { n:[0,0,1],  a:[0,1,0], b:[1,0,0], shade:0.6,  cr:clamp(r+nPosZ),  cg:clamp(g+nPosZ),  cb:clamp(b+nPosZ)  },
+            { n:[0,0,-1], a:[1,0,0], b:[0,1,0], shade:0.6,  cr:clamp(r+nNegZ),  cg:clamp(g+nNegZ),  cb:clamp(b+nNegZ)  },
           ];
 
           for (let fi = 0; fi < 6; fi++) {

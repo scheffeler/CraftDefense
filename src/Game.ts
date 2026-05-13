@@ -157,6 +157,13 @@ export class Game {
       else if (!nowOpen && !this.scene.isPointerLocked) this.scene.lockPointer();
     };
 
+    // Recipe book toggle (R)
+    this.input.onRecipeBookToggle = () => {
+      if (!this.scene.isPointerLocked) return;
+      const nowOpen = !this.ui.isRecipeBookOpen();
+      this.ui.showRecipeBook(nowOpen);
+    };
+
     // Left click — melee attack (mining is handled by isLeftMouseDown in update)
     this.input.onLeftClick = () => {
       if (this.ui.isInventoryOpen()) return;
@@ -440,6 +447,7 @@ export class Game {
 
     if (this.phase === "gameover" || this.phase === "win") return;
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen()) return;
+    // Recipe book doesn't pause gameplay, just a HUD overlay
 
     // Player movement + bow charge accumulation
     const input = this.input.getMovementInput();
@@ -626,5 +634,6 @@ export class Game {
     );
     const active = this.inventory.getActiveItem();
     this.scene.updateArmItem(active?.itemId ?? null);
+    this.ui.updateItemTooltip(active?.itemId ?? null, active?.durability);
   }
 }

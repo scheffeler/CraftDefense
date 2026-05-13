@@ -90,6 +90,7 @@ export class UI {
   onWorkbenchSlotClick: (row: number, col: number) => void = () => {};
   onWorkbenchResultClick: () => void = () => {};
   onWorkbenchClose: () => void = () => {};
+  onRecipeBookClose: () => void = () => {};
 
   // Legacy TD stubs (backward compat — Game.ts uses these until Phase 12)
   onStartWave: () => void = () => {};
@@ -103,6 +104,7 @@ export class UI {
   private heartEls: HTMLElement[] = [];
   private hungerEls: HTMLElement[] = [];
   private xpBarFill!: HTMLElement;
+  private itemTooltip!: HTMLElement;
   private elWaveInfo!: HTMLElement;
   private elObjective!: HTMLElement;
   private lockPrompt!: HTMLElement;
@@ -120,6 +122,7 @@ export class UI {
 
   // Workbench overlay
   private workbenchOverlay!: HTMLElement;
+  private recipeBookOverlay!: HTMLElement;
   private workbenchCells: HTMLElement[][] = [];
   private workbenchResult!: HTMLElement;
   private _workbenchGrid: (string | null)[][] = [
@@ -176,6 +179,16 @@ export class UI {
       slot.classList.toggle("active", i === activeSlot);
       this.renderStackInSlot(slot, stack);
     }
+  }
+
+  updateItemTooltip(itemId: string | null, durability?: number): void {
+    if (!itemId) { this.itemTooltip.style.display = "none"; return; }
+    const def = ITEMS[itemId];
+    if (!def) { this.itemTooltip.style.display = "none"; return; }
+    const durStr = (durability != null && def.durability != null)
+      ? ` <span style="color:#aaa;font-size:7px">(${durability}/${def.durability})</span>` : "";
+    this.itemTooltip.innerHTML = def.name + durStr;
+    this.itemTooltip.style.display = "block";
   }
 
   updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean): void {
@@ -354,6 +367,7 @@ export class UI {
     this.buildHungerBar();
     this.buildXPBar();
     this.buildHotbar();
+    this.buildItemTooltip();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -376,9 +390,9 @@ export class UI {
           </button>
         </div>
         <div class="fps-lock-controls">
-          WASD: move &nbsp;|&nbsp; Mouse: look &nbsp;|&nbsp;
-          LClick: mine/attack &nbsp;|&nbsp; RClick: place &nbsp;|&nbsp;
-          E: inventory &nbsp;|&nbsp; 1-9: hotbar &nbsp;|&nbsp; Esc: unlock
+          WASD: move &nbsp;|&nbsp; Shift: sprint &nbsp;|&nbsp; Space: jump &nbsp;|&nbsp; Mouse: look<br>
+          LClick: mine/attack &nbsp;|&nbsp; RClick: place/use &nbsp;|&nbsp; E: inventory<br>
+          R: recipe book &nbsp;|&nbsp; 1-9: hotbar &nbsp;|&nbsp; Esc: unlock
         </div>
       </div>`;
     this.lockPrompt.querySelector("#btn-helmsdeep")!.addEventListener("click", (e) => {
@@ -395,6 +409,7 @@ export class UI {
 
     this.buildInventoryOverlay();
     this.buildWorkbenchOverlay();
+    this.buildRecipeBookOverlay();
     this.buildDeathOverlay();
     this.buildEndOverlay();
   }
@@ -408,6 +423,12 @@ export class UI {
       this.heartEls.push(h);
     }
     this.container.appendChild(wrap);
+  }
+
+  private buildItemTooltip(): void {
+    this.itemTooltip = div("fps-item-tooltip");
+    this.itemTooltip.style.display = "none";
+    this.container.appendChild(this.itemTooltip);
   }
 
   private buildHungerBar(): void {
@@ -581,6 +602,60 @@ export class UI {
     ov.appendChild(box);
     this.workbenchOverlay = ov;
     this.container.appendChild(ov);
+  }
+
+  private buildRecipeBookOverlay(): void {
+    const ov = div("fps-recipe-book");
+    ov.style.display = "none";
+
+    const title = div("fps-rb-title");
+    title.textContent = "Recipe Book";
+    ov.appendChild(title);
+
+    const entries = [
+      { name: "Planks", ingredients: "1 Wood → 4 Planks", key: "planks_from_wood" },
+      { name: "Sticks", ingredients: "2 Planks (vertical) → 4 Sticks", key: "sticks" },
+      { name: "Crafting Table", ingredients: "4 Planks (2×2) → Crafting Table", key: "crafting_table" },
+      { name: "Torches", ingredients: "1 Coal + 1 Stick → 4 Torches", key: "torches" },
+      { name: "Wood Sword", ingredients: "2 Planks + 1 Stick → Sword", key: "wood_sword" },
+      { name: "Wood Pickaxe", ingredients: "3 Planks + 2 Sticks → Pickaxe", key: "wood_pickaxe" },
+      { name: "Wood Axe", ingredients: "3 Planks + 2 Sticks → Axe", key: "wood_axe" },
+      { name: "Stone Sword", ingredients: "2 Cobblestone + 1 Stick", key: "stone_sword" },
+      { name: "Stone Pickaxe", ingredients: "3 Cobblestone + 2 Sticks", key: "stone_pickaxe" },
+      { name: "Iron Sword", ingredients: "2 Iron Ingot + 1 Stick", key: "iron_sword" },
+      { name: "Iron Pickaxe", ingredients: "3 Iron Ingot + 2 Sticks", key: "iron_pickaxe" },
+      { name: "Iron Block", ingredients: "9 Iron Ingots (3×3)", key: "iron_block" },
+      { name: "Iron Helmet", ingredients: "5 Iron Ingots (horseshoe shape)", key: "iron_helmet" },
+      { name: "Iron Chestplate", ingredients: "8 Iron Ingots (chest shape)", key: "iron_chestplate" },
+      { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
+      { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+    ];
+
+    const list = div("fps-rb-list");
+    for (const entry of entries) {
+      const row = div("fps-rb-row");
+      const nameEl = div("fps-rb-name");
+      nameEl.textContent = entry.name;
+      const ingEl = div("fps-rb-ing");
+      ingEl.textContent = entry.ingredients;
+      row.appendChild(nameEl);
+      row.appendChild(ingEl);
+      list.appendChild(row);
+    }
+    ov.appendChild(list);
+
+    const hint = div("fps-rb-hint");
+    hint.textContent = "[R] to close";
+    ov.appendChild(hint);
+
+    this.recipeBookOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  isRecipeBookOpen(): boolean { return this.recipeBookOverlay.style.display !== "none"; }
+
+  showRecipeBook(open: boolean): void {
+    this.recipeBookOverlay.style.display = open ? "flex" : "none";
   }
 
   private buildDeathOverlay(): void {
@@ -796,6 +871,18 @@ const FPS_CSS = `
   height: 100%;
   background: #80ff20;
   transition: width 0.3s;
+}
+
+/* Item tooltip — name above hotbar */
+.fps-item-tooltip {
+  position: absolute;
+  bottom: 62px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: #fff;
+  text-shadow: 1px 1px 0 #000, 2px 2px 0 #000;
+  background: rgba(0,0,0,0.7);
+  padding: 3px 8px;
+  pointer-events: none; z-index: 14;
+  white-space: nowrap;
 }
 
 /* Hotbar — Minecraft dark gray, square slots */
@@ -1075,4 +1162,32 @@ const FPS_CSS = `
   30%  { opacity: 0.9; }
   100% { opacity: 0; }
 }
+.fps-recipe-book {
+  position: absolute;
+  top: 50%; right: 16px;
+  transform: translateY(-50%);
+  background: #1a1a1a;
+  border: 3px solid #555;
+  padding: 14px 18px;
+  max-height: 70vh; overflow-y: auto;
+  z-index: 55;
+  pointer-events: all;
+  flex-direction: column; gap: 6px;
+  min-width: 280px;
+}
+.fps-rb-title {
+  font-size: 13px; color: #ffdd44;
+  text-shadow: 1px 1px 0 #000;
+  margin-bottom: 10px; text-align: center;
+  border-bottom: 1px solid #444; padding-bottom: 6px;
+}
+.fps-rb-list { display: flex; flex-direction: column; gap: 4px; }
+.fps-rb-row {
+  padding: 4px 6px;
+  border: 1px solid #333;
+  background: #242424;
+}
+.fps-rb-name { font-size: 9px; color: #fff; margin-bottom: 2px; }
+.fps-rb-ing  { font-size: 7px; color: #aaa; }
+.fps-rb-hint { font-size: 7px; color: #666; text-align: center; margin-top: 8px; }
 `;

@@ -13,11 +13,12 @@ export class InputManager {
   private _leftDown  = false;
   private _rightDown = false;
 
-  onLeftClick:       () => void = () => {};
-  onRightClick:      () => void = () => {};
-  onRightRelease:    () => void = () => {};
-  onInventoryToggle: () => void = () => {};
-  onSlotChange:      (slot: number) => void = () => {};
+  onLeftClick:        () => void = () => {};
+  onRightClick:       () => void = () => {};
+  onRightRelease:     () => void = () => {};
+  onInventoryToggle:  () => void = () => {};
+  onRecipeBookToggle: () => void = () => {};
+  onSlotChange:       (slot: number) => void = () => {};
 
   constructor(canvas: HTMLElement) {
     window.addEventListener("keydown",   e => this.onKeyDown(e));
@@ -46,6 +47,7 @@ export class InputManager {
   private onKeyDown(e: KeyboardEvent): void {
     this.keysHeld.add(e.code);
     if (e.code === "KeyE") this.onInventoryToggle();
+    if (e.code === "KeyR") this.onRecipeBookToggle();
 
     const digit = e.code.match(/^Digit(\d)$/);
     if (digit) {
