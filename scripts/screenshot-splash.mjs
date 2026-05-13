@@ -13,7 +13,7 @@ await page.addStyleTag({ content: `
   canvas { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
 ` });
 await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-await page.waitForTimeout(2000);
+await page.waitForTimeout(3500);
 
 // Splash screen (before clicking)
 await page.screenshot({ path: 'screenshots/splash.png' });
@@ -23,7 +23,7 @@ await page.evaluate(() => {
   const el = document.querySelector('.fps-lock-prompt');
   if (el) el.style.display = 'none';
 });
-await page.waitForTimeout(300);
+await page.waitForTimeout(400);
 await page.screenshot({ path: 'screenshots/current.png' });
 
 await browser.close();

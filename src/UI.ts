@@ -190,6 +190,14 @@ export class UI {
   showDeathScreen(): void { this.deathOverlay.style.display = "flex"; }
   hideDeathScreen(): void { this.deathOverlay.style.display = "none"; }
 
+  showLevelUp(level: number): void {
+    const el = document.createElement("div");
+    el.className = "level-up-announce";
+    el.innerHTML = `LEVEL UP!<br><span class="level-up-sub">Level ${level}</span>`;
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
   /** Shows a big centered announcement that fades out after ~2 seconds. */
   showWaveAnnouncement(waveNum: number): void {
     const el = document.createElement("div");
@@ -862,6 +870,36 @@ const FPS_CSS = `
   0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
   80%  { opacity: 0.8; }
   100% { opacity: 0; transform: translateX(-50%) translateY(-48px); }
+}
+
+/* Level-up banner */
+.level-up-announce {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 28px;
+  color: #80ff20;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+  text-align: center;
+  pointer-events: none;
+  z-index: 50;
+  animation: levelUpAnim 3.0s ease-out forwards;
+  white-space: nowrap;
+}
+.level-up-sub {
+  font-size: 16px;
+  color: #ffffff;
+  display: block;
+  margin-top: 8px;
+}
+@keyframes levelUpAnim {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.8); }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.05); }
+  40%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.0); }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-16px); }
 }
 
 /* Wave announcement banner */

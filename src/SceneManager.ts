@@ -76,7 +76,7 @@ export class SceneManager {
   onPointerLockChange: (locked: boolean) => void = () => {};
 
   constructor(container: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
@@ -91,8 +91,8 @@ export class SceneManager {
     this.scene.fog = new THREE.Fog(0xaad4e8, 48, 130);
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(32, 4, 12);
-    this.camera.lookAt(32, 4, 24);
+    this.camera.position.set(32, 2.62, 32);
+    this.camera.lookAt(32, 2.62, 18);
 
     this.controls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.controls.addEventListener("lock",   () => this.onPointerLockChange(true));
@@ -297,8 +297,8 @@ export class SceneManager {
   }
 
   resetCamera(): void {
-    this.camera.position.set(32, 2.62, 48);
-    this.camera.lookAt(32, 2.62, 32);
+    this.camera.position.set(32, 2.62, 32);
+    this.camera.lookAt(32, 2.62, 18);
   }
 
   private setupLighting(): void {

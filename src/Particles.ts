@@ -15,35 +15,61 @@ export class ParticleSystem {
   constructor(private readonly scene: THREE.Scene) {}
 
   spawnBlockBreak(wx: number, wy: number, wz: number, color: number): void {
-    const count = 8 + Math.floor(Math.random() * 5); // 8-12 particles
-    const mat = new THREE.MeshLambertMaterial({ color });
-
+    const count = 8 + Math.floor(Math.random() * 5);
     for (let i = 0; i < count; i++) {
       const size = 0.06 + Math.random() * 0.08;
-      const geo  = new THREE.BoxGeometry(size, size, size);
-      const mesh = new THREE.Mesh(geo, mat.clone());
-
-      // Spawn at random point within the block
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshLambertMaterial({ color }),
+      );
       mesh.position.set(
         wx + 0.5 + (Math.random() - 0.5) * 0.8,
         wy + 0.5 + (Math.random() - 0.5) * 0.8,
         wz + 0.5 + (Math.random() - 0.5) * 0.8,
       );
-
       const speed = 2.5 + Math.random() * 2.5;
       const theta = Math.random() * Math.PI * 2;
-      const phi   = (Math.random() * 0.5 + 0.3) * Math.PI; // mostly upward
-
-      this.particles.push({
-        mesh,
-        vx: Math.sin(phi) * Math.cos(theta) * speed,
-        vy: Math.cos(phi) * speed + 1.5,
-        vz: Math.sin(phi) * Math.sin(theta) * speed,
-        life: 0,
-        maxLife: 0.4 + Math.random() * 0.3,
-      });
-      this.scene.add(mesh);
+      const phi   = (Math.random() * 0.5 + 0.3) * Math.PI;
+      this.spawnParticle(mesh, Math.sin(phi) * Math.cos(theta) * speed, Math.cos(phi) * speed + 1.5, Math.sin(phi) * Math.sin(theta) * speed, 0.4 + Math.random() * 0.3);
     }
+  }
+
+  spawnEnemyDeath(x: number, y: number, z: number, color: number): void {
+    const count = 12 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < count; i++) {
+      const size = 0.07 + Math.random() * 0.1;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshLambertMaterial({ color }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.5,
+        y + (Math.random() - 0.5) * 0.5,
+        z + (Math.random() - 0.5) * 0.5,
+      );
+      const speed = 3 + Math.random() * 4;
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.random() * Math.PI;
+      this.spawnParticle(mesh, Math.sin(phi) * Math.cos(theta) * speed, Math.cos(phi) * speed + 2, Math.sin(phi) * Math.sin(theta) * speed, 0.5 + Math.random() * 0.4);
+    }
+  }
+
+  spawnXPOrbs(x: number, y: number, z: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.06, 4, 4),
+        new THREE.MeshBasicMaterial({ color: 0x44ff44, emissive: 0x22cc22 } as THREE.MeshBasicMaterialParameters),
+      );
+      mesh.position.set(x + (Math.random() - 0.5) * 0.4, y + 0.5, z + (Math.random() - 0.5) * 0.4);
+      const speed = 1.5 + Math.random() * 2;
+      const theta = Math.random() * Math.PI * 2;
+      this.spawnParticle(mesh, Math.cos(theta) * speed * 0.4, 2 + Math.random() * 2, Math.sin(theta) * speed * 0.4, 0.8 + Math.random() * 0.5);
+    }
+  }
+
+  private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
+    this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
+    this.scene.add(mesh);
   }
 
   update(dt: number): void {

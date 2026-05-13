@@ -64,14 +64,15 @@ export class Game {
     this.flowField = new FlowField(this.gameMap.world);
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
 
-    this.player    = new Player(this.gameMap.world, this.scene.camera, 32, 48);
+    this.player    = new Player(this.gameMap.world, this.scene.camera, 32, 32);
     this.inventory = new Inventory();
-    this.inventory.addItem("wood_sword", 1);
-    this.inventory.addItem("wood_pickaxe", 1);
+    this.inventory.addItem("stone_sword", 1);
+    this.inventory.addItem("stone_pickaxe", 1);
+    this.inventory.addItem("wood_axe", 1);
+    this.inventory.addItem("cobblestone", 32);
     this.inventory.addItem("wood", 16);
-    this.inventory.addItem("dirt", 16);
     this.inventory.addItem("torch", 8);
-    this.inventory.addItem("apple", 4);
+    this.inventory.addItem("apple", 8);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -203,6 +204,13 @@ export class Game {
 
     // Enemy events
     this.enemies.onEnemyDied = (state) => {
+      const pos = this.enemies.getEnemyPosition(state.id);
+      if (pos) {
+        this.particles.spawnEnemyDeath(pos.x, pos.y, pos.z, state.config.color);
+        if (state.config.xpReward) {
+          this.particles.spawnXPOrbs(pos.x, pos.y, pos.z, Math.min(state.config.xpReward, 5));
+        }
+      }
       if (state.config.xpReward) { this.player.addXP(state.config.xpReward); this.refreshXPBar(); }
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
@@ -309,6 +317,8 @@ export class Game {
     this.player.level     = 0;
     this.player.hunger    = 20;
     this.player.onDeath   = this.player.onDeath;
+    this.player.position.set(32, 1, 32);
+    this.scene.resetCamera();
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
     this.ui.hideDeathScreen();
     this.ui.hideEnd();
@@ -462,9 +472,14 @@ export class Game {
     this.refreshXPBar();
   }
 
+  private _lastLevel = 0;
   private refreshXPBar(): void {
     const thresholds = [0, 50, 150, 350, 700, 1200];
     const lvl = this.player.level;
+    if (lvl > this._lastLevel) {
+      this._lastLevel = lvl;
+      this.ui.showLevelUp(lvl);
+    }
     if (lvl >= thresholds.length - 1) { this.ui.updateXP(1, 1); return; }
     const lo = thresholds[lvl], hi = thresholds[lvl + 1];
     this.ui.updateXP(this.player.xp - lo, hi - lo);

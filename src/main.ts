@@ -6,3 +6,4 @@ if (!app) throw new Error("No #app element found");
 
 const game = new Game(app);
 game.start();
+(window as any).__game = game;

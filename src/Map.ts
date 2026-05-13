@@ -12,23 +12,23 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 // Block definitions
 // ---------------------------------------------------------------------------
 export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
-  air:            { id: "air",            name: "Air",            color: 0x000000, hardness: 0,    placeable: false, transparent: true  },
-  grass:          { id: "grass",          name: "Grass",          color: 0x5d9e3a, topColor: 0x5d9e3a, bottomColor: 0x8b5c2a, hardness: 1, placeable: true,  transparent: false },
-  dirt:           { id: "dirt",           name: "Dirt",           color: 0x8b5c2a, hardness: 1,    placeable: true,  transparent: false },
-  stone:          { id: "stone",          name: "Stone",          color: 0x888888, hardness: 3,    placeable: true,  transparent: false },
-  wood:           { id: "wood",           name: "Wood",           color: 0x6b4c2a, hardness: 2,    placeable: true,  transparent: false },
-  planks:         { id: "planks",         name: "Planks",         color: 0xc8a060, hardness: 2,    placeable: true,  transparent: false },
-  cobblestone:    { id: "cobblestone",    name: "Cobblestone",    color: 0x888070, hardness: 3,    placeable: true,  transparent: false },
-  sand:           { id: "sand",           name: "Sand",           color: 0xd4c484, hardness: 1,    placeable: true,  transparent: false },
-  glass:          { id: "glass",          name: "Glass",          color: 0x88ccee, hardness: 1,    placeable: true,  transparent: true  },
-  leaves:         { id: "leaves",         name: "Leaves",         color: 0x3a7a25, hardness: 0.5,  placeable: true,  transparent: true  },
-  obsidian:       { id: "obsidian",       name: "Obsidian",       color: 0x1a0a2a, hardness: 10,   placeable: true,  transparent: false },
-  iron_ore:       { id: "iron_ore",       name: "Iron Ore",       color: 0x886655, hardness: 4,    placeable: true,  transparent: false },
-  coal_ore:       { id: "coal_ore",       name: "Coal Ore",       color: 0x444444, hardness: 3,    placeable: true,  transparent: false },
-  iron_block:     { id: "iron_block",     name: "Iron Block",     color: 0xaaaaaa, hardness: 5,    placeable: true,  transparent: false },
-  crafting_table: { id: "crafting_table", name: "Crafting Table", color: 0x8b5c2a, hardness: 2,    placeable: true,  transparent: false },
-  furnace:        { id: "furnace",        name: "Furnace",        color: 0x777777, hardness: 3,    placeable: true,  transparent: false },
-  torch:          { id: "torch",          name: "Torch",          color: 0xffaa22, hardness: 0,    placeable: true,  transparent: true  },
+  air:            { id: "air",            name: "Air",            color: 0x000000,                   hardness: 0,    placeable: false, transparent: true  },
+  grass:          { id: "grass",          name: "Grass",          color: 0x8b5c2a, topColor: 0x5d9e3a, hardness: 1, placeable: true,  transparent: false },
+  dirt:           { id: "dirt",           name: "Dirt",           color: 0x8b5c2a,                   hardness: 1,    placeable: true,  transparent: false },
+  stone:          { id: "stone",          name: "Stone",          color: 0x888888,                   hardness: 3,    placeable: true,  transparent: false },
+  wood:           { id: "wood",           name: "Wood",           color: 0x6b4c2a, topColor: 0xb8905a, hardness: 2,  placeable: true,  transparent: false },
+  planks:         { id: "planks",         name: "Planks",         color: 0xc8a060,                   hardness: 2,    placeable: true,  transparent: false },
+  cobblestone:    { id: "cobblestone",    name: "Cobblestone",    color: 0x888070,                   hardness: 3,    placeable: true,  transparent: false },
+  sand:           { id: "sand",           name: "Sand",           color: 0xd4c484,                   hardness: 1,    placeable: true,  transparent: false },
+  glass:          { id: "glass",          name: "Glass",          color: 0x88ccee,                   hardness: 1,    placeable: true,  transparent: true  },
+  leaves:         { id: "leaves",         name: "Leaves",         color: 0x3a7a25,                   hardness: 0.5,  placeable: true,  transparent: true  },
+  obsidian:       { id: "obsidian",       name: "Obsidian",       color: 0x1a0a2a,                   hardness: 10,   placeable: true,  transparent: false },
+  iron_ore:       { id: "iron_ore",       name: "Iron Ore",       color: 0x888888, topColor: 0x998877, hardness: 4,  placeable: true,  transparent: false },
+  coal_ore:       { id: "coal_ore",       name: "Coal Ore",       color: 0x888888, topColor: 0x555555, hardness: 3,  placeable: true,  transparent: false },
+  iron_block:     { id: "iron_block",     name: "Iron Block",     color: 0xaaaaaa,                   hardness: 5,    placeable: true,  transparent: false },
+  crafting_table: { id: "crafting_table", name: "Crafting Table", color: 0x6b4c2a, topColor: 0x7a3a2a, hardness: 2,  placeable: true,  transparent: false },
+  furnace:        { id: "furnace",        name: "Furnace",        color: 0x777777, topColor: 0x555555, hardness: 3,  placeable: true,  transparent: false },
+  torch:          { id: "torch",          name: "Torch",          color: 0xffaa22,                   hardness: 0,    placeable: true,  transparent: true  },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];
@@ -169,7 +169,7 @@ export class VoxelWorld {
           const tb = (topC         & 0xff) / 255;
 
           // Per-block brightness noise — breaks up flat monotone look
-          const n = (Math.sin(wx * 127.1 + wy * 311.7 + wz * 74.7) * 0.5 + 0.5 - 0.5) * 0.07;
+          const n = Math.sin(wx * 127.1 + wy * 311.7 + wz * 74.7) * 0.10;
           const clamp = (v: number) => Math.max(0, Math.min(1, v));
 
           const neighbors: [number,number,number][] = [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]];
