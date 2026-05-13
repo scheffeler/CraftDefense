@@ -35,6 +35,8 @@ export function generateWorld(world: VoxelWorld): void {
   generateInterior(world);
   generateTrees(world);
   generateSpawnMarkers(world);
+  generateWaterFeatures(world);
+  generateRuins(world);
 }
 
 /** Returns [x, z] enemy spawn positions for the given gate. */
@@ -293,5 +295,81 @@ function generateSpawnMarkers(world: VoxelWorld): void {
     world.setBlock(GATE_CENTER_X + 1, y, 2,  "obsidian");
     world.setBlock(GATE_CENTER_X,     y, 61, "obsidian");
     world.setBlock(GATE_CENTER_X + 1, y, 61, "obsidian");
+  }
+}
+
+function generateWaterFeatures(world: VoxelWorld): void {
+  // Small ponds in the corners of the map (away from fortress and spawn zones)
+  const ponds: [number, number, number, number][] = [
+    // [centerX, centerZ, radiusX, radiusZ]
+    [8,  15, 3, 3],
+    [56, 12, 3, 2],
+    [5,  48, 2, 3],
+    [58, 50, 3, 3],
+    [10, 35, 2, 2],
+  ];
+
+  for (const [cx, cz, rx, rz] of ponds) {
+    for (let dx = -rx; dx <= rx; dx++) {
+      for (let dz = -rz; dz <= rz; dz++) {
+        if ((dx / rx) ** 2 + (dz / rz) ** 2 > 1) continue;
+        const x = cx + dx, z = cz + dz;
+        if (x < 0 || z < 0 || x >= WORLD_WIDTH || z >= WORLD_DEPTH) continue;
+        // Dig a shallow basin and fill with water
+        world.setBlock(x, 0, z, "water");
+        // Dig 1 block deep (sand bottom)
+        // world.setBlock(x, -1, z, "sand"); // negative y not supported
+        // Clear any grass/stone blocks above
+        world.setBlock(x, 1, z, "air");
+        world.setBlock(x, 2, z, "air");
+        // Add sand around edges of pond for beach effect
+        if (Math.abs(dx) === rx || Math.abs(dz) === rz ||
+            Math.abs(dx) === rx - 1 || Math.abs(dz) === rz - 1) {
+          const adjacent = [
+            [x+1, z], [x-1, z], [x, z+1], [x, z-1],
+          ];
+          for (const [ax, az] of adjacent) {
+            if (ax < 0 || az < 0 || ax >= WORLD_WIDTH || az >= WORLD_DEPTH) continue;
+            const cur = world.getBlock(ax, 0, az);
+            if (cur === "grass" || cur === "dirt") {
+              world.setBlock(ax, 0, az, "sand");
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function generateRuins(world: VoxelWorld): void {
+  // Scattered ruined stone walls add visual interest to the landscape
+  const ruins: [number, number][] = [
+    [6, 25], [12, 40], [55, 28], [50, 42], [14, 20], [50, 18],
+  ];
+
+  for (const [rx, rz] of ruins) {
+    if (inFortressBounds(rx, rz)) continue;
+    if (rz <= 10 || rz >= WORLD_DEPTH - 11) continue;
+
+    // L-shaped or partial wall segments
+    const h = 2 + (hash(rx, rz) % 3); // 2-4 blocks tall
+    const len = 3 + (hash(rx * 3, rz) % 4); // 3-6 blocks long
+
+    for (let i = 0; i < len; i++) {
+      for (let y = 1; y <= h; y++) {
+        // Skip some blocks for ruined look
+        if (hash(rx + i, y * 17 + rz) % 4 === 0) continue;
+        world.setBlock(rx + i, y, rz, "cobblestone");
+      }
+    }
+
+    // Perpendicular arm (partial)
+    const arm = 2 + (hash(rz, rx) % 3);
+    for (let i = 0; i < arm; i++) {
+      for (let y = 1; y <= Math.max(1, h - 1); y++) {
+        if (hash(rz + i, y * 11 + rx) % 3 === 0) continue;
+        world.setBlock(rx, y, rz + i, "cobblestone");
+      }
+    }
   }
 }

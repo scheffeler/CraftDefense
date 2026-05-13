@@ -14,9 +14,9 @@ const DAY_FRAMES: DayFrame[] = [
   { t: 0.00, sky: 0x050510, fog: 0x060615, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
   { t: 0.20, sky: 0x0a1535, fog: 0x0a1830, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
   { t: 0.27, sky: 0xff8040, fog: 0xdd6030, ambientColor: 0xcc6633, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff9060 },
-  { t: 0.35, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.7,  sunInt: 1.6, sunColor: 0xffe8b0 },
-  { t: 0.50, sky: 0x5ab3dd, fog: 0x80ccee, ambientColor: 0xb8d8f0, ambientInt: 0.85, sunInt: 1.9, sunColor: 0xfffde0 },
-  { t: 0.65, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.7,  sunInt: 1.6, sunColor: 0xffe8b0 },
+  { t: 0.35, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.8,  sunInt: 1.6, sunColor: 0xffe8b0 },
+  { t: 0.50, sky: 0x5ab3dd, fog: 0x80ccee, ambientColor: 0xb8d8f0, ambientInt: 1.0,  sunInt: 1.9, sunColor: 0xfffde0 },
+  { t: 0.65, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.8,  sunInt: 1.6, sunColor: 0xffe8b0 },
   { t: 0.73, sky: 0xff6020, fog: 0xcc4010, ambientColor: 0xcc5522, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff7040 },
   { t: 0.80, sky: 0x0a1535, fog: 0x0a1830, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
   { t: 1.00, sky: 0x050510, fog: 0x060615, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
@@ -320,7 +320,7 @@ export class SceneManager {
   }
 
   private setupLighting(): void {
-    this.ambientLight = new THREE.AmbientLight(0xb0c8e8, 0.7);
+    this.ambientLight = new THREE.AmbientLight(0xb0c8e8, 0.9);
     this.scene.add(this.ambientLight);
 
     this.sunLight = new THREE.DirectionalLight(0xffe8b0, 1.6);
