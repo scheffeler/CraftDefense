@@ -55,6 +55,9 @@ export class Game {
   private _regenTimer = 0;
   private _stepTimer  = 0;
   private _headBob    = 0;
+  // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
+  private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
+  private openChestKey: string | null = null;
 
   private particles!:        ParticleSystem;
   private scene!:            SceneManager;
@@ -110,6 +113,29 @@ export class Game {
     );
 
     this.particles = new ParticleSystem(this.scene.scene);
+
+    // Pre-populate world chests with loot
+    const craftShackChest = "38,1,30";
+    this.chestStorage.set(craftShackChest, [
+      { itemId: "iron_ingot",  count: 6  },
+      { itemId: "stick",       count: 8  },
+      { itemId: "coal_ore",    count: 4  },
+      { itemId: "planks",      count: 16 },
+      null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null,
+    ]);
+    const barracksChest = "22,1,30";
+    this.chestStorage.set(barracksChest, [
+      { itemId: "iron_sword",    count: 1 },
+      { itemId: "apple",         count: 6 },
+      { itemId: "arrow_item",    count: 12 },
+      { itemId: "cobblestone",   count: 32 },
+      null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null,
+    ]);
+
     this.ui    = new UI(this.container);
     this.audio = new AudioManager();
     this.input = new InputManager(this.scene.renderer.domElement);
@@ -151,6 +177,12 @@ export class Game {
         if (!this.scene.isPointerLocked) this.scene.lockPointer();
         return;
       }
+      if (this.ui.isChestOpen()) {
+        this.ui.showChest(false);
+        this.openChestKey = null;
+        if (!this.scene.isPointerLocked) this.scene.lockPointer();
+        return;
+      }
       const nowOpen = !this.ui.isInventoryOpen();
       this.ui.showInventory(nowOpen, this.inventory);
       if (nowOpen && this.scene.isPointerLocked) this.scene.unlockPointer();
@@ -180,6 +212,18 @@ export class Game {
       const tb = this.blockInteraction.getTargetBlock();
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "crafting_table") {
         this.ui.showWorkbench(true);
+        if (this.scene.isPointerLocked) this.scene.unlockPointer();
+        return;
+      }
+
+      // Check if looking at a chest — open chest storage
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "chest") {
+        const key = `${tb.wx},${tb.wy},${tb.wz}`;
+        if (!this.chestStorage.has(key)) {
+          this.chestStorage.set(key, Array(27).fill(null));
+        }
+        this.openChestKey = key;
+        this.ui.showChest(true, this.chestStorage.get(key)!);
         if (this.scene.isPointerLocked) this.scene.unlockPointer();
         return;
       }
@@ -388,6 +432,35 @@ export class Game {
       this.scene.lockPointer();
     };
 
+    // Chest storage
+    this.ui.onChestSlotClick = (index) => {
+      if (!this.openChestKey) return;
+      const storage = this.chestStorage.get(this.openChestKey);
+      if (!storage) return;
+      const active = this.inventory.getActiveItem();
+      if (active && !storage[index]) {
+        // Put active item in chest
+        storage[index] = { itemId: active.itemId, count: active.count };
+        this.inventory.removeItem(active.itemId, active.count);
+        this.ui.updateChestSlot(index, storage[index]);
+        this.refreshHotbar();
+      } else if (storage[index]) {
+        // Take item from chest
+        const s = storage[index]!;
+        this.inventory.addItem(s.itemId, s.count);
+        storage[index] = null;
+        this.ui.updateChestSlot(index, null);
+        this.audio.play("pickup", 0.4);
+        this.refreshHotbar();
+      }
+    };
+
+    this.ui.onChestClose = () => {
+      this.ui.showChest(false);
+      this.openChestKey = null;
+      this.scene.lockPointer();
+    };
+
     // UI restart
     this.ui.onRestart = () => this.resetGame();
   }
@@ -446,7 +519,7 @@ export class Game {
     this.audio.updateAmbient(dt, this.scene.daylight);
 
     if (this.phase === "gameover" || this.phase === "win") return;
-    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen()) return;
+    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
     // Player movement + bow charge accumulation

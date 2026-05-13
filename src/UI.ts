@@ -91,6 +91,8 @@ export class UI {
   onWorkbenchResultClick: () => void = () => {};
   onWorkbenchClose: () => void = () => {};
   onRecipeBookClose: () => void = () => {};
+  onChestSlotClick: (index: number) => void = () => {};
+  onChestClose: () => void = () => {};
 
   // Legacy TD stubs (backward compat — Game.ts uses these until Phase 12)
   onStartWave: () => void = () => {};
@@ -124,6 +126,8 @@ export class UI {
   // Workbench overlay
   private workbenchOverlay!: HTMLElement;
   private recipeBookOverlay!: HTMLElement;
+  private chestOverlay!: HTMLElement;
+  private chestSlotEls: HTMLElement[] = [];
   private workbenchCells: HTMLElement[][] = [];
   private workbenchResult!: HTMLElement;
   private _workbenchGrid: (string | null)[][] = [
@@ -416,6 +420,7 @@ export class UI {
 
     this.buildInventoryOverlay();
     this.buildWorkbenchOverlay();
+    this.buildChestOverlay();
     this.buildRecipeBookOverlay();
     this.buildDeathOverlay();
     this.buildEndOverlay();
@@ -613,6 +618,58 @@ export class UI {
     ov.appendChild(box);
     this.workbenchOverlay = ov;
     this.container.appendChild(ov);
+  }
+
+  private buildChestOverlay(): void {
+    const ov = div("fps-inventory overlay hidden");
+    ov.style.display = "none";
+
+    const box = div("fps-inv-box");
+
+    const title = div("fps-inv-label");
+    title.textContent = "Chest";
+    title.style.cssText = "font-size:14px;margin-bottom:8px;color:#c8a060;";
+    box.appendChild(title);
+
+    const grid = div("fps-inv-grid");
+    this.chestSlotEls = [];
+    for (let i = 0; i < 27; i++) {
+      const cell = div("fps-slot");
+      cell.addEventListener("click", () => this.onChestSlotClick(i));
+      cell.title = "Click to take/put item";
+      grid.appendChild(cell);
+      this.chestSlotEls.push(cell);
+    }
+    box.appendChild(grid);
+
+    const hint = div("fps-inv-hint");
+    hint.textContent = "Click item in chest to take · Click slot with item in hand to store · [E] close";
+    box.appendChild(hint);
+
+    const closeBtn = div("fps-inv-close-btn");
+    closeBtn.textContent = "✕ Close";
+    closeBtn.addEventListener("click", () => this.onChestClose());
+    box.appendChild(closeBtn);
+
+    ov.appendChild(box);
+    this.chestOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  isChestOpen(): boolean { return this.chestOverlay.style.display !== "none"; }
+
+  showChest(open: boolean, storage?: Array<{itemId:string;count:number}|null>): void {
+    this.chestOverlay.style.display = open ? "flex" : "none";
+    if (open && storage) {
+      for (let i = 0; i < 27; i++) {
+        const s = storage[i];
+        this.renderStackInSlot(this.chestSlotEls[i], s ? { itemId: s.itemId, count: s.count } : null);
+      }
+    }
+  }
+
+  updateChestSlot(index: number, stack: {itemId:string;count:number}|null): void {
+    this.renderStackInSlot(this.chestSlotEls[index], stack ? { itemId: stack.itemId, count: stack.count } : null);
   }
 
   private buildRecipeBookOverlay(): void {

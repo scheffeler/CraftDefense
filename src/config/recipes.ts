@@ -207,6 +207,17 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "glass", count: 1 },
   },
 
+  // --- Chest ---
+  {
+    id: "chest",
+    pattern: [
+      [r("planks"), r("planks"), r("planks")],
+      [r("planks"), null,        r("planks")],
+      [r("planks"), r("planks"), r("planks")],
+    ],
+    result: { itemId: "chest", count: 1 },
+  },
+
   // --- Torches ---
   {
     id: "torches",

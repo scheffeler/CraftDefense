@@ -258,6 +258,8 @@ function generateInterior(world: VoxelWorld): void {
   // Crafting table and furnace inside
   world.setBlock(39, 1, 29, "crafting_table");
   world.setBlock(39, 1, 30, "furnace");
+  // Chest with starter loot in the east shack
+  world.setBlock(38, 1, 30, "chest");
   // Torch in the shack
   world.setBlock(40, 3, 30, "torch");
 
@@ -280,6 +282,8 @@ function generateInterior(world: VoxelWorld): void {
     }
   }
   world.setBlock(24, 3, 30, "torch");
+  // Chest in the west shack (barracks supplies)
+  world.setBlock(22, 1, 30, "chest");
 }
 
 function generateSpawnMarkers(world: VoxelWorld): void {
