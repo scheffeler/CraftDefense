@@ -2,11 +2,66 @@ import * as THREE from "three";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import { ITEMS } from "./config/items";
 
+// ---------------------------------------------------------------------------
+// Day/night cycle keyframes (t=0 midnight, t=0.5 noon, t=1 midnight)
+// ---------------------------------------------------------------------------
+interface DayFrame {
+  t: number; sky: number; fog: number;
+  ambientColor: number; ambientInt: number;
+  sunInt: number; sunColor: number;
+}
+const DAY_FRAMES: DayFrame[] = [
+  { t: 0.00, sky: 0x050510, fog: 0x060615, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 0.20, sky: 0x0a1535, fog: 0x0a1830, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 0.27, sky: 0xff8040, fog: 0xdd6030, ambientColor: 0xcc6633, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff9060 },
+  { t: 0.35, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.7,  sunInt: 1.6, sunColor: 0xffe8b0 },
+  { t: 0.50, sky: 0x5ab3dd, fog: 0x80ccee, ambientColor: 0xb8d8f0, ambientInt: 0.85, sunInt: 1.9, sunColor: 0xfffde0 },
+  { t: 0.65, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.7,  sunInt: 1.6, sunColor: 0xffe8b0 },
+  { t: 0.73, sky: 0xff6020, fog: 0xcc4010, ambientColor: 0xcc5522, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff7040 },
+  { t: 0.80, sky: 0x0a1535, fog: 0x0a1830, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 1.00, sky: 0x050510, fog: 0x060615, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
+];
+
+function lerpHex(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+  return ((Math.round(ar + (br - ar) * t) << 16) |
+          (Math.round(ag + (bg - ag) * t) << 8)  |
+           Math.round(ab + (bb - ab) * t));
+}
+
+function sampleDayCycle(t: number): Omit<DayFrame, "t"> {
+  t = ((t % 1) + 1) % 1;
+  let lo = DAY_FRAMES[0], hi = DAY_FRAMES[DAY_FRAMES.length - 1];
+  for (let i = 0; i < DAY_FRAMES.length - 1; i++) {
+    if (t >= DAY_FRAMES[i].t && t <= DAY_FRAMES[i + 1].t) {
+      lo = DAY_FRAMES[i]; hi = DAY_FRAMES[i + 1]; break;
+    }
+  }
+  const f = lo.t === hi.t ? 0 : (t - lo.t) / (hi.t - lo.t);
+  return {
+    sky:         lerpHex(lo.sky, hi.sky, f),
+    fog:         lerpHex(lo.fog, hi.fog, f),
+    ambientColor: lerpHex(lo.ambientColor, hi.ambientColor, f),
+    ambientInt:  lo.ambientInt + (hi.ambientInt - lo.ambientInt) * f,
+    sunInt:      lo.sunInt  + (hi.sunInt  - lo.sunInt)  * f,
+    sunColor:    lerpHex(lo.sunColor, hi.sunColor, f),
+  };
+}
+
+// ---------------------------------------------------------------------------
+
 export class SceneManager {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
   private readonly controls: PointerLockControls;
+
+  // Day/night
+  private dayTime = 0.38; // start at morning
+  private readonly DAY_DURATION = 600; // 10 real minutes per game day
+  private sunLight!: THREE.DirectionalLight;
+  private ambientLight!: THREE.AmbientLight;
 
   // First-person arm
   private readonly armScene: THREE.Scene;
@@ -30,7 +85,6 @@ export class SceneManager {
     this.scene.fog = new THREE.Fog(0xaad4e8, 48, 130);
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    // Start outside north gate looking at sunlit fortress wall
     this.camera.position.set(32, 4, 12);
     this.camera.lookAt(32, 4, 24);
 
@@ -39,8 +93,9 @@ export class SceneManager {
     this.controls.addEventListener("unlock", () => this.onPointerLockChange(false));
 
     this.setupLighting();
+    this.buildClouds();
 
-    // Arm scene — rendered after main scene with depth cleared so arm always shows
+    // Arm scene — rendered after main scene with depth cleared
     this.armScene = new THREE.Scene();
     this.armScene.add(new THREE.AmbientLight(0xffffff, 0.9));
     const armSun = new THREE.DirectionalLight(0xffe8b0, 0.8);
@@ -50,9 +105,7 @@ export class SceneManager {
     this.armGroup = new THREE.Group();
     this.armGroup.scale.setScalar(0.65);
     this.armScene.add(this.armGroup);
-
     this.buildArmMesh();
-    this.buildClouds();
 
     window.addEventListener("resize", () => this.onResize());
   }
@@ -62,9 +115,35 @@ export class SceneManager {
   lockPointer():   void { this.controls.lock(); }
   unlockPointer(): void { this.controls.unlock(); }
 
+  /** Advance the day/night cycle. Call from game loop. */
+  updateDayNight(dt: number): void {
+    this.dayTime = (this.dayTime + dt / this.DAY_DURATION) % 1;
+    const frame = sampleDayCycle(this.dayTime);
+
+    (this.scene.background as THREE.Color).setHex(frame.sky);
+    (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
+
+    this.ambientLight.color.setHex(frame.ambientColor);
+    this.ambientLight.intensity = frame.ambientInt;
+
+    this.sunLight.intensity = frame.sunInt;
+    this.sunLight.color.setHex(frame.sunColor);
+
+    // Animate sun position around world center
+    const angle = this.dayTime * Math.PI * 2;
+    const r = 100;
+    this.sunLight.position.set(
+      Math.cos(angle) * r,
+      Math.sin(angle) * r,
+      20,
+    );
+
+    // Tone mapping exposure: brighter at noon, dimmer at night
+    this.renderer.toneMappingExposure = 0.5 + frame.ambientInt * 0.8;
+  }
+
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
   updateArmItem(itemId: string | null): void {
-    // Remove all children except the arm itself (index 0)
     while (this.armGroup.children.length > 1) {
       this.armGroup.remove(this.armGroup.children[1]);
     }
@@ -73,15 +152,11 @@ export class SceneManager {
     const def = ITEMS[itemId];
     if (!def) return;
 
-    const itemMesh = this.buildItemMesh(itemId, def.category, def.color);
+    const itemMesh = this.buildItemMesh(def.category, def.color);
     if (itemMesh) this.armGroup.add(itemMesh);
   }
 
-  private buildItemMesh(
-    _id: string,
-    category: string,
-    color: number,
-  ): THREE.Object3D | null {
+  private buildItemMesh(category: string, color: number): THREE.Object3D | null {
     if (category === "block") {
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), mat);
@@ -115,7 +190,6 @@ export class SceneManager {
   private buildArmMesh(): void {
     const skinMat = new THREE.MeshLambertMaterial({ color: 0x8b6040 });
     const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), skinMat);
-    arm.position.set(0, 0, 0);
     this.armGroup.add(arm);
   }
 
@@ -123,39 +197,33 @@ export class SceneManager {
     const cloudMat = new THREE.MeshLambertMaterial({
       color: 0xffffff, transparent: true, opacity: 0.85,
     });
-
-    // Scattered flat cloud boxes at y=22
     const positions: [number, number][] = [
       [10, 8], [28, 5], [48, 12], [15, 42], [45, 38],
       [5, 22], [38, 25], [55, 50], [22, 55], [50, 20],
+      [35, 14], [18, 48], [52, 32], [8, 36], [42, 58],
     ];
-
     for (const [cx, cz] of positions) {
-      const w = 6 + (cx % 5);
-      const d = 4 + (cz % 4);
-      const geo = new THREE.BoxGeometry(w, 1.2, d);
-      const cloud = new THREE.Mesh(geo, cloudMat);
+      const w = 5 + (cx % 7);
+      const d = 3 + (cz % 5);
+      const cloud = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, d), cloudMat);
       cloud.position.set(cx, 22, cz);
       this.scene.add(cloud);
     }
   }
 
   render(): void {
-    // Sync arm camera to main camera
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     this.renderer.clearDepth();
-    // Render arm with same camera perspective (camera is not in armScene — we position arm manually)
-    this.renderArmWithCamera();
+    this.renderArm();
   }
 
-  private renderArmWithCamera(): void {
+  private renderArm(): void {
     const worldPos  = new THREE.Vector3();
     const worldQuat = new THREE.Quaternion();
     this.camera.getWorldPosition(worldPos);
     this.camera.getWorldQuaternion(worldQuat);
 
-    // Push arm into lower-right corner — far enough to stay small on screen
     const localOffset = new THREE.Vector3(0.38, -0.52, -0.75);
     localOffset.applyQuaternion(worldQuat);
     this.armGroup.position.copy(worldPos).add(localOffset);
@@ -174,21 +242,21 @@ export class SceneManager {
   }
 
   private setupLighting(): void {
-    this.scene.add(new THREE.AmbientLight(0xb0c8e8, 0.7));
+    this.ambientLight = new THREE.AmbientLight(0xb0c8e8, 0.7);
+    this.scene.add(this.ambientLight);
 
-    const sun = new THREE.DirectionalLight(0xffe8b0, 1.6);
-    sun.position.set(60, 100, 20);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 220;
-    sun.shadow.camera.left  = -90;
-    sun.shadow.camera.right =  90;
-    sun.shadow.camera.top   =  90;
-    sun.shadow.camera.bottom = -90;
-    this.scene.add(sun);
+    this.sunLight = new THREE.DirectionalLight(0xffe8b0, 1.6);
+    this.sunLight.position.set(60, 100, 20);
+    this.sunLight.castShadow = true;
+    this.sunLight.shadow.mapSize.set(2048, 2048);
+    this.sunLight.shadow.camera.near = 1;
+    this.sunLight.shadow.camera.far = 220;
+    this.sunLight.shadow.camera.left  = -90;
+    this.sunLight.shadow.camera.right =  90;
+    this.sunLight.shadow.camera.top   =  90;
+    this.sunLight.shadow.camera.bottom = -90;
+    this.scene.add(this.sunLight);
 
-    // Fill lights from multiple angles to prevent pitch-black shadow sides
     const fill1 = new THREE.DirectionalLight(0x88aacc, 0.5);
     fill1.position.set(-30, 20, -20);
     this.scene.add(fill1);

@@ -302,6 +302,9 @@ export class Game {
   }
 
   private update(dt: number): void {
+    // Day/night cycle runs even while paused/locked
+    this.scene.updateDayNight(dt);
+
     if (this.phase === "gameover" || this.phase === "win") return;
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen()) return;
 
