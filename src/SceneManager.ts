@@ -58,7 +58,7 @@ export class SceneManager {
   private readonly controls: PointerLockControls;
 
   // Day/night
-  private dayTime = 0.38; // start at morning
+  private _dayTime = 0.38; // start at morning
   private _totalDays = 0;
   private readonly DAY_DURATION = 600; // 10 real minutes per game day
   private sunLight!: THREE.DirectionalLight;
@@ -133,6 +133,7 @@ export class SceneManager {
   }
 
   get isPointerLocked(): boolean { return this.controls.isLocked; }
+  get dayTime(): number { return this._dayTime; }
   get daylight(): number {
     const frame = sampleDayCycle(this.dayTime);
     return frame.ambientInt;
@@ -146,8 +147,8 @@ export class SceneManager {
   /** Advance the day/night cycle. Call from game loop. */
   updateDayNight(dt: number): void {
     this._totalDays += dt / this.DAY_DURATION;
-    this.dayTime = (this.dayTime + dt / this.DAY_DURATION) % 1;
-    const frame = sampleDayCycle(this.dayTime);
+    this._dayTime = (this._dayTime + dt / this.DAY_DURATION) % 1;
+    const frame = sampleDayCycle(this._dayTime);
 
     // Underwater overrides sky/fog
     if (this._underwaterEffect) {
@@ -169,7 +170,7 @@ export class SceneManager {
     this.sunLight.color.setHex(frame.sunColor);
 
     // Animate sun position around world center
-    const angle = this.dayTime * Math.PI * 2;
+    const angle = this._dayTime * Math.PI * 2;
     const r = 100;
     this.sunLight.position.set(
       Math.cos(angle) * r,
@@ -186,7 +187,7 @@ export class SceneManager {
     (this.moon.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
 
     // Moon position: opposite side of sky from sun
-    const moonAngle = this.dayTime * Math.PI * 2 + Math.PI;
+    const moonAngle = this._dayTime * Math.PI * 2 + Math.PI;
     const mr = 130;
     this.moon.position.set(
       Math.cos(moonAngle) * mr + 32,

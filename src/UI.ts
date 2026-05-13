@@ -127,6 +127,9 @@ export class UI {
   private blockTooltip!: HTMLElement;
   private elWaveInfo!: HTMLElement;
   private elObjective!: HTMLElement;
+  private dayClockCanvas!: HTMLCanvasElement;
+  private minimapCanvas!: HTMLCanvasElement;
+  private minimapTerrain: ImageData | null = null;
   private lockPrompt!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
@@ -281,6 +284,15 @@ export class UI {
     setTimeout(() => el.remove(), 2500);
   }
 
+  showAchievement(title: string, desc: string): void {
+    const el = document.createElement("div");
+    el.className = "achievement-toast";
+    el.innerHTML = `<div class="ach-title">Achievement Unlocked!</div><div class="ach-name">${title}</div><div class="ach-desc">${desc}</div>`;
+    this.container.appendChild(el);
+    setTimeout(() => el.classList.add("ach-hide"), 3500);
+    setTimeout(() => el.remove(), 4500);
+  }
+
   showFloatingNumber(text: string, color: string, screenX: number, screenY: number): void {
     const div = document.createElement("div");
     div.className = "float-num";
@@ -404,6 +416,8 @@ export class UI {
     this.buildXPBar();
     this.buildHotbar();
     this.buildItemTooltip();
+    this.buildDayClock();
+    this.buildMinimap();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -491,6 +505,122 @@ export class UI {
     this.xpBarFill.style.width = "0%";
     track.appendChild(this.xpBarFill);
     this.container.appendChild(track);
+  }
+
+  private buildDayClock(): void {
+    const canvas = document.createElement("canvas");
+    canvas.width = 50; canvas.height = 50;
+    canvas.className = "fps-day-clock";
+    this.dayClockCanvas = canvas;
+    this.container.appendChild(canvas);
+    this.updateDayClock(0.38);
+  }
+
+  updateDayClock(dayTime: number): void {
+    const c = this.dayClockCanvas;
+    if (!c) return;
+    const ctx = c.getContext("2d")!;
+    const cx = 25, cy = 25, r = 20;
+    ctx.clearRect(0, 0, 50, 50);
+
+    // Night arc (dark blue)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = "#08142a";
+    ctx.fill();
+
+    // Day arc (sky blue) from t=0.27 to t=0.73 (dawn to dusk)
+    const dayStart = 0.27, dayEnd = 0.73;
+    const startAngle = (dayStart * Math.PI * 2) - Math.PI / 2;
+    const endAngle   = (dayEnd   * Math.PI * 2) - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = "#3a8bbf";
+    ctx.fill();
+
+    // Sun or moon indicator
+    const angle = dayTime * Math.PI * 2 - Math.PI / 2;
+    const sx = cx + Math.cos(angle) * (r - 5);
+    const sy = cy + Math.sin(angle) * (r - 5);
+    const isDay = dayTime >= dayStart && dayTime <= dayEnd;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = isDay ? "#ffee44" : "#ddeeff";
+    ctx.fill();
+
+    // Clock border
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private buildMinimap(): void {
+    const c = document.createElement("canvas");
+    c.width = 96; c.height = 96;
+    c.className = "fps-minimap";
+    this.minimapCanvas = c;
+    this.container.appendChild(c);
+  }
+
+  initMinimapTerrain(worldW: number, worldD: number, sampleBlock: (x: number, z: number) => string): void {
+    const S = 96;
+    const c = document.createElement("canvas");
+    c.width = S; c.height = S;
+    const ctx = c.getContext("2d")!;
+    const scaleX = S / worldW, scaleZ = S / worldD;
+    for (let z = 0; z < worldD; z++) {
+      for (let x = 0; x < worldW; x++) {
+        const b = sampleBlock(x, z);
+        let col = "#3a7a25";
+        if (b === "stone" || b === "cobblestone") col = "#777";
+        else if (b === "grass") col = "#5d9e3a";
+        else if (b === "dirt" || b === "farmland") col = "#8b5c2a";
+        else if (b === "sand") col = "#d4c484";
+        else if (b === "water") col = "#3a9aee";
+        else if (b === "planks" || b === "wood") col = "#a07040";
+        else if (b === "leaves") col = "#2a6015";
+        else if (b === "bedrock") col = "#222";
+        ctx.fillStyle = col;
+        ctx.fillRect(Math.floor(x * scaleX), Math.floor(z * scaleZ), Math.ceil(scaleX) + 1, Math.ceil(scaleZ) + 1);
+      }
+    }
+    this.minimapTerrain = ctx.getImageData(0, 0, S, S);
+  }
+
+  updateMinimap(px: number, pz: number, enemies: Array<{x: number; z: number}>, worldW = 64, worldD = 64): void {
+    const c = this.minimapCanvas;
+    if (!c) return;
+    const S = 96;
+    const ctx = c.getContext("2d")!;
+    ctx.clearRect(0, 0, S, S);
+
+    if (this.minimapTerrain) ctx.putImageData(this.minimapTerrain, 0, 0);
+    else { ctx.fillStyle = "#222"; ctx.fillRect(0, 0, S, S); }
+
+    const scaleX = S / worldW, scaleZ = S / worldD;
+
+    // Enemy dots
+    ctx.fillStyle = "#ff3333";
+    for (const e of enemies) {
+      const ex = e.x * scaleX, ez = e.z * scaleZ;
+      ctx.fillRect(ex - 1, ez - 1, 3, 3);
+    }
+
+    // Player dot
+    const mapX = px * scaleX, mapZ = pz * scaleZ;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(mapX - 2, mapZ - 2, 5, 5);
+    ctx.fillStyle = "#ffff00";
+    ctx.fillRect(mapX - 1, mapZ - 1, 3, 3);
+
+    // Border
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, S, S);
   }
 
   private buildHotbar(): void {
@@ -1034,6 +1164,25 @@ const FPS_CSS = `
   white-space: nowrap;
 }
 
+/* Day/night clock — top right below wave info */
+.fps-day-clock {
+  position: absolute;
+  top: 52px; right: 8px;
+  width: 50px; height: 50px;
+  pointer-events: none; z-index: 15;
+  image-rendering: pixelated;
+}
+
+/* Minimap — bottom right above hotbar */
+.fps-minimap {
+  position: absolute;
+  bottom: 72px; right: 8px;
+  width: 96px; height: 96px;
+  pointer-events: none; z-index: 15;
+  image-rendering: pixelated;
+  outline: 2px solid #555;
+}
+
 /* Wave info — flat, white text */
 .fps-wave-info {
   position: absolute;
@@ -1426,6 +1575,33 @@ const FPS_CSS = `
   80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.0) translateY(-20px); }
 }
+/* Minecraft-style achievement toast */
+.achievement-toast {
+  position: absolute;
+  top: 12px; right: 12px;
+  background: #222;
+  border: 2px solid #555;
+  padding: 8px 12px 8px 40px;
+  min-width: 220px;
+  font-family: 'Press Start 2P', monospace;
+  z-index: 80;
+  pointer-events: none;
+  animation: achSlideIn 0.35s ease-out;
+  transition: opacity 0.8s ease;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect x='4' y='4' width='24' height='24' rx='2' fill='%23ffdd00'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='%23000'>★</text></svg>");
+  background-repeat: no-repeat;
+  background-position: 6px center;
+  background-size: 28px;
+}
+.achievement-toast.ach-hide { opacity: 0; }
+.ach-title { font-size: 7px; color: #ffdd00; margin-bottom: 4px; }
+.ach-name { font-size: 9px; color: #fff; margin-bottom: 2px; }
+.ach-desc { font-size: 7px; color: #aaa; }
+@keyframes achSlideIn {
+  from { transform: translateX(110%); }
+  to   { transform: translateX(0); }
+}
+
 .damage-vignette {
   position: absolute;
   inset: 0;

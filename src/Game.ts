@@ -86,6 +86,9 @@ export class Game {
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
 
+  // Achievement tracking
+  private readonly _achievements = new Set<string>();
+
   // Item entity drops — floating 3D items in the world
   private readonly itemEntities: Array<{
     group: THREE.Group;
@@ -179,6 +182,16 @@ export class Game {
     this.ui    = new UI(this.container);
     this.audio = new AudioManager();
     this.input = new InputManager(this.scene.renderer.domElement);
+
+    // Pre-render minimap terrain once
+    const G = 6; // GROUND_OFFSET
+    this.ui.initMinimapTerrain(64, 64, (x, z) => {
+      for (let y = G + 12; y >= G; y--) {
+        const b = this.gameMap.world.getBlock(x, y, z);
+        if (b !== "air") return b as string;
+      }
+      return "bedrock";
+    });
 
     this.wireCallbacks();
     this.refreshHUD();
@@ -397,6 +410,11 @@ export class Game {
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
       if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+
+      // Achievements
+      if (id === "iron_ore") this.unlockAchievement("iron_ore", "Getting an Upgrade", "Mine your first iron ore");
+      if (id === "coal_ore") this.unlockAchievement("coal_ore", "Hot Topic", "Mine your first coal");
+      if (id === "diamond_ore") this.unlockAchievement("diamond_ore", "Diamonds!", "Find a rare diamond ore deposit");
     };
 
     this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
@@ -404,6 +422,7 @@ export class Game {
       if (id === "torch") this.addTorchLight(wx, wy, wz);
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
       this.refreshHotbar();
+      if (id === "torch") this.unlockAchievement("torch_place", "Lighting the Way", "Place your first torch");
     };
 
     // Enemy events
@@ -416,14 +435,21 @@ export class Game {
         }
       }
       if (state.config.xpReward) { this.player.addXP(state.config.xpReward); this.refreshXPBar(); }
-      if (state.config.drops) {
+      this.unlockAchievement("first_kill", "Monster Hunter", `Defeated your first ${state.config.name}`);
+      if (state.config.drops && pos) {
         for (const drop of state.config.drops) {
           if (Math.random() < drop.chance) {
-            this.inventory.addItem(drop.itemId, drop.count ?? 1);
-            this.audio.play("pickup", 0.4);
+            const count = drop.count ?? 1;
+            for (let d = 0; d < count; d++) {
+              this.spawnItemEntity(
+                pos.x + (Math.random() - 0.5) * 0.4,
+                pos.y + 0.3,
+                pos.z + (Math.random() - 0.5) * 0.4,
+                drop.itemId,
+              );
+            }
           }
         }
-        this.refreshHotbar();
       }
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
@@ -878,7 +904,15 @@ export class Game {
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+    this.ui.updateDayClock(this.scene.dayTime);
     this.refreshHotbar();
+
+    // Minimap — update every frame with enemy positions
+    const enemyPositions = this.enemies.getAliveEnemies().map(e => {
+      const p = this.enemies.getEnemyPosition(e.id);
+      return p ? { x: p.x, z: p.z } : null;
+    }).filter((p): p is {x: number; z: number} => p !== null);
+    this.ui.updateMinimap(this.player.position.x, this.player.position.z, enemyPositions);
 
     // Block name tooltip when targeting a block
     const tb2 = this.blockInteraction.getTargetBlock();
@@ -1112,7 +1146,11 @@ export class Game {
     this.projectiles.update(
       dt,
       (id)         => this.enemies.getEnemyPosition(id),
-      (id, d, s, dur) => this.enemies.damage(id, d, s, dur),
+      (id, d, s, dur) => {
+        this.enemies.damage(id, d, s, dur);
+        const pos = this.enemies.getEnemyPosition(id);
+        if (pos) this.showDamageNumber(d, pos.x, pos.y + 1.8, pos.z);
+      },
       (c, r)       => this.enemies.getAliveEnemies()
         .filter(e => { const p = this.enemies.getEnemyPosition(e.id); return p ? p.distanceTo(c) <= r : false; })
         .map(e => e.id),
@@ -1146,8 +1184,24 @@ export class Game {
       if (pos && pos.distanceTo(result.center) <= result.radius) {
         this.enemies.damage(state.id, damage);
         this.audio.play("hit", 0.4);
+        this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
       }
     }
+  }
+
+  private unlockAchievement(id: string, title: string, desc: string): void {
+    if (this._achievements.has(id)) return;
+    this._achievements.add(id);
+    this.ui.showAchievement(title, desc);
+  }
+
+  private showDamageNumber(amount: number, wx: number, wy: number, wz: number): void {
+    const v = new THREE.Vector3(wx, wy, wz);
+    v.project(this.scene.camera);
+    if (v.z > 1) return; // behind camera
+    const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    this.ui.showFloatingNumber(`-${amount}`, "#ff4444", sx, sy);
   }
 
   // ─── Torch lights ─────────────────────────────────────────────────────────
