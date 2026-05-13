@@ -55,8 +55,9 @@ export class Game {
   private _regenTimer = 0;
   private _stepTimer  = 0;
   private _headBob    = 0;
-  private _wasInWater     = false;
-  private _nightSpawnTimer = 0;
+  private _wasInWater       = false;
+  private _nightSpawnTimer  = 0;
+  private _flowUpdateTimer  = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
@@ -438,6 +439,33 @@ export class Game {
       }
     };
 
+    // Personal 2×2 crafting (inventory screen)
+    this.ui.onCraftingSlotClick = (row, col) => {
+      const active = this.inventory.getActiveItem();
+      if (active) {
+        this.ui.setPersonalCraftSlot(row, col, active.itemId);
+      } else {
+        this.ui.setPersonalCraftSlot(row, col, null);
+      }
+      const recipe = Crafting.findRecipe(this.ui.getPersonalCraftGrid());
+      this.ui.setPersonalCraftResult(recipe?.result.itemId ?? null, recipe?.result.count ?? 0);
+    };
+
+    this.ui.onCraftingResultClick = () => {
+      const grid = this.ui.getPersonalCraftGrid();
+      const recipe = Crafting.findRecipe(grid);
+      if (!recipe) return;
+      const result = Crafting.craft(this.inventory, recipe);
+      if (result) {
+        this.audio.play("pickup", 0.5);
+        this.refreshHotbar();
+        for (let r = 0; r < 2; r++)
+          for (let c = 0; c < 2; c++)
+            this.ui.setPersonalCraftSlot(r, c, null);
+        this.ui.setPersonalCraftResult(null, 0);
+      }
+    };
+
     // Workbench 3×3 crafting
     this.ui.onWorkbenchSlotClick = (row, col) => {
       const active = this.inventory.getActiveItem();
@@ -680,6 +708,26 @@ export class Game {
 
     // Crop growth
     this.updateCrops(dt);
+
+    // Torch flicker — subtle sine-wave intensity variation
+    if (this.torchLights.size > 0) {
+      const t = performance.now() * 0.001;
+      for (const light of this.torchLights.values()) {
+        light.intensity = 1.6 + Math.sin(t * 7.3) * 0.25 + Math.sin(t * 12.1 + 1.5) * 0.12;
+      }
+    }
+
+    // Freeplay: flow field tracks player (recomputed every 3 s)
+    if (this.mode === "freeplay" && this.enemies.getAliveEnemies().length > 0) {
+      this._flowUpdateTimer += dt;
+      if (this._flowUpdateTimer >= 3) {
+        this._flowUpdateTimer = 0;
+        this.flowField.recompute(
+          Math.round(this.player.position.x),
+          Math.round(this.player.position.z),
+        );
+      }
+    }
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
