@@ -317,11 +317,26 @@ export class EnemyManager {
 
     const legMat = new THREE.MeshLambertMaterial({ color: cfg.color });
     for (const [lx, i] of [[-0.14, 0], [0.14, 1]] as [number, number][]) {
+      const legPivot = new THREE.Object3D();
+      legPivot.position.set(lx, 0.5, 0);
+      legPivot.name = `legpivot_${i}`;
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), legMat);
-      leg.position.set(lx, 0.25, 0);
+      leg.position.y = -0.25;
       leg.castShadow = true;
-      leg.name = `leg_${i}`;
-      group.add(leg);
+      legPivot.add(leg);
+      group.add(legPivot);
+    }
+
+    // Arms
+    const armMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+    for (const [ax, i] of [[-0.36, 0], [0.36, 1]] as [number, number][]) {
+      const armPivot = new THREE.Object3D();
+      armPivot.position.set(ax, 0.9, 0);
+      armPivot.name = `armpivot_${i}`;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), armMat);
+      arm.position.y = -0.22;
+      armPivot.add(arm);
+      group.add(armPivot);
     }
 
     // Extra details per type
@@ -338,9 +353,17 @@ export class EnemyManager {
       // Pickaxe prop
       const pickMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
       const pick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), pickMat);
-      pick.position.set(0.35, 0.7, 0.2);
+      pick.position.set(0.38, 0.7, 0.2);
       pick.rotation.x = Math.PI / 4;
       group.add(pick);
+    }
+
+    if (type === "orc" || type === "zombie") {
+      // Club/weapon
+      const wepMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1a });
+      const club = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.4, 0.08), wepMat);
+      club.position.set(0.38, 0.65, 0.15);
+      group.add(club);
     }
   }
 
@@ -348,11 +371,17 @@ export class EnemyManager {
     const group = this.meshes.get(id);
     if (!group) return;
     group.traverse(c => {
-      if (c.name.startsWith("leg_")) {
+      if (c.name.startsWith("legpivot_")) {
         const idx = parseInt(c.name.split("_")[1]);
-        (c as THREE.Mesh).rotation.x = Math.sin(phase + idx * Math.PI) * 0.5;
+        (c as THREE.Object3D).rotation.x = Math.sin(phase + idx * Math.PI) * 0.55;
+      } else if (c.name.startsWith("armpivot_")) {
+        const idx = parseInt(c.name.split("_")[1]);
+        // Arms swing opposite to legs
+        (c as THREE.Object3D).rotation.x = Math.sin(phase + (1 - idx) * Math.PI) * 0.45;
       }
     });
+    // Slight walk bob
+    group.position.y = ENEMY_Y + Math.abs(Math.sin(phase * 2)) * 0.04;
   }
 
   // ─── Health bar ────────────────────────────────────────────────────────────

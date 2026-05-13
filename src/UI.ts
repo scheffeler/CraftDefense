@@ -105,6 +105,7 @@ export class UI {
   private hungerEls: HTMLElement[] = [];
   private xpBarFill!: HTMLElement;
   private itemTooltip!: HTMLElement;
+  private blockTooltip!: HTMLElement;
   private elWaveInfo!: HTMLElement;
   private elObjective!: HTMLElement;
   private lockPrompt!: HTMLElement;
@@ -179,6 +180,12 @@ export class UI {
       slot.classList.toggle("active", i === activeSlot);
       this.renderStackInSlot(slot, stack);
     }
+  }
+
+  showBlockTooltip(name: string | null): void {
+    if (!name) { this.blockTooltip.style.display = "none"; return; }
+    this.blockTooltip.textContent = name;
+    this.blockTooltip.style.display = "block";
   }
 
   updateItemTooltip(itemId: string | null, durability?: number): void {
@@ -429,6 +436,10 @@ export class UI {
     this.itemTooltip = div("fps-item-tooltip");
     this.itemTooltip.style.display = "none";
     this.container.appendChild(this.itemTooltip);
+
+    this.blockTooltip = div("fps-block-tooltip");
+    this.blockTooltip.style.display = "none";
+    this.container.appendChild(this.blockTooltip);
   }
 
   private buildHungerBar(): void {
@@ -871,6 +882,18 @@ const FPS_CSS = `
   height: 100%;
   background: #80ff20;
   transition: width 0.3s;
+}
+
+/* Block name tooltip — appears just below crosshair */
+.fps-block-tooltip {
+  position: absolute;
+  top: calc(50% + 28px); left: 50%; transform: translateX(-50%);
+  font-size: 9px; color: #eee;
+  text-shadow: 1px 1px 0 #000, 2px 2px 0 #000;
+  background: rgba(0,0,0,0.55);
+  padding: 2px 7px;
+  pointer-events: none; z-index: 14;
+  white-space: nowrap;
 }
 
 /* Item tooltip — name above hotbar */

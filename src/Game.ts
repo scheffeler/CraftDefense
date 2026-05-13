@@ -555,6 +555,16 @@ export class Game {
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.refreshHotbar();
+
+    // Block name tooltip when targeting a block
+    const tb2 = this.blockInteraction.getTargetBlock();
+    if (tb2) {
+      const blockId = this.gameMap.world.getBlock(tb2.wx, tb2.wy, tb2.wz);
+      const blockName = BLOCK_DEFS[blockId]?.name ?? blockId;
+      this.ui.showBlockTooltip(blockName);
+    } else {
+      this.ui.showBlockTooltip(null);
+    }
   }
 
   // ─── Combat ────────────────────────────────────────────────────────────────
