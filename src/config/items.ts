@@ -43,12 +43,17 @@ export const ITEMS: Record<string, ItemDef> = {
   chest:          { id:"chest",          name:"Chest",          category:"block",    stackSize:64, color:0xa05020, placesBlock:"chest"          },
 
   // --- Raw materials ---
-  stick:      { id:"stick",      name:"Stick",      category:"material", stackSize:64, color:0x8b6914 },
-  iron_ore:   { id:"iron_ore",   name:"Iron Ore",   category:"material", stackSize:64, color:0x886655 },
-  coal_ore:   { id:"coal_ore",   name:"Coal",       category:"material", stackSize:64, color:0x333333 },
-  iron_ingot: { id:"iron_ingot", name:"Iron Ingot", category:"material", stackSize:64, color:0xbbbbbb },
-  flint:      { id:"flint",      name:"Flint",      category:"material", stackSize:64, color:0x555555 },
-  arrow_item: { id:"arrow_item", name:"Arrow",      category:"material", stackSize:64, color:0x888888 },
+  stick:        { id:"stick",        name:"Stick",        category:"material", stackSize:64, color:0x8b6914 },
+  iron_ore:     { id:"iron_ore",     name:"Iron Ore",     category:"material", stackSize:64, color:0x886655 },
+  coal_ore:     { id:"coal_ore",     name:"Coal",         category:"material", stackSize:64, color:0x333333 },
+  iron_ingot:   { id:"iron_ingot",   name:"Iron Ingot",   category:"material", stackSize:64, color:0xbbbbbb },
+  flint:        { id:"flint",        name:"Flint",        category:"material", stackSize:64, color:0x555555 },
+  arrow_item:   { id:"arrow_item",   name:"Arrow",        category:"material", stackSize:64, color:0x888888 },
+  gravel:       { id:"gravel",       name:"Gravel",       category:"block",    stackSize:64, color:0x888880, placesBlock:"gravel" },
+  gold_ore:     { id:"gold_ore",     name:"Gold Ore",     category:"material", stackSize:64, color:0xddaa00 },
+  diamond_ore:  { id:"diamond_ore",  name:"Diamond",      category:"material", stackSize:64, color:0x00cccc },
+  gold_ingot:   { id:"gold_ingot",   name:"Gold Ingot",   category:"material", stackSize:64, color:0xffdd44 },
+  diamond:      { id:"diamond",      name:"Diamond",      category:"material", stackSize:64, color:0x55ffff },
 
   // --- Food ---
   apple: { id:"apple", name:"Apple", category:"food", stackSize:64, color:0xdd2222, foodPoints:4 },

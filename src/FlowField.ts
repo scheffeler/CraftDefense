@@ -1,5 +1,5 @@
 import type { VoxelWorld } from "./Map";
-import { WORLD_WIDTH, WORLD_DEPTH } from "./config/map";
+import { WORLD_WIDTH, WORLD_DEPTH, GROUND_OFFSET } from "./config/map";
 
 const W = WORLD_WIDTH;
 const D = WORLD_DEPTH;
@@ -64,7 +64,7 @@ export class FlowField {
   }
 
   private isPassable(x: number, z: number): boolean {
-    return this.world.getBlock(x, 1, z) === "air";
+    return this.world.getBlock(x, GROUND_OFFSET + 1, z) === "air";
   }
 
   private computeDirections(): void {

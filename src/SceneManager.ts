@@ -100,8 +100,8 @@ export class SceneManager {
     this.scene.fog = new THREE.Fog(0xaad4e8, 48, 130);
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(32, 2.62, 8);
-    this.camera.lookAt(32, 2, 30); // look south toward fortress from outside north gate
+    this.camera.position.set(32, 8.62, 8);
+    this.camera.lookAt(32, 8, 30); // look south toward fortress from outside north gate
 
     this.controls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.controls.addEventListener("lock",   () => this.onPointerLockChange(true));
@@ -369,8 +369,8 @@ export class SceneManager {
   }
 
   resetCamera(): void {
-    this.camera.position.set(32, 2.62, 36);
-    this.camera.lookAt(32, 2, 60);
+    this.camera.position.set(32, 8.62, 36);
+    this.camera.lookAt(32, 8, 60);
   }
 
   private setupLighting(): void {

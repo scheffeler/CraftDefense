@@ -3,12 +3,12 @@ import type { EnemyState, EnemyTypeName } from "./types";
 import { ENEMY_CONFIGS } from "./config/enemies";
 import type { FlowField } from "./FlowField";
 import type { VoxelWorld } from "./Map";
-import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
+import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z, ENEMY_Y as CFG_ENEMY_Y } from "./config/map";
 import { getSpawnPositions } from "./WorldGen";
 
 export type { EnemyState };
 
-const ENEMY_Y       = 1.5;
+const ENEMY_Y       = CFG_ENEMY_Y;
 const REACH_RADIUS  = 2.0; // distance to fortress center that counts as "reached base"
 const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
 
@@ -207,13 +207,13 @@ export class EnemyManager {
       if (blocked) {
         if (!state.breakTarget ||
             state.breakTarget.x !== nx || state.breakTarget.z !== nz) {
-          state.breakTarget = { x: nx, y: 1, z: nz };
+          state.breakTarget = { x: nx, y: Math.round(ENEMY_Y), z: nz };
           state.breakTimer  = 0;
         }
         state.breakTimer = (state.breakTimer ?? 0) + dt;
         if (state.breakTimer >= WALL_BREAK_TIME) {
-          // Break up to 3 wall layers vertically
-          for (let wy = 1; wy <= 3; wy++) {
+          const baseY = Math.round(ENEMY_Y);
+          for (let wy = baseY; wy <= baseY + 2; wy++) {
             if (this.world.getBlock(nx, wy, nz) !== "air") {
               this.world.setBlock(nx, wy, nz, "air");
             }

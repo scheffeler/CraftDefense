@@ -35,6 +35,8 @@ const SURFACE_STEP_SOUND = {
 
 const SMELT_RECIPES: Record<string, string> = {
   iron_ore:    "iron_ingot",
+  gold_ore:    "gold_ingot",
+  diamond_ore: "diamond",
   sand:        "glass",
   cobblestone: "stone",
 };
@@ -139,7 +141,7 @@ export class Game {
     this.particles = new ParticleSystem(this.scene.scene);
 
     // Pre-populate world chests with loot
-    const craftShackChest = "38,1,30";
+    const craftShackChest = `38,${7},30`;
     this.chestStorage.set(craftShackChest, [
       { itemId: "iron_ingot",  count: 6  },
       { itemId: "stick",       count: 8  },
@@ -149,7 +151,7 @@ export class Game {
       null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, null, null, null,
     ]);
-    const barracksChest = "22,1,30";
+    const barracksChest = `22,${7},30`;
     this.chestStorage.set(barracksChest, [
       { itemId: "iron_sword",    count: 1 },
       { itemId: "apple",         count: 6 },
@@ -645,7 +647,7 @@ export class Game {
     this.player.level     = 0;
     this.player.hunger    = 20;
     this.player.onDeath   = this.player.onDeath;
-    this.player.position.set(32, 1, 32);
+    this.player.position.set(32, 7, 32);
     this.scene.resetCamera();
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
     this.ui.hideDeathScreen();

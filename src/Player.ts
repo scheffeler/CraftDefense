@@ -45,7 +45,7 @@ export class Player {
     startX = 32,
     startZ = 32,
   ) {
-    this.position = new THREE.Vector3(startX, 1.0, startZ);
+    this.position = new THREE.Vector3(startX, 7.0, startZ);
   }
 
   update(dt: number, input: MovementInput): void {

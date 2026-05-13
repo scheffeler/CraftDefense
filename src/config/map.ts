@@ -8,9 +8,10 @@ export const GRID_WIDTH = WORLD_WIDTH;
 export const GRID_DEPTH = WORLD_DEPTH;
 
 export const CELL_SIZE = 1;
-export const TERRAIN_Y = 0;   // ground surface block Y index
-export const ENEMY_Y = 1.5;   // enemy group center height above ground
-export const TOWER_BASE_Y = 1; // legacy TD constant
+export const GROUND_OFFSET = 6; // underground depth — surface block at Y=GROUND_OFFSET
+export const TERRAIN_Y = GROUND_OFFSET;   // ground surface block Y index
+export const ENEMY_Y = GROUND_OFFSET + 1.5;   // enemy group center height
+export const TOWER_BASE_Y = GROUND_OFFSET + 1; // legacy TD constant
 
 // Fortress layout
 export const FORTRESS_CENTER_X = 32;
@@ -25,7 +26,7 @@ export const GATE_CENTER_X = 32;
 // Player start (feet position, inside fortress)
 export const PLAYER_START_X = 32;
 export const PLAYER_START_Z = 32;
-export const PLAYER_START_Y = 1.0;
+export const PLAYER_START_Y = GROUND_OFFSET + 1.0; // feet Y above surface
 
 // Legacy TD constants (kept for Path.ts / Game.ts compatibility — removed in Phase 12)
 export const PATH_WAYPOINTS: [number, number][] = [
