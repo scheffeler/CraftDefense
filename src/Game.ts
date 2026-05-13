@@ -19,6 +19,19 @@ import { ITEMS } from "./config/items";
 import { getSpawnPositions } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
+import { Crafting } from "./Crafting";
+
+const SURFACE_STEP_SOUND = {
+  grass:       "step_grass",
+  dirt:        "step_dirt",
+  sand:        "step_sand",
+  stone:       "step_stone",
+  cobblestone: "step_stone",
+  wood:        "step_wood",
+  planks:      "step_wood",
+  leaves:      "step_grass",
+  iron_block:  "step_stone",
+} as const;
 
 const SMELT_RECIPES: Record<string, string> = {
   iron_ore: "iron_ingot",
@@ -39,6 +52,9 @@ export class Game {
 
   // Hunger depletion timer
   private hungerTimer = 0;
+  private _regenTimer = 0;
+  private _stepTimer  = 0;
+  private _headBob    = 0;
 
   private particles!:        ParticleSystem;
   private scene!:            SceneManager;
@@ -130,6 +146,11 @@ export class Game {
 
     // Inventory toggle (E)
     this.input.onInventoryToggle = () => {
+      if (this.ui.isWorkbenchOpen()) {
+        this.ui.showWorkbench(false);
+        if (!this.scene.isPointerLocked) this.scene.lockPointer();
+        return;
+      }
       const nowOpen = !this.ui.isInventoryOpen();
       this.ui.showInventory(nowOpen, this.inventory);
       if (nowOpen && this.scene.isPointerLocked) this.scene.unlockPointer();
@@ -148,8 +169,15 @@ export class Game {
       const stack   = this.inventory.getActiveItem();
       const itemDef = stack ? ITEMS[stack.itemId] : null;
 
-      // Check if looking at a furnace — smelt active item
+      // Check if looking at a crafting_table — open workbench
       const tb = this.blockInteraction.getTargetBlock();
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "crafting_table") {
+        this.ui.showWorkbench(true);
+        if (this.scene.isPointerLocked) this.scene.unlockPointer();
+        return;
+      }
+
+      // Check if looking at a furnace — smelt active item
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "furnace") {
         if (stack && SMELT_RECIPES[stack.itemId]) {
           const result = SMELT_RECIPES[stack.itemId];
@@ -234,9 +262,19 @@ export class Game {
         }
       }
       if (state.config.xpReward) { this.player.addXP(state.config.xpReward); this.refreshXPBar(); }
+      if (state.config.drops) {
+        for (const drop of state.config.drops) {
+          if (Math.random() < drop.chance) {
+            this.inventory.addItem(drop.itemId, drop.count ?? 1);
+            this.audio.play("pickup", 0.4);
+          }
+        }
+        this.refreshHotbar();
+      }
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
         this.waves.wave, this.waves.totalWaves, this.enemies.getAliveEnemies().length,
+        this.scene.dayNumber, this.scene.isDay,
       );
       this.audio.play("death", 0.4);
     };
@@ -244,10 +282,12 @@ export class Game {
     this.enemies.onEnemyReachedBase = (state) => {
       this.player.damage(state.config.damage);
       this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.ui.showDamageVignette();
       this.audio.play("player_hurt", 0.7);
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
         this.waves.wave, this.waves.totalWaves, this.enemies.getAliveEnemies().length,
+        this.scene.dayNumber, this.scene.isDay,
       );
     };
 
@@ -306,6 +346,41 @@ export class Game {
       }
     };
 
+    // Workbench 3×3 crafting
+    this.ui.onWorkbenchSlotClick = (row, col) => {
+      const active = this.inventory.getActiveItem();
+      if (active) {
+        this.ui.setWorkbenchSlot(row, col, active.itemId);
+        const recipe = Crafting.findRecipe(this.ui.getWorkbenchGrid());
+        this.ui.setWorkbenchResult(recipe?.result.itemId ?? null, recipe?.result.count ?? 0);
+      } else {
+        this.ui.setWorkbenchSlot(row, col, null);
+        const recipe = Crafting.findRecipe(this.ui.getWorkbenchGrid());
+        this.ui.setWorkbenchResult(recipe?.result.itemId ?? null, recipe?.result.count ?? 0);
+      }
+    };
+
+    this.ui.onWorkbenchResultClick = () => {
+      const grid = this.ui.getWorkbenchGrid();
+      const recipe = Crafting.findRecipe(grid);
+      if (!recipe) return;
+      const result = Crafting.craft(this.inventory, recipe);
+      if (result) {
+        this.audio.play("pickup", 0.5);
+        this.refreshHotbar();
+        // Clear the workbench grid
+        for (let r = 0; r < 3; r++)
+          for (let c = 0; c < 3; c++)
+            this.ui.setWorkbenchSlot(r, c, null);
+        this.ui.setWorkbenchResult(null, 0);
+      }
+    };
+
+    this.ui.onWorkbenchClose = () => {
+      this.ui.showWorkbench(false);
+      this.scene.lockPointer();
+    };
+
     // UI restart
     this.ui.onRestart = () => this.resetGame();
   }
@@ -361,13 +436,36 @@ export class Game {
   private update(dt: number): void {
     // Day/night cycle runs even while paused/locked
     this.scene.updateDayNight(dt);
+    this.audio.updateAmbient(dt, this.scene.daylight);
 
     if (this.phase === "gameover" || this.phase === "win") return;
-    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen()) return;
+    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen()) return;
 
     // Player movement + bow charge accumulation
     const input = this.input.getMovementInput();
     this.player.update(dt, input);
+
+    // Footstep sounds + head bob
+    const isMovingH = input.forward || input.backward || input.left || input.right;
+    if (isMovingH && this.player.onGround) {
+      const stepInterval = input.sprint ? 0.32 : 0.45;
+      this._stepTimer += dt;
+      if (this._stepTimer >= stepInterval) {
+        this._stepTimer = 0;
+        const fx = Math.floor(this.player.position.x);
+        const fz = Math.floor(this.player.position.z);
+        const surfaceBlock = this.gameMap.world.getBlock(fx, Math.floor(this.player.position.y) - 1, fz);
+        const sfx = SURFACE_STEP_SOUND[surfaceBlock as keyof typeof SURFACE_STEP_SOUND] ?? "step_stone";
+        this.audio.play(sfx as any, 0.35);
+      }
+      this._headBob = Math.min(1, this._headBob + dt * 8);
+    } else {
+      this._headBob = Math.max(0, this._headBob - dt * 12);
+      this._stepTimer = 0;
+    }
+    const bobSpeed  = input.sprint ? 14 : 9;
+    const bobAmt    = 0.035 * this._headBob;
+    this.scene.camera.position.y += Math.sin(performance.now() * 0.001 * bobSpeed) * bobAmt;
 
     // Block interaction (mining)
     const activeStack = this.inventory.getActiveItem();
@@ -423,8 +521,22 @@ export class Game {
         this.ui.updateHunger(this.player.hunger, 20);
       } else {
         this.player.damage(1);
+        this.ui.showDamageVignette();
       }
     }
+
+    // Health regeneration — regen 1 HP every 4 seconds when hunger >= 18
+    this._regenTimer += dt;
+    if (this._regenTimer >= 4) {
+      this._regenTimer = 0;
+      if (this.player.hunger >= 18 && this.player.health < this.player.maxHealth) {
+        this.player.heal(1);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      }
+    }
+
+    // Sprint FOV
+    this.scene.setFOV(input.sprint && isMovingH ? 85 : 75, dt);
 
     // Sync armor value each frame
     this.player.armorValue = this.inventory.getArmorValue();
@@ -489,7 +601,7 @@ export class Game {
   private refreshHUD(): void {
     this.refreshHotbar();
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-    this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0);
+    this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0, this.scene.dayNumber, this.scene.isDay);
     this.ui.updateHunger(this.player.hunger, 20);
     this.refreshXPBar();
   }

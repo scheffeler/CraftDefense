@@ -41,6 +41,7 @@ export interface EnemyConfig {
   scale: number;
   canBreakWalls?: boolean;
   xpReward?: number;
+  drops?: Array<{ itemId: string; chance: number; count?: number }>;
 }
 
 // ---------------------------------------------------------------------------

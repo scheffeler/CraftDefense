@@ -59,6 +59,7 @@ export class SceneManager {
 
   // Day/night
   private dayTime = 0.38; // start at morning
+  private _totalDays = 0;
   private readonly DAY_DURATION = 600; // 10 real minutes per game day
   private sunLight!: THREE.DirectionalLight;
   private ambientLight!: THREE.AmbientLight;
@@ -119,12 +120,19 @@ export class SceneManager {
   }
 
   get isPointerLocked(): boolean { return this.controls.isLocked; }
+  get daylight(): number {
+    const frame = sampleDayCycle(this.dayTime);
+    return frame.ambientInt;
+  }
+  get dayNumber(): number { return Math.floor(this._totalDays) + 1; }
+  get isDay(): boolean { return this.daylight > 0.3; }
 
   lockPointer():   void { this.controls.lock(); }
   unlockPointer(): void { this.controls.unlock(); }
 
   /** Advance the day/night cycle. Call from game loop. */
   updateDayNight(dt: number): void {
+    this._totalDays += dt / this.DAY_DURATION;
     this.dayTime = (this.dayTime + dt / this.DAY_DURATION) % 1;
     const frame = sampleDayCycle(this.dayTime);
 
@@ -294,6 +302,16 @@ export class SceneManager {
     this.armGroup.quaternion.copy(worldQuat).multiply(tiltQ);
 
     this.renderer.render(this.armScene, this.camera);
+  }
+
+  /** Smoothly transition FOV. Call every frame with target (75 normal, 85 sprint). */
+  setFOV(targetFOV: number, dt: number): void {
+    const diff = targetFOV - this.camera.fov;
+    const step = diff * Math.min(1, dt * 10);
+    if (Math.abs(step) > 0.01) {
+      this.camera.fov += step;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   resetCamera(): void {

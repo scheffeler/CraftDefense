@@ -6,3 +6,4 @@ src/config/*.js
 .vite/
 .DS_Store
 dev-server-*.log
+screenshots/

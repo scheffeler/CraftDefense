@@ -48,6 +48,10 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     headColor: 0x5a8a2a,
     scale: 0.75,
     xpReward: 5,
+    drops: [
+      { itemId: "arrow_item", chance: 0.4, count: 4 },
+      { itemId: "flint",      chance: 0.3, count: 1 },
+    ],
   },
   orc: {
     type: "orc",
@@ -60,6 +64,10 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     headColor: 0xaa6a30,
     scale: 1.1,
     xpReward: 15,
+    drops: [
+      { itemId: "iron_ingot", chance: 0.5, count: 2 },
+      { itemId: "cobblestone",chance: 0.6, count: 4 },
+    ],
   },
   troll: {
     type: "troll",
@@ -72,6 +80,11 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     headColor: 0x445533,
     scale: 1.6,
     xpReward: 40,
+    drops: [
+      { itemId: "iron_ingot", chance: 0.9, count: 4 },
+      { itemId: "iron_block", chance: 0.3, count: 1 },
+      { itemId: "apple",      chance: 0.5, count: 2 },
+    ],
   },
   goblin_miner: {
     type: "goblin_miner",
@@ -85,5 +98,10 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     scale: 0.85,
     canBreakWalls: true,
     xpReward: 20,
+    drops: [
+      { itemId: "iron_ore",   chance: 0.6, count: 2 },
+      { itemId: "coal_ore",   chance: 0.7, count: 2 },
+      { itemId: "stick",      chance: 0.5, count: 4 },
+    ],
   },
 };

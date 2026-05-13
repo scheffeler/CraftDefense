@@ -87,6 +87,9 @@ export class UI {
   onModeSelect: (mode: "helmsdeep" | "freeplay") => void = () => {};
   onCraftingSlotClick: (row: number, col: number) => void = () => {};
   onCraftingResultClick: () => void = () => {};
+  onWorkbenchSlotClick: (row: number, col: number) => void = () => {};
+  onWorkbenchResultClick: () => void = () => {};
+  onWorkbenchClose: () => void = () => {};
 
   // Legacy TD stubs (backward compat — Game.ts uses these until Phase 12)
   onStartWave: () => void = () => {};
@@ -114,6 +117,16 @@ export class UI {
   private armorSlotEls: Record<string, HTMLElement> = {};
   private personalCraftCells: HTMLElement[][] = [];
   private personalCraftResult!: HTMLElement;
+
+  // Workbench overlay
+  private workbenchOverlay!: HTMLElement;
+  private workbenchCells: HTMLElement[][] = [];
+  private workbenchResult!: HTMLElement;
+  private _workbenchGrid: (string | null)[][] = [
+    [null, null, null],
+    [null, null, null],
+    [null, null, null],
+  ];
 
   private _personalGrid: (string | null)[][] = [[null, null], [null, null]];
   private _inventoryOpen = false;
@@ -165,9 +178,12 @@ export class UI {
     }
   }
 
-  updateWaveInfo(wave: number, total: number, enemyCount: number): void {
+  updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean): void {
+    const dayStr = dayNum != null
+      ? `<br><span style="color:${isDay ? "#ffee88" : "#aabbff"}">${isDay ? "☀" : "☽"} Day ${dayNum}</span>`
+      : "";
     this.elWaveInfo.innerHTML =
-      `Wave ${wave}/${total}<br>${enemyCount} enemies`;
+      `Wave ${wave}/${total}<br>${enemyCount} enemies${dayStr}`;
   }
 
   setObjective(text: string): void {
@@ -225,6 +241,34 @@ export class UI {
     setTimeout(() => div.remove(), 1100);
   }
 
+  // ── 3×3 Workbench overlay ──────────────────────────────────────────────────
+
+  isWorkbenchOpen(): boolean { return this.workbenchOverlay.style.display !== "none"; }
+
+  showWorkbench(open: boolean): void {
+    this.workbenchOverlay.style.display = open ? "flex" : "none";
+    if (!open) {
+      this._workbenchGrid = [[null,null,null],[null,null,null],[null,null,null]];
+      for (let r = 0; r < 3; r++)
+        for (let c = 0; c < 3; c++)
+          this.renderIdInSlot(this.workbenchCells[r][c], null);
+      this.renderIdInSlot(this.workbenchResult, null);
+    }
+  }
+
+  setWorkbenchSlot(row: number, col: number, itemId: string | null): void {
+    this._workbenchGrid[row][col] = itemId;
+    this.renderIdInSlot(this.workbenchCells[row][col], itemId);
+  }
+
+  setWorkbenchResult(itemId: string | null, count: number): void {
+    this.renderIdInSlot(this.workbenchResult, itemId, count > 1 ? count : undefined);
+  }
+
+  getWorkbenchGrid(): (string | null)[][] {
+    return this._workbenchGrid.map(r => [...r]);
+  }
+
   // ── Personal crafting grid (2×2 in inventory overlay) ─────────────────────
 
   setPersonalCraftSlot(row: number, col: number, itemId: string | null): void {
@@ -254,6 +298,14 @@ export class UI {
   }
 
   hideEnd(): void { this.endOverlay.style.display = "none"; }
+
+  showDamageVignette(): void {
+    const el = document.createElement("div");
+    el.className = "damage-vignette";
+    this.container.appendChild(el);
+    // Remove after animation completes
+    setTimeout(() => el.remove(), 600);
+  }
 
   // ─── Legacy TD stubs ──────────────────────────────────────────────────────
   // These are no-ops kept to avoid breaking Game.ts until Phase 12 rewrite.
@@ -342,6 +394,7 @@ export class UI {
     this.container.appendChild(this.lockPrompt);
 
     this.buildInventoryOverlay();
+    this.buildWorkbenchOverlay();
     this.buildDeathOverlay();
     this.buildEndOverlay();
   }
@@ -477,6 +530,56 @@ export class UI {
 
     ov.appendChild(box);
     this.inventoryOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  private buildWorkbenchOverlay(): void {
+    const ov = div("fps-inventory overlay hidden");
+    ov.style.display = "none";
+
+    const box = div("fps-inv-box");
+
+    const title = div("fps-inv-label");
+    title.textContent = "Crafting Table";
+    title.style.cssText = "font-size:14px;margin-bottom:12px;color:#ffdd44;";
+    box.appendChild(title);
+
+    const craftArea = div("fps-craft-area");
+
+    const grid3 = div("fps-craft-grid fps-grid-3x3");
+    this.workbenchCells = [];
+    for (let r = 0; r < 3; r++) {
+      const row: HTMLElement[] = [];
+      for (let c = 0; c < 3; c++) {
+        const cell = div("fps-slot fps-craft-cell");
+        cell.addEventListener("click", () => this.onWorkbenchSlotClick(r, c));
+        grid3.appendChild(cell);
+        row.push(cell);
+      }
+      this.workbenchCells.push(row);
+    }
+    craftArea.appendChild(grid3);
+
+    const arrow = div("fps-craft-arrow");
+    arrow.textContent = "➡";
+    craftArea.appendChild(arrow);
+
+    this.workbenchResult = div("fps-slot fps-craft-result");
+    this.workbenchResult.addEventListener("click", () => this.onWorkbenchResultClick());
+    craftArea.appendChild(this.workbenchResult);
+    box.appendChild(craftArea);
+
+    const hint = div("fps-inv-hint");
+    hint.textContent = "[E] close  ·  Click slots, then take result";
+    box.appendChild(hint);
+
+    const closeBtn = div("fps-inv-close-btn");
+    closeBtn.textContent = "✕ Close";
+    closeBtn.addEventListener("click", () => this.onWorkbenchClose());
+    box.appendChild(closeBtn);
+
+    ov.appendChild(box);
+    this.workbenchOverlay = ov;
     this.container.appendChild(ov);
   }
 
@@ -828,6 +931,14 @@ const FPS_CSS = `
 }
 .fps-craft-grid { display: grid; gap: 3px; }
 .fps-grid-2x2  { grid-template-columns: repeat(2, 40px); }
+.fps-grid-3x3  { grid-template-columns: repeat(3, 40px); }
+.fps-inv-close-btn {
+  margin-top: 10px; padding: 6px 16px;
+  background: #555; border: 2px solid #888; color: #fff;
+  font-family: 'Press Start 2P', monospace; font-size: 9px;
+  cursor: pointer; text-align: center; display: inline-block;
+}
+.fps-inv-close-btn:hover { background: #777; }
 .fps-craft-arrow { font-size: 18px; color: #555; }
 .fps-craft-result { width: 40px; height: 40px; cursor: pointer; }
 .fps-craft-result:hover { border-color: #fff !important; }
@@ -950,5 +1061,18 @@ const FPS_CSS = `
   40%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.0) translateY(-20px); }
+}
+.damage-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.75) 100%);
+  animation: damageFlash 0.6s ease-out forwards;
+}
+@keyframes damageFlash {
+  0%   { opacity: 1; }
+  30%  { opacity: 0.9; }
+  100% { opacity: 0; }
 }
 `;

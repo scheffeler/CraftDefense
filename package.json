@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsc -p tsconfig.emit.json && node scripts/dev.mjs",
     "build": "tsc -p tsconfig.emit.json && node scripts/build.mjs",
-    "preview": "node scripts/preview.mjs"
+    "preview": "node scripts/preview.mjs",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "three": "^0.165.0",
@@ -15,6 +16,7 @@
     "vite": "^5.4.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/three": "^0.184.1"
   }
 }
