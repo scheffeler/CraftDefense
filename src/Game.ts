@@ -20,6 +20,12 @@ import { getSpawnPositions } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
 
+const SMELT_RECIPES: Record<string, string> = {
+  iron_ore: "iron_ingot",
+  sand:     "glass",
+  cobblestone: "stone",
+};
+
 export class Game {
   private phase: GamePhase = "wave_clear";
   private mode: "helmsdeep" | "freeplay" = "helmsdeep";
@@ -136,11 +142,27 @@ export class Game {
       if (!this.blockInteraction.getTargetBlock()) this.tryMeleeAttack();
     };
 
-    // Right click — place block, start bow charge, or eat food
+    // Right click — place block, start bow charge, eat food, or smelt at furnace
     this.input.onRightClick = () => {
       if (this.ui.isInventoryOpen()) return;
       const stack   = this.inventory.getActiveItem();
       const itemDef = stack ? ITEMS[stack.itemId] : null;
+
+      // Check if looking at a furnace — smelt active item
+      const tb = this.blockInteraction.getTargetBlock();
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "furnace") {
+        if (stack && SMELT_RECIPES[stack.itemId]) {
+          const result = SMELT_RECIPES[stack.itemId];
+          this.inventory.removeItem(stack.itemId, 1);
+          this.inventory.addItem(result, 1);
+          this.audio.play("block_place", 0.7);
+          this.refreshHotbar();
+          this.ui.showSmeltNotice(stack.itemId, result);
+          return;
+        }
+        return; // clicked furnace but nothing to smelt
+      }
+
       if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);

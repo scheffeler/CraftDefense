@@ -34,7 +34,6 @@ export function generateWorld(world: VoxelWorld): void {
   generateFortress(world);
   generateInterior(world);
   generateTrees(world);
-  generateOreOutcroppings(world);
   generateSpawnMarkers(world);
 }
 
@@ -53,7 +52,7 @@ function generateTerrain(world: VoxelWorld): void {
   for (let x = 0; x < WORLD_WIDTH; x++) {
     for (let z = 0; z < WORLD_DEPTH; z++) {
       if (inFortressBounds(x, z)) {
-        world.setBlock(x, 0, z, "stone");
+        world.setBlock(x, 0, z, "cobblestone");
         continue;
       }
 
@@ -63,15 +62,30 @@ function generateTerrain(world: VoxelWorld): void {
         continue;
       }
 
-      // Gentle hills outside fortress: up to 2 blocks of dirt under grass
+      // Hills outside fortress: up to 5 blocks tall
       const n = smoothNoise(x, z);
-      const hillHeight = Math.floor(n * 2.5); // 0, 1, or 2
-      if (hillHeight > 0) {
-        for (let y = 0; y < hillHeight; y++) {
+      const hillHeight = Math.floor(n * 5.5); // 0–5 blocks
+
+      // Fill column: stone at base, dirt in middle, grass on top
+      for (let y = 0; y <= hillHeight; y++) {
+        if (y <= hillHeight - 3) {
+          world.setBlock(x, y, z, "stone");
+        } else if (y < hillHeight) {
           world.setBlock(x, y, z, "dirt");
+        } else {
+          world.setBlock(x, y, z, "grass");
         }
       }
-      world.setBlock(x, hillHeight, z, "grass");
+
+      // Embed ore veins in stone layers
+      if (hillHeight >= 3) {
+        const stoneTop = hillHeight - 3;
+        for (let y = 0; y <= stoneTop; y++) {
+          const oreHash = hash(x * 1009 + y * 317, z * 769);
+          if (oreHash % 18 === 0) world.setBlock(x, y, z, "iron_ore");
+          else if (oreHash % 10 === 0) world.setBlock(x, y, z, "coal_ore");
+        }
+      }
     }
   }
 }
@@ -155,16 +169,22 @@ function generateTrees(world: VoxelWorld): void {
       if (z <= 7 || z >= WORLD_DEPTH - 8) continue;
       if (hash(x, z) % 16 !== 0) continue;
 
+      // Find surface height
+      let groundY = 0;
+      for (let y = 10; y >= 0; y--) {
+        if (world.getBlock(x, y, z) !== "air") { groundY = y; break; }
+      }
+
       const h = hash(x * 3, z * 7);
       const trunkHeight = 4 + (h % 3); // 4–6 blocks
 
-      for (let y = 1; y <= trunkHeight; y++) {
+      for (let y = groundY + 1; y <= groundY + trunkHeight; y++) {
         world.setBlock(x, y, z, "wood");
       }
 
       // Wide 3-layer canopy
-      for (let ly = trunkHeight - 1; ly <= trunkHeight + 1; ly++) {
-        const radius = ly <= trunkHeight ? 2 : 1;
+      for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 1; ly++) {
+        const radius = (ly <= groundY + trunkHeight) ? 2 : 1;
         for (let dx = -radius; dx <= radius; dx++) {
           for (let dz = -radius; dz <= radius; dz++) {
             if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
@@ -177,30 +197,12 @@ function generateTrees(world: VoxelWorld): void {
         }
       }
       // Top cap
-      world.setBlock(x, trunkHeight + 2, z, "leaves");
+      world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
     }
   }
 }
 
-function generateOreOutcroppings(world: VoxelWorld): void {
-  // Small stone mounds with ore exposed on top, on a 6-unit grid
-  for (let x = 6; x < WORLD_WIDTH - 6; x += 6) {
-    for (let z = 6; z < WORLD_DEPTH - 6; z += 6) {
-      if (x >= WX1 - 6 && x <= WX2 + 6 && z >= WZ1 - 6 && z <= WZ2 + 6) continue;
-      if (z <= 10 || z >= WORLD_DEPTH - 11) continue;
-      const h = hash(x * 7, z * 13);
-      if (h % 4 !== 0) continue;
-
-      const oreId = h % 3 === 0 ? "iron_ore" : "coal_ore";
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          world.setBlock(x + dx, 1, z + dz, "stone");
-        }
-      }
-      world.setBlock(x, 2, z, oreId);
-    }
-  }
-}
+// Ore outcroppings now handled by terrain generation (ore embedded in hills)
 
 function generateInterior(world: VoxelWorld): void {
   // Stone-paved floor path from north gate to south gate (x=30..33, all z inside fortress)

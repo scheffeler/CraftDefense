@@ -206,6 +206,16 @@ export const RECIPES: Recipe[] = [
     pattern: [[r("sand")]],
     result: { itemId: "glass", count: 1 },
   },
+
+  // --- Torches ---
+  {
+    id: "torches",
+    pattern: [
+      [r("coal_ore")],
+      [r("stick")   ],
+    ],
+    result: { itemId: "torch", count: 4 },
+  },
 ];
 
 // Silence unused helper warning

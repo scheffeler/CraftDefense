@@ -190,6 +190,15 @@ export class UI {
   showDeathScreen(): void { this.deathOverlay.style.display = "flex"; }
   hideDeathScreen(): void { this.deathOverlay.style.display = "none"; }
 
+  showSmeltNotice(input: string, output: string): void {
+    const name = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    const el = document.createElement("div");
+    el.className = "smelt-notice";
+    el.textContent = `${name(input)} → ${name(output)}`;
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+  }
+
   showLevelUp(level: number): void {
     const el = document.createElement("div");
     el.className = "level-up-announce";
@@ -870,6 +879,24 @@ const FPS_CSS = `
   0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
   80%  { opacity: 0.8; }
   100% { opacity: 0; transform: translateX(-50%) translateY(-48px); }
+}
+
+/* Smelt notice (bottom center, small) */
+.smelt-notice {
+  position: absolute;
+  bottom: 110px; left: 50%; transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: #ffaa22;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none; z-index: 50;
+  animation: smeltFade 1.8s ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes smeltFade {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  20%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* Level-up banner */

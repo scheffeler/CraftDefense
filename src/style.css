@@ -3,9 +3,10 @@
 body {
   background: #000;
   overflow: hidden;
-  font-family: 'Courier New', monospace;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
   color: #fff;
   user-select: none;
+  font-size: 10px;
 }
 
 canvas { display: block; position: absolute; inset: 0; }
