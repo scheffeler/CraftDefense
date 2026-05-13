@@ -11,7 +11,8 @@ export type ProjectileType = "arrow" | "cannonball" | "icebolt";
 export type BlockId =
   | "air" | "grass" | "dirt" | "stone" | "wood"
   | "planks" | "cobblestone" | "sand" | "glass" | "leaves" | "obsidian"
-  | "iron_ore" | "coal_ore" | "iron_block" | "crafting_table" | "furnace";
+  | "iron_ore" | "coal_ore" | "iron_block" | "crafting_table" | "furnace"
+  | "torch";
 
 export interface BlockDef {
   id: BlockId;

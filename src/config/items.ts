@@ -39,6 +39,7 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_block:     { id:"iron_block",     name:"Iron Block",     category:"block",    stackSize:64, color:0xaaaaaa, placesBlock:"iron_block"     },
   crafting_table: { id:"crafting_table", name:"Crafting Table", category:"block",    stackSize:64, color:0x8b5c2a, placesBlock:"crafting_table" },
   furnace:        { id:"furnace",        name:"Furnace",        category:"block",    stackSize:64, color:0x777777, placesBlock:"furnace"        },
+  torch:          { id:"torch",          name:"Torch",          category:"block",    stackSize:64, color:0xffaa22, placesBlock:"torch"          },
 
   // --- Raw materials ---
   stick:      { id:"stick",      name:"Stick",      category:"material", stackSize:64, color:0x8b6914 },

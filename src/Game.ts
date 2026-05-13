@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import type { GamePhase, EnemyTypeName } from "./types";
 import { SceneManager } from "./SceneManager";
 import { GameMap } from "./Map";
@@ -24,6 +25,12 @@ export class Game {
 
   // Initial build phase before wave 1 (seconds)
   private buildPhaseTimer = 120;
+
+  // Torch point lights keyed by "wx,wy,wz"
+  private readonly torchLights = new Map<string, THREE.PointLight>();
+
+  // Hunger depletion timer
+  private hungerTimer = 0;
 
   private scene!:            SceneManager;
   private gameMap!:          GameMap;
@@ -57,8 +64,11 @@ export class Game {
     this.player    = new Player(this.gameMap.world, this.scene.camera, 32, 48);
     this.inventory = new Inventory();
     this.inventory.addItem("wood_sword", 1);
+    this.inventory.addItem("wood_pickaxe", 1);
     this.inventory.addItem("wood", 16);
     this.inventory.addItem("dirt", 16);
+    this.inventory.addItem("torch", 8);
+    this.inventory.addItem("apple", 4);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -121,7 +131,7 @@ export class Game {
       if (!this.blockInteraction.getTargetBlock()) this.tryMeleeAttack();
     };
 
-    // Right click — place block or start bow charge
+    // Right click — place block, start bow charge, or eat food
     this.input.onRightClick = () => {
       if (this.ui.isInventoryOpen()) return;
       const stack   = this.inventory.getActiveItem();
@@ -129,6 +139,14 @@ export class Game {
       if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
+      } else if (itemDef?.category === "food" && itemDef.foodPoints && this.player.hunger < 20) {
+        this.inventory.removeItem(stack!.itemId, 1);
+        this.player.hunger = Math.min(20, this.player.hunger + itemDef.foodPoints);
+        this.player.heal(Math.ceil(itemDef.foodPoints / 2));
+        this.audio.play("eat", 0.6);
+        this.refreshHotbar();
+        this.ui.updateHunger(this.player.hunger, 20);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
       } else if (itemDef?.placesBlock && stack) {
         const placed = this.blockInteraction.tryPlace(itemDef.placesBlock);
         if (placed) {
@@ -166,13 +184,13 @@ export class Game {
         }
         this.refreshHotbar();
       }
-      // Recompute flow field when wall-height blocks are broken
+      if (id === "torch") this.removeTorchLight(wx, wy, wz);
       if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
-      void wx; void wz;
     };
 
-    this.blockInteraction.onBlockPlaced = () => {
+    this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
       this.audio.play("block_place", 0.5);
+      if (id === "torch") this.addTorchLight(wx, wy, wz);
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
       this.refreshHotbar();
     };
@@ -357,6 +375,18 @@ export class Game {
       }
     }
 
+    // Hunger depletion — 1 point every 45 seconds
+    this.hungerTimer += dt;
+    if (this.hungerTimer >= 45) {
+      this.hungerTimer = 0;
+      if (this.player.hunger > 0) {
+        this.player.hunger = Math.max(0, this.player.hunger - 1);
+        this.ui.updateHunger(this.player.hunger, 20);
+      } else {
+        this.player.damage(1);
+      }
+    }
+
     // Sync armor value each frame
     this.player.armorValue = this.inventory.getArmorValue();
 
@@ -384,6 +414,31 @@ export class Game {
         this.enemies.damage(state.id, damage);
         this.audio.play("hit", 0.4);
       }
+    }
+  }
+
+  // ─── Torch lights ─────────────────────────────────────────────────────────
+
+  private torchKey(wx: number, wy: number, wz: number): string {
+    return `${wx},${wy},${wz}`;
+  }
+
+  private addTorchLight(wx: number, wy: number, wz: number): void {
+    const key = this.torchKey(wx, wy, wz);
+    if (this.torchLights.has(key)) return;
+    const light = new THREE.PointLight(0xffaa44, 1.8, 10, 2);
+    light.position.set(wx + 0.5, wy + 0.8, wz + 0.5);
+    this.scene.scene.add(light);
+    this.torchLights.set(key, light);
+  }
+
+  private removeTorchLight(wx: number, wy: number, wz: number): void {
+    const key = this.torchKey(wx, wy, wz);
+    const light = this.torchLights.get(key);
+    if (light) {
+      this.scene.scene.remove(light);
+      light.dispose();
+      this.torchLights.delete(key);
     }
   }
 

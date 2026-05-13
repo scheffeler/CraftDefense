@@ -28,6 +28,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
   iron_block:     { id: "iron_block",     name: "Iron Block",     color: 0xaaaaaa, hardness: 5,    placeable: true,  transparent: false },
   crafting_table: { id: "crafting_table", name: "Crafting Table", color: 0x8b5c2a, hardness: 2,    placeable: true,  transparent: false },
   furnace:        { id: "furnace",        name: "Furnace",        color: 0x777777, hardness: 3,    placeable: true,  transparent: false },
+  torch:          { id: "torch",          name: "Torch",          color: 0xffaa22, hardness: 0,    placeable: true,  transparent: true  },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];

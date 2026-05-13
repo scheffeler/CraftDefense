@@ -23,4 +23,5 @@ export const BLOCK_BEHAVIORS: Partial<Record<BlockId, BlockBehavior>> = {
   crafting_table: { toolCategory: "axe",     requiresTool: false, drops: ["crafting_table"] },
   furnace:        { toolCategory: "pickaxe", requiresTool: false, drops: ["furnace"]      },
   obsidian:       { toolCategory: "pickaxe", requiresTool: true,  drops: []               },
+  torch:          { toolCategory: "hand",    requiresTool: false, drops: ["torch"]        },
 };
