@@ -1,25 +1,38 @@
-export const GRID_WIDTH = 24;
-export const GRID_DEPTH = 24;
+// World dimensions (FPS game)
+export const WORLD_WIDTH = 64;
+export const WORLD_DEPTH = 64;
+export const WORLD_HEIGHT = 32;
+
+// Legacy aliases (still referenced by old TD code — removed in Phase 12)
+export const GRID_WIDTH = WORLD_WIDTH;
+export const GRID_DEPTH = WORLD_DEPTH;
+
 export const CELL_SIZE = 1;
-export const TERRAIN_Y = 0;   // grass top face Y
-export const ENEMY_Y = 1.5;   // enemy group position Y while walking
-export const TOWER_BASE_Y = 1; // tower mesh bottom Y
+export const TERRAIN_Y = 0;   // ground surface block Y index
+export const ENEMY_Y = 1.5;   // enemy group center height above ground
+export const TOWER_BASE_Y = 1; // legacy TD constant
 
-// Path waypoints [x, z] in grid coords — all segments are axis-aligned
+// Fortress layout
+export const FORTRESS_CENTER_X = 32;
+export const FORTRESS_CENTER_Z = 32;
+export const WALL_HEIGHT = 6;
+
+// Enemy spawn gate positions (world Z)
+export const SPAWN_GATE_NORTH_Z = 2;
+export const SPAWN_GATE_SOUTH_Z = 61;
+export const GATE_CENTER_X = 32;
+
+// Player start (feet position, inside fortress)
+export const PLAYER_START_X = 32;
+export const PLAYER_START_Z = 32;
+export const PLAYER_START_Y = 1.0;
+
+// Legacy TD constants (kept for Path.ts / Game.ts compatibility — removed in Phase 12)
 export const PATH_WAYPOINTS: [number, number][] = [
-  [0, 11],
-  [5, 11],
-  [5, 4],
-  [13, 4],
-  [13, 18],
-  [19, 18],
-  [19, 7],
-  [23, 7],
+  [0, 11], [5, 11], [5, 4], [13, 4], [13, 18], [19, 18], [19, 7], [23, 7],
 ];
-
 export const STARTING_GOLD = 150;
-export const BASE_MAX_HEALTH = 20; // lives; each enemy reduces by config.damage
-
+export const BASE_MAX_HEALTH = 20;
 export const TREE_POSITIONS: [number, number][] = [
   [1, 2], [2, 1], [22, 1], [22, 22], [1, 22],
   [8, 8], [16, 12], [6, 20], [20, 14],

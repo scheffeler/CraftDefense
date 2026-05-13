@@ -4,7 +4,10 @@ type SoundName =
   | "place" | "upgrade" | "sell"
   | "ui_click"
   | "wave_start" | "wave_complete" | "base_hit"
-  | "explosion" | "victory";
+  | "explosion" | "victory"
+  | "swing" | "bow_charge" | "arrow_release"
+  | "block_break" | "block_place" | "pickup"
+  | "eat" | "player_hurt" | "player_death";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -142,6 +145,53 @@ export class AudioManager {
         });
         break;
       }
+
+      // ── FPS combat & interaction sounds ────────────────────────────────────
+      case "swing":
+        noiseBurst(0.08, 2000, 0.035);
+        tone(200, 0.06, "sawtooth", 0.6);
+        break;
+
+      case "bow_charge":
+        tone(330, 0.15, "sine", 0.3);
+        tone(440, 0.1, "sine", 0.2);
+        break;
+
+      case "arrow_release":
+        noiseBurst(0.05, 3000, 0.02);
+        tone(660, 0.04, "sawtooth", 0.5);
+        break;
+
+      case "block_break":
+        noiseBurst(0.18, 300, 0.08);
+        tone(90, 0.12, "square", 0.4);
+        break;
+
+      case "block_place":
+        noiseBurst(0.06, 500, 0.025);
+        tone(160, 0.05, "square", 0.5);
+        break;
+
+      case "pickup":
+        tone(880, 0.05, "sine", 0.5);
+        tone(1047, 0.07, "sine", 0.4);
+        break;
+
+      case "eat":
+        noiseBurst(0.12, 600, 0.05);
+        tone(220, 0.08, "sine", 0.3);
+        break;
+
+      case "player_hurt":
+        tone(180, 0.12, "sawtooth", 0.7);
+        noiseBurst(0.08, 400, 0.04);
+        break;
+
+      case "player_death":
+        noiseBurst(0.4, 150, 0.2);
+        tone(100, 0.35, "sawtooth", 0.8);
+        tone(60, 0.5, "sine", 0.5);
+        break;
     }
   }
 }

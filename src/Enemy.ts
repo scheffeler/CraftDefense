@@ -1,50 +1,91 @@
 import * as THREE from "three";
 import type { EnemyState, EnemyTypeName } from "./types";
 import { ENEMY_CONFIGS } from "./config/enemies";
-import { advanceTowardWaypoint, SPAWN_POINT, WAYPOINTS, pathProgress } from "./Path";
+import type { FlowField } from "./FlowField";
+import type { VoxelWorld } from "./Map";
+import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
+import { getSpawnPositions } from "./WorldGen";
 
 export type { EnemyState };
 
+const ENEMY_Y       = 1.5;
+const REACH_RADIUS  = 2.0; // distance to fortress center that counts as "reached base"
+const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
+
+// All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
+const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
+  "goblin", "orc", "troll", "goblin_miner",
+  "zombie", "spider", "golem",
+]);
+
 export class EnemyManager {
-  private readonly enemies = new Map<number, EnemyState>();
-  private readonly meshes  = new Map<number, THREE.Group>();
+  private readonly enemies   = new Map<number, EnemyState>();
+  private readonly meshes    = new Map<number, THREE.Group>();
   private readonly healthBars = new Map<number, { bar: THREE.Mesh; bg: THREE.Mesh }>();
   private idCounter = 0;
 
+  private flowField: FlowField | null = null;
+  private world: VoxelWorld | null = null;
+
   onEnemyReachedBase: (state: EnemyState) => void = () => {};
-  onEnemyDied: (state: EnemyState) => void = () => {};
+  onEnemyDied:        (state: EnemyState) => void = () => {};
+  onWallBroken: (wx: number, wz: number) => void = () => {};
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly camera: THREE.Camera,
   ) {}
 
-  spawn(type: EnemyTypeName): number {
+  setFlowField(ff: FlowField): void { this.flowField = ff; }
+  setWorld(w: VoxelWorld):     void { this.world = w; }
+
+  spawn(type: EnemyTypeName, spawnX?: number, spawnZ?: number): number {
     const cfg = ENEMY_CONFIGS[type];
-    const id = this.idCounter++;
+    const id  = this.idCounter++;
+
     const state: EnemyState = {
       id,
       config: cfg,
       health: cfg.maxHealth,
-      waypointIndex: 1, // start moving toward waypoint[1] (we're at [0])
+      waypointIndex: 1,
       speed: cfg.speed,
       slowTimer: 0,
       alive: true,
       dying: false,
       dyingTimer: 0,
       movePhase: Math.random() * Math.PI * 2,
+      useFlowField: FLOW_FIELD_TYPES.has(type),
+      breakTarget: null,
+      breakTimer: 0,
     };
     this.enemies.set(id, state);
 
     const group = this.buildMesh(type, cfg.scale);
-    group.position.copy(SPAWN_POINT);
+
+    if (FLOW_FIELD_TYPES.has(type)) {
+      let sx: number, sz: number;
+      if (spawnX !== undefined && spawnZ !== undefined) {
+        sx = spawnX; sz = spawnZ;
+      } else {
+        const positions = getSpawnPositions("north");
+        [sx, sz] = positions[Math.floor(Math.random() * positions.length)];
+        sx += 0.5; sz += 0.5;
+      }
+      group.position.set(sx, ENEMY_Y, sz);
+    } else {
+      // All types now use flow field — fall back to north gate
+      const positions = getSpawnPositions("north");
+      const [fx, fz]  = positions[Math.floor(Math.random() * positions.length)];
+      group.position.set(fx + 0.5, ENEMY_Y, fz + 0.5);
+    }
+
     this.scene.add(group);
     this.meshes.set(id, group);
 
-    const healthBar = this.buildHealthBar();
-    this.scene.add(healthBar.bg);
-    this.scene.add(healthBar.bar);
-    this.healthBars.set(id, healthBar);
+    const hb = this.buildHealthBar();
+    this.scene.add(hb.bg);
+    this.scene.add(hb.bar);
+    this.healthBars.set(id, hb);
 
     return id;
   }
@@ -58,13 +99,10 @@ export class EnemyManager {
         const group = this.meshes.get(id)!;
         group.rotation.x += dt * 4;
         group.scale.multiplyScalar(1 - dt * 3);
-        if (state.dyingTimer <= 0) {
-          this.despawn(id);
-        }
+        if (state.dyingTimer <= 0) this.despawn(id);
         continue;
       }
 
-      // Slow timer decay
       if (state.slowTimer > 0) {
         state.slowTimer -= dt;
         if (state.slowTimer <= 0) {
@@ -74,35 +112,12 @@ export class EnemyManager {
       }
 
       const group = this.meshes.get(id)!;
-      const pos = group.position.clone();
-      const result = advanceTowardWaypoint(pos, state.waypointIndex, state.speed, dt);
 
-      group.position.copy(result.newPosition);
-      state.waypointIndex = result.newIndex;
-
-      // Face movement direction
-      if (result.newIndex < WAYPOINTS.length) {
-        const target = WAYPOINTS[Math.min(result.newIndex, WAYPOINTS.length - 1)];
-        const dir = target.clone().sub(group.position);
-        dir.y = 0;
-        if (dir.length() > 0.01) {
-          const angle = Math.atan2(dir.x, dir.z);
-          group.rotation.y = angle;
-        }
+      if (this.flowField) {
+        this.updateFlowFieldEnemy(id, state, group, dt);
       }
 
-      // Leg animation
-      state.movePhase += dt * state.speed * 4;
-      this.animateLegs(id, state.movePhase);
-
-      // Update health bar position
       this.updateHealthBar(id, state, group.position);
-
-      if (result.reachedBase) {
-        state.alive = false;
-        this.despawn(id);
-        this.onEnemyReachedBase(state);
-      }
     }
   }
 
@@ -157,137 +172,176 @@ export class EnemyManager {
   }
 
   getEnemyProgress(id: number): number {
-    const state = this.enemies.get(id);
     const pos = this.meshes.get(id)?.position;
-    if (!state || !pos) return 0;
-    return pathProgress(state.waypointIndex, pos);
+    if (!pos || !this.flowField) return 0;
+    const dist = this.flowField.getDistance(pos.x, pos.z);
+    return isFinite(dist) ? 1 / (1 + dist) : 0;
   }
 
-  private despawn(id: number): void {
-    const group = this.meshes.get(id);
-    if (group) {
-      this.scene.remove(group);
-      group.traverse(c => {
-        if ((c as THREE.Mesh).isMesh) {
-          (c as THREE.Mesh).geometry.dispose();
-          const m = (c as THREE.Mesh).material;
-          if (Array.isArray(m)) m.forEach(x => x.dispose()); else m.dispose();
+  // ─── Flow-field movement ───────────────────────────────────────────────────
+
+  private updateFlowFieldEnemy(
+    id: number, state: EnemyState, group: THREE.Group, dt: number,
+  ): void {
+    const pos = group.position;
+
+    // Reached fortress center?
+    const dx = pos.x - FORTRESS_CENTER_X;
+    const dz = pos.z - FORTRESS_CENTER_Z;
+    if (Math.sqrt(dx * dx + dz * dz) < REACH_RADIUS) {
+      state.alive = false;
+      this.despawn(id);
+      this.onEnemyReachedBase(state);
+      return;
+    }
+
+    const flow = this.flowField!.getFlowDirection(pos.x, pos.z);
+
+    if (state.config.canBreakWalls && this.world) {
+      // Check if the next cell in movement direction has a wall
+      const nx = Math.floor(pos.x + flow.dx);
+      const nz = Math.floor(pos.z + flow.dz);
+      const blocked = nx >= 0 && nz >= 0 &&
+        this.world.getBlock(nx, 1, nz) !== "air";
+
+      if (blocked) {
+        if (!state.breakTarget ||
+            state.breakTarget.x !== nx || state.breakTarget.z !== nz) {
+          state.breakTarget = { x: nx, y: 1, z: nz };
+          state.breakTimer  = 0;
         }
-      });
-      this.meshes.delete(id);
+        state.breakTimer = (state.breakTimer ?? 0) + dt;
+        if (state.breakTimer >= WALL_BREAK_TIME) {
+          // Break up to 3 wall layers vertically
+          for (let wy = 1; wy <= 3; wy++) {
+            if (this.world.getBlock(nx, wy, nz) !== "air") {
+              this.world.setBlock(nx, wy, nz, "air");
+            }
+          }
+          this.world.rebuildDirtyChunks();
+          state.breakTarget = null;
+          state.breakTimer  = 0;
+          this.onWallBroken(nx, nz);
+        }
+        return; // stand still while breaking
+      }
     }
-    const hb = this.healthBars.get(id);
-    if (hb) {
-      this.scene.remove(hb.bg);
-      this.scene.remove(hb.bar);
-      hb.bg.geometry.dispose(); (hb.bg.material as THREE.Material).dispose();
-      hb.bar.geometry.dispose(); (hb.bar.material as THREE.Material).dispose();
-      this.healthBars.delete(id);
+
+    // Move in flow direction
+    if (flow.dx !== 0 || flow.dz !== 0) {
+      pos.x += flow.dx * state.speed * dt;
+      pos.z += flow.dz * state.speed * dt;
+      pos.y  = ENEMY_Y;
+
+      const angle = Math.atan2(flow.dx, flow.dz);
+      group.rotation.y = angle;
     }
-    this.enemies.delete(id);
+
+    state.movePhase += dt * state.speed * 4;
+    this.animateLegs(id, state.movePhase);
   }
 
-  // -------------------------------------------------------------------------
-  // Mesh building
-  // -------------------------------------------------------------------------
+  // ─── Mesh building ─────────────────────────────────────────────────────────
+
   private buildMesh(type: EnemyTypeName, scale: number): THREE.Group {
     const group = new THREE.Group();
     group.scale.setScalar(scale);
 
     if (type === "spider") {
-      // Low flat body + 8 legs
-      const bodyGeo = new THREE.BoxGeometry(0.6, 0.3, 0.5);
-      const bodyMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 0.15;
-      body.castShadow = true;
-      group.add(body);
-
-      const headGeo = new THREE.BoxGeometry(0.3, 0.25, 0.3);
-      const headMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
-      const head = new THREE.Mesh(headGeo, headMat);
-      head.position.set(0.35, 0.2, 0);
-      group.add(head);
-
-      // Eyes
-      const eyeGeo = new THREE.BoxGeometry(0.06, 0.06, 0.01);
-      const eyeMat = new THREE.MeshLambertMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 });
-      [-0.07, 0.07].forEach(ex => {
-        const eye = new THREE.Mesh(eyeGeo, eyeMat);
-        eye.position.set(0.5, 0.22, ex);
-        group.add(eye);
-      });
-
-      // 8 legs (4 per side)
-      const legMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-      for (let i = 0; i < 4; i++) {
-        [-1, 1].forEach(side => {
-          const legGeo = new THREE.BoxGeometry(0.05, 0.05, 0.4);
-          const leg = new THREE.Mesh(legGeo, legMat);
-          const angle = ((i - 1.5) / 3) * Math.PI * 0.5;
-          leg.position.set(side * 0.35, 0.1, (i - 1.5) * 0.18);
-          leg.rotation.z = side * 0.6;
-          leg.rotation.x = angle * 0.5;
-          leg.name = `leg_${i}_${side}`;
-          group.add(leg);
-        });
-      }
-
+      this.buildSpiderMesh(group);
     } else {
-      // Humanoid: body + head + 2 legs
-      const bodyColor = ENEMY_CONFIGS[type].color;
-      const headColor = ENEMY_CONFIGS[type].headColor;
-
-      const bodyGeo = new THREE.BoxGeometry(0.5, 0.65, 0.3);
-      const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 0.7;
-      body.castShadow = true;
-      group.add(body);
-
-      const headGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
-      const headMat = new THREE.MeshLambertMaterial({ color: headColor });
-      const head = new THREE.Mesh(headGeo, headMat);
-      head.position.y = 1.25;
-      head.castShadow = true;
-      group.add(head);
-
-      // Eyes
-      const eyeGeo = new THREE.BoxGeometry(0.09, 0.09, 0.01);
-      const eyeMat = new THREE.MeshLambertMaterial({
-        color: type === "golem" ? 0xff4400 : 0xffffff,
-        emissive: type === "golem" ? 0xff4400 : 0x888888,
-        emissiveIntensity: 0.5,
-      });
-      [-0.1, 0.1].forEach(ex => {
-        const eye = new THREE.Mesh(eyeGeo, eyeMat);
-        eye.position.set(ex, 1.3, 0.22);
-        group.add(eye);
-      });
-
-      const legGeo = new THREE.BoxGeometry(0.22, 0.5, 0.22);
-      const legMat = new THREE.MeshLambertMaterial({ color: bodyColor });
-      [-0.14, 0.14].forEach((lx, i) => {
-        const leg = new THREE.Mesh(legGeo, legMat);
-        leg.position.set(lx, 0.25, 0);
-        leg.castShadow = true;
-        leg.name = `leg_${i}`;
-        group.add(leg);
-      });
-
-      // Golem extra: shoulder pads
-      if (type === "golem") {
-        const padGeo = new THREE.BoxGeometry(0.2, 0.2, 0.35);
-        const padMat = new THREE.MeshLambertMaterial({ color: 0x666666 });
-        [-0.35, 0.35].forEach(px => {
-          const pad = new THREE.Mesh(padGeo, padMat);
-          pad.position.set(px, 0.95, 0);
-          group.add(pad);
-        });
-      }
+      this.buildHumanoidMesh(group, type);
     }
 
     return group;
+  }
+
+  private buildSpiderMesh(group: THREE.Group): void {
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.5), bodyMat);
+    body.position.y = 0.15;
+    body.castShadow = true;
+    group.add(body);
+
+    const headMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.3), headMat);
+    head.position.set(0.35, 0.2, 0);
+    group.add(head);
+
+    const eyeMat = new THREE.MeshLambertMaterial({
+      color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5,
+    });
+    for (const ex of [-0.07, 0.07]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.01), eyeMat);
+      eye.position.set(0.5, 0.22, ex);
+      group.add(eye);
+    }
+
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    for (let i = 0; i < 4; i++) {
+      for (const side of [-1, 1]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.4), legMat);
+        leg.position.set(side * 0.35, 0.1, (i - 1.5) * 0.18);
+        leg.rotation.z = side * 0.6;
+        leg.name = `leg_${i}_${side}`;
+        group.add(leg);
+      }
+    }
+  }
+
+  private buildHumanoidMesh(group: THREE.Group, type: EnemyTypeName): void {
+    const cfg = ENEMY_CONFIGS[type];
+
+    const bodyMat = new THREE.MeshLambertMaterial({ color: cfg.color });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.65, 0.3), bodyMat);
+    body.position.y = 0.7;
+    body.castShadow = true;
+    group.add(body);
+
+    const headMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), headMat);
+    head.position.y = 1.25;
+    head.castShadow = true;
+    group.add(head);
+
+    const eyeColor = type === "golem" ? 0xff4400 : 0xffffff;
+    const eyeEmissive = type === "golem" ? 0xff4400 : 0x888888;
+    const eyeMat = new THREE.MeshLambertMaterial({
+      color: eyeColor, emissive: eyeEmissive, emissiveIntensity: 0.5,
+    });
+    for (const ex of [-0.1, 0.1]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.01), eyeMat);
+      eye.position.set(ex, 1.3, 0.22);
+      group.add(eye);
+    }
+
+    const legMat = new THREE.MeshLambertMaterial({ color: cfg.color });
+    for (const [lx, i] of [[-0.14, 0], [0.14, 1]] as [number, number][]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), legMat);
+      leg.position.set(lx, 0.25, 0);
+      leg.castShadow = true;
+      leg.name = `leg_${i}`;
+      group.add(leg);
+    }
+
+    // Extra details per type
+    if (type === "golem" || type === "troll") {
+      const padMat = new THREE.MeshLambertMaterial({ color: 0x666666 });
+      for (const px of [-0.35, 0.35]) {
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.35), padMat);
+        pad.position.set(px, 0.95, 0);
+        group.add(pad);
+      }
+    }
+
+    if (type === "goblin_miner") {
+      // Pickaxe prop
+      const pickMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+      const pick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), pickMat);
+      pick.position.set(0.35, 0.7, 0.2);
+      pick.rotation.x = Math.PI / 4;
+      group.add(pick);
+    }
   }
 
   private animateLegs(id: number, phase: number): void {
@@ -301,15 +355,19 @@ export class EnemyManager {
     });
   }
 
+  // ─── Health bar ────────────────────────────────────────────────────────────
+
   private buildHealthBar(): { bar: THREE.Mesh; bg: THREE.Mesh } {
-    const bgGeo = new THREE.PlaneGeometry(0.7, 0.1);
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: false });
-    const bg = new THREE.Mesh(bgGeo, bgMat);
+    const bgMat = new THREE.MeshBasicMaterial({
+      color: 0x333333, side: THREE.DoubleSide, depthTest: false,
+    });
+    const bg = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.1), bgMat);
     bg.renderOrder = 1;
 
-    const barGeo = new THREE.PlaneGeometry(0.7, 0.1);
-    const barMat = new THREE.MeshBasicMaterial({ color: 0x44ff44, side: THREE.DoubleSide, depthTest: false });
-    const bar = new THREE.Mesh(barGeo, barMat);
+    const barMat = new THREE.MeshBasicMaterial({
+      color: 0x44ff44, side: THREE.DoubleSide, depthTest: false,
+    });
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.1), barMat);
     bar.renderOrder = 2;
 
     return { bar, bg };
@@ -324,7 +382,7 @@ export class EnemyManager {
     hb.bg.position.set(position.x, y, position.z);
     hb.bg.lookAt(this.camera.position);
 
-    const pct = Math.max(0, state.health / state.config.maxHealth);
+    const pct   = Math.max(0, state.health / state.config.maxHealth);
     const color = pct > 0.5 ? 0x44ff44 : pct > 0.25 ? 0xffaa00 : 0xff2222;
     (hb.bar.material as THREE.MeshBasicMaterial).color.setHex(color);
 
@@ -333,6 +391,8 @@ export class EnemyManager {
     hb.bar.position.set(position.x - (1 - scale) * 0.35, y, position.z);
     hb.bar.lookAt(this.camera.position);
   }
+
+  // ─── Visual effects ────────────────────────────────────────────────────────
 
   private flashHit(id: number): void {
     const group = this.meshes.get(id);
@@ -357,8 +417,9 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      (m.material as THREE.MeshLambertMaterial).emissive.setHex(0x3399ff);
-      (m.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.3;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.emissive.setHex(0x3399ff);
+      mat.emissiveIntensity = 0.3;
     });
   }
 
@@ -368,8 +429,35 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      (m.material as THREE.MeshLambertMaterial).emissive.setHex(0x000000);
-      (m.material as THREE.MeshLambertMaterial).emissiveIntensity = 0;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.emissive.setHex(0x000000);
+      mat.emissiveIntensity = 0;
     });
+  }
+
+  // ─── Despawn ───────────────────────────────────────────────────────────────
+
+  private despawn(id: number): void {
+    const group = this.meshes.get(id);
+    if (group) {
+      this.scene.remove(group);
+      group.traverse(c => {
+        if ((c as THREE.Mesh).isMesh) {
+          (c as THREE.Mesh).geometry.dispose();
+          const m = (c as THREE.Mesh).material;
+          if (Array.isArray(m)) m.forEach(x => x.dispose()); else m.dispose();
+        }
+      });
+      this.meshes.delete(id);
+    }
+    const hb = this.healthBars.get(id);
+    if (hb) {
+      this.scene.remove(hb.bg);
+      this.scene.remove(hb.bar);
+      hb.bg.geometry.dispose();  (hb.bg.material as THREE.Material).dispose();
+      hb.bar.geometry.dispose(); (hb.bar.material as THREE.Material).dispose();
+      this.healthBars.delete(id);
+    }
+    this.enemies.delete(id);
   }
 }

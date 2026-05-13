@@ -1,10 +1,7 @@
 import * as THREE from "three";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
-import type { BlockId, BlockDef, GridCell } from "./types";
-import {
-  GRID_WIDTH, GRID_DEPTH, PATH_WAYPOINTS,
-  TREE_POSITIONS,
-} from "./config/map";
+import type { BlockId, BlockDef } from "./types";
+import { generateWorld } from "./WorldGen";
 
 // BVH acceleration for raycasting
 (THREE.BufferGeometry.prototype as any).computeBoundsTree = computeBoundsTree;
@@ -15,17 +12,22 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 // Block definitions
 // ---------------------------------------------------------------------------
 export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
-  air:         { id: "air",         name: "Air",         color: 0x000000, hardness: 0,   placeable: false, transparent: true  },
-  grass:       { id: "grass",       name: "Grass",       color: 0x5d9e3a, topColor: 0x5d9e3a, bottomColor: 0x8b5c2a, hardness: 1, placeable: true,  transparent: false },
-  dirt:        { id: "dirt",        name: "Dirt",        color: 0x8b5c2a, hardness: 1,   placeable: true,  transparent: false },
-  stone:       { id: "stone",       name: "Stone",       color: 0x888888, hardness: 3,   placeable: true,  transparent: false },
-  wood:        { id: "wood",        name: "Wood",        color: 0x6b4c2a, hardness: 2,   placeable: true,  transparent: false },
-  planks:      { id: "planks",      name: "Planks",      color: 0xc8a060, hardness: 2,   placeable: true,  transparent: false },
-  cobblestone: { id: "cobblestone", name: "Cobblestone", color: 0x888070, hardness: 3,   placeable: true,  transparent: false },
-  sand:        { id: "sand",        name: "Sand",        color: 0xd4c484, hardness: 1,   placeable: true,  transparent: false },
-  glass:       { id: "glass",       name: "Glass",       color: 0x88ccee, hardness: 1,   placeable: true,  transparent: true  },
-  leaves:      { id: "leaves",      name: "Leaves",      color: 0x3a7a25, hardness: 0.5, placeable: true,  transparent: true  },
-  obsidian:    { id: "obsidian",    name: "Obsidian",    color: 0x1a0a2a, hardness: 10,  placeable: true,  transparent: false },
+  air:            { id: "air",            name: "Air",            color: 0x000000, hardness: 0,    placeable: false, transparent: true  },
+  grass:          { id: "grass",          name: "Grass",          color: 0x5d9e3a, topColor: 0x5d9e3a, bottomColor: 0x8b5c2a, hardness: 1, placeable: true,  transparent: false },
+  dirt:           { id: "dirt",           name: "Dirt",           color: 0x8b5c2a, hardness: 1,    placeable: true,  transparent: false },
+  stone:          { id: "stone",          name: "Stone",          color: 0x888888, hardness: 3,    placeable: true,  transparent: false },
+  wood:           { id: "wood",           name: "Wood",           color: 0x6b4c2a, hardness: 2,    placeable: true,  transparent: false },
+  planks:         { id: "planks",         name: "Planks",         color: 0xc8a060, hardness: 2,    placeable: true,  transparent: false },
+  cobblestone:    { id: "cobblestone",    name: "Cobblestone",    color: 0x888070, hardness: 3,    placeable: true,  transparent: false },
+  sand:           { id: "sand",           name: "Sand",           color: 0xd4c484, hardness: 1,    placeable: true,  transparent: false },
+  glass:          { id: "glass",          name: "Glass",          color: 0x88ccee, hardness: 1,    placeable: true,  transparent: true  },
+  leaves:         { id: "leaves",         name: "Leaves",         color: 0x3a7a25, hardness: 0.5,  placeable: true,  transparent: true  },
+  obsidian:       { id: "obsidian",       name: "Obsidian",       color: 0x1a0a2a, hardness: 10,   placeable: true,  transparent: false },
+  iron_ore:       { id: "iron_ore",       name: "Iron Ore",       color: 0x886655, hardness: 4,    placeable: true,  transparent: false },
+  coal_ore:       { id: "coal_ore",       name: "Coal Ore",       color: 0x444444, hardness: 3,    placeable: true,  transparent: false },
+  iron_block:     { id: "iron_block",     name: "Iron Block",     color: 0xaaaaaa, hardness: 5,    placeable: true,  transparent: false },
+  crafting_table: { id: "crafting_table", name: "Crafting Table", color: 0x8b5c2a, hardness: 2,    placeable: true,  transparent: false },
+  furnace:        { id: "furnace",        name: "Furnace",        color: 0x777777, hardness: 3,    placeable: true,  transparent: false },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];
@@ -36,7 +38,7 @@ BLOCK_ID_INDEX.forEach((id, i) => { BLOCK_TO_IDX[id] = i; });
 // Voxel chunk
 // ---------------------------------------------------------------------------
 const CHUNK_SIZE = 16;
-const WORLD_HEIGHT = 8;
+const WORLD_HEIGHT = 32;
 const BLOCK_SIZE = 1.0;
 
 class Chunk {
@@ -219,106 +221,15 @@ export class VoxelWorld {
 }
 
 // ---------------------------------------------------------------------------
-// Map builder — creates the TD map layout
-// ---------------------------------------------------------------------------
-function computePathCells(): Set<string> {
-  const cells = new Set<string>();
-  for (let i = 0; i < PATH_WAYPOINTS.length - 1; i++) {
-    const [x0, z0] = PATH_WAYPOINTS[i];
-    const [x1, z1] = PATH_WAYPOINTS[i + 1];
-    if (x0 === x1) {
-      const zMin = Math.min(z0, z1), zMax = Math.max(z0, z1);
-      for (let z = zMin; z <= zMax; z++) cells.add(`${x0},${z}`);
-    } else {
-      const xMin = Math.min(x0, x1), xMax = Math.max(x0, x1);
-      for (let x = xMin; x <= xMax; x++) cells.add(`${x},${z0}`);
-    }
-  }
-  return cells;
-}
-
-function buildMap(world: VoxelWorld, pathCells: Set<string>): void {
-  // Stone base layer + grass surface
-  for (let x = 0; x < GRID_WIDTH; x++) {
-    for (let z = 0; z < GRID_DEPTH; z++) {
-      world.setBlock(x, -1, z, "stone"); // y=-1 not visible but provides solid base
-      world.setBlock(x, 0, z, "grass");
-    }
-  }
-
-  // Path blocks
-  for (const key of pathCells) {
-    const [x, z] = key.split(",").map(Number);
-    world.setBlock(x, 0, z, "cobblestone");
-  }
-
-  // Trees: wood trunk × 2 + leaf canopy 3×3
-  for (const [tx, tz] of TREE_POSITIONS) {
-    if (pathCells.has(`${tx},${tz}`)) continue;
-    world.setBlock(tx, 1, tz, "wood");
-    world.setBlock(tx, 2, tz, "wood");
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        world.setBlock(tx + dx, 3, tz + dz, "leaves");
-      }
-    }
-  }
-
-  // Spawn marker (orange-ish sand)
-  const [sx, sz] = PATH_WAYPOINTS[0];
-  world.setBlock(sx, 1, sz, "sand");
-
-  // Base marker (dark obsidian)
-  const [bx, bz] = PATH_WAYPOINTS[PATH_WAYPOINTS.length - 1];
-  world.setBlock(bx, 1, bz, "obsidian");
-}
-
-// ---------------------------------------------------------------------------
-// GameMap — grid tracking + world facade
+// GameMap — wraps VoxelWorld; TD-specific grid removed
 // ---------------------------------------------------------------------------
 export class GameMap {
   readonly world: VoxelWorld;
-  private readonly grid: GridCell[][];
-  readonly pathCells: Set<string>;
 
   constructor(scene: THREE.Scene) {
     this.world = new VoxelWorld(scene);
-    this.pathCells = computePathCells();
-    this.grid = Array.from({ length: GRID_WIDTH }, (_, x) =>
-      Array.from({ length: GRID_DEPTH }, (_, z) => ({
-        x, z,
-        isPath: this.pathCells.has(`${x},${z}`),
-        hasTower: false,
-        towerId: null,
-      }))
-    );
-    buildMap(this.world, this.pathCells);
+    generateWorld(this.world);
     this.world.rebuildDirtyChunks();
-  }
-
-  isPathCell(x: number, z: number): boolean {
-    return this.pathCells.has(`${x},${z}`);
-  }
-
-  isBuildable(x: number, z: number): boolean {
-    if (x < 0 || x >= GRID_WIDTH || z < 0 || z >= GRID_DEPTH) return false;
-    const cell = this.grid[x][z];
-    return !cell.isPath && !cell.hasTower;
-  }
-
-  placeTower(x: number, z: number, towerId: number): void {
-    this.grid[x][z].hasTower = true;
-    this.grid[x][z].towerId = towerId;
-  }
-
-  removeTower(x: number, z: number): void {
-    this.grid[x][z].hasTower = false;
-    this.grid[x][z].towerId = null;
-  }
-
-  getCell(x: number, z: number): GridCell | null {
-    if (x < 0 || x >= GRID_WIDTH || z < 0 || z >= GRID_DEPTH) return null;
-    return this.grid[x][z];
   }
 
   getChunkMeshes(): THREE.Mesh[] {

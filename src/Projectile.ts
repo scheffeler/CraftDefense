@@ -15,14 +15,60 @@ interface ProjectileData {
   maxLife: number;
 }
 
-const POOL_SIZE = 200;
-const HIT_DIST = 0.6;
+interface PlayerArrow {
+  active: boolean;
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  damage: number;
+  life: number;
+}
+
+const POOL_SIZE       = 200;
+const PLAYER_POOL     = 20;
+const HIT_DIST        = 0.6;
+const ARROW_HIT_DIST  = 0.9;
+const GRAVITY         = 20;
+const ARROW_MAX_LIFE  = 6;
+const ARROW_BASE_SPEED = 18;
+const ARROW_POWER_MULT = 22;
 
 export class ProjectileManager {
   private readonly pool: ProjectileData[] = [];
+  private readonly playerArrows: PlayerArrow[] = [];
 
   constructor(private readonly scene: THREE.Scene) {
     this.buildPool();
+    this.buildPlayerArrowPool();
+  }
+
+  private buildPlayerArrowPool(): void {
+    const geo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 4);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x8b6914 });
+    for (let i = 0; i < PLAYER_POOL; i++) {
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.playerArrows.push({
+        active: false, mesh, velocity: new THREE.Vector3(), damage: 0, life: 0,
+      });
+    }
+  }
+
+  fireFromPlayer(
+    from: THREE.Vector3,
+    direction: THREE.Vector3,
+    power: number,
+    damage: number,
+  ): void {
+    const arrow = this.playerArrows.find(a => !a.active);
+    if (!arrow) return;
+    arrow.active = true;
+    arrow.damage = damage;
+    arrow.life = ARROW_MAX_LIFE;
+    arrow.mesh.position.copy(from);
+    arrow.mesh.visible = true;
+    const speed = ARROW_BASE_SPEED + power * ARROW_POWER_MULT;
+    arrow.velocity.copy(direction).multiplyScalar(speed);
   }
 
   private buildPool(): void {
@@ -84,7 +130,9 @@ export class ProjectileManager {
     getEnemyPos: (id: number) => THREE.Vector3 | null,
     damageEnemy: (id: number, dmg: number, slow: number, slowDur: number) => void,
     getEnemiesInRadius: (center: THREE.Vector3, radius: number) => number[],
+    getAliveEnemyIds?: () => number[],
   ): void {
+    // Tower projectiles (homing)
     for (const p of this.pool) {
       if (!p.active) continue;
 
@@ -94,14 +142,12 @@ export class ProjectileManager {
       const targetPos = getEnemyPos(p.targetId);
       if (!targetPos) { this.deactivate(p); continue; }
 
-      const dir = targetPos.clone().sub(p.mesh.position);
+      const dir  = targetPos.clone().sub(p.mesh.position);
       const dist = dir.length();
 
       if (dist < HIT_DIST) {
-        // Hit
         if (p.aoeRadius > 0) {
-          const hits = getEnemiesInRadius(p.mesh.position, p.aoeRadius);
-          for (const eid of hits) {
+          for (const eid of getEnemiesInRadius(p.mesh.position, p.aoeRadius)) {
             damageEnemy(eid, p.damage, p.slowFactor, p.slowDuration);
           }
           this.showAoeFlash(p.mesh.position, p.aoeRadius);
@@ -112,25 +158,57 @@ export class ProjectileManager {
         continue;
       }
 
-      // Move toward target
       const step = dir.normalize().multiplyScalar(Math.min(p.speed * dt, dist));
       p.mesh.position.add(step);
+      if (p.type === "arrow") { p.mesh.lookAt(targetPos); p.mesh.rotateX(Math.PI / 2); }
+    }
 
-      // Orient along movement direction
-      if (p.type === "arrow") {
-        p.mesh.lookAt(targetPos);
-        p.mesh.rotateX(Math.PI / 2);
+    // Player arrows (directional + gravity)
+    for (const a of this.playerArrows) {
+      if (!a.active) continue;
+
+      a.life -= dt;
+      if (a.life <= 0) { this.deactivateArrow(a); continue; }
+
+      a.velocity.y -= GRAVITY * dt;
+      a.mesh.position.addScaledVector(a.velocity, dt);
+
+      // Orient along velocity
+      const speed = a.velocity.length();
+      if (speed > 0.1) {
+        const dir = a.velocity.clone().normalize();
+        a.mesh.lookAt(a.mesh.position.clone().add(dir));
+        a.mesh.rotateX(Math.PI / 2);
+      }
+
+      // Hit detection vs all alive enemies
+      if (getAliveEnemyIds) {
+        for (const eid of getAliveEnemyIds()) {
+          const epos = getEnemyPos(eid);
+          if (!epos) continue;
+          if (a.mesh.position.distanceTo(epos) < ARROW_HIT_DIST) {
+            damageEnemy(eid, a.damage, 1, 0);
+            this.deactivateArrow(a);
+            break;
+          }
+        }
       }
     }
   }
 
   reset(): void {
     for (const p of this.pool) this.deactivate(p);
+    for (const a of this.playerArrows) this.deactivateArrow(a);
   }
 
   private deactivate(p: ProjectileData): void {
     p.active = false;
     p.mesh.visible = false;
+  }
+
+  private deactivateArrow(a: PlayerArrow): void {
+    a.active = false;
+    a.mesh.visible = false;
   }
 
   private showAoeFlash(center: THREE.Vector3, radius: number): void {
