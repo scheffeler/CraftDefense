@@ -32,6 +32,7 @@ function inFortressBounds(x: number, z: number): boolean {
 export function generateWorld(world: VoxelWorld): void {
   generateTerrain(world);
   generateFortress(world);
+  generateInterior(world);
   generateTrees(world);
   generateOreOutcroppings(world);
   generateSpawnMarkers(world);
@@ -183,6 +184,43 @@ function generateOreOutcroppings(world: VoxelWorld): void {
       world.setBlock(x, 2, z, oreId);
     }
   }
+}
+
+function generateInterior(world: VoxelWorld): void {
+  // Central well (cobblestone ring at 32, 32)
+  const cx = 32, cz = 32;
+  for (let angle = 0; angle < 8; angle++) {
+    const a = angle / 8 * Math.PI * 2;
+    const wx = Math.round(cx + Math.cos(a) * 2);
+    const wz = Math.round(cz + Math.sin(a) * 2);
+    world.setBlock(wx, 1, wz, "cobblestone");
+    world.setBlock(wx, 2, wz, "cobblestone");
+  }
+  // Well water (represented by stone for now — air inside)
+  world.setBlock(cx, 0, cz, "stone");
+
+  // Small wooden shack near east wall (crafting area)
+  for (let dx = 0; dx < 3; dx++) {
+    world.setBlock(38 + dx, 1, 28, "planks");
+    world.setBlock(38 + dx, 1, 31, "planks");
+    world.setBlock(38 + dx, 2, 28, "planks");
+    world.setBlock(38 + dx, 2, 31, "planks");
+    world.setBlock(38 + dx, 3, 28, "wood");
+    world.setBlock(38 + dx, 3, 31, "wood");
+  }
+  world.setBlock(38, 1, 29, "planks");
+  world.setBlock(38, 1, 30, "planks");
+  world.setBlock(38, 2, 29, "planks");
+  world.setBlock(38, 2, 30, "planks");
+  // Roof
+  for (let dx = 0; dx < 3; dx++) {
+    for (let dz = 0; dz < 4; dz++) {
+      world.setBlock(38 + dx, 4, 28 + dz, "planks");
+    }
+  }
+  // Crafting table and furnace inside
+  world.setBlock(39, 1, 29, "crafting_table");
+  world.setBlock(39, 1, 30, "furnace");
 }
 
 function generateSpawnMarkers(world: VoxelWorld): void {

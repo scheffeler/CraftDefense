@@ -297,7 +297,7 @@ export class Game {
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);
     this.lastTime = time;
     this.update(dt);
-    this.scene.render();
+    this.scene.render(dt);
     requestAnimationFrame(t => this.loop(t));
   }
 
@@ -377,6 +377,7 @@ export class Game {
     if (!result) return;
 
     this.audio.play("swing");
+    this.scene.swingArm();
     for (const state of this.enemies.getAliveEnemies()) {
       const pos = this.enemies.getEnemyPosition(state.id);
       if (pos && pos.distanceTo(result.center) <= result.radius) {

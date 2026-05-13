@@ -63,9 +63,15 @@ export class SceneManager {
   private sunLight!: THREE.DirectionalLight;
   private ambientLight!: THREE.AmbientLight;
 
-  // First-person arm
+  // Night sky elements
+  private readonly stars: THREE.Points;
+  private readonly moon: THREE.Mesh;
+
+  // First-person arm + swing animation
   private readonly armScene: THREE.Scene;
   private readonly armGroup: THREE.Group;
+  private armSwingTimer = 0;
+  private readonly ARM_SWING_DURATION = 0.25;
 
   onPointerLockChange: (locked: boolean) => void = () => {};
 
@@ -94,6 +100,8 @@ export class SceneManager {
 
     this.setupLighting();
     this.buildClouds();
+    this.stars = this.buildStars();
+    this.moon  = this.buildMoon();
 
     // Arm scene — rendered after main scene with depth cleared
     this.armScene = new THREE.Scene();
@@ -140,6 +148,20 @@ export class SceneManager {
 
     // Tone mapping exposure: brighter at noon, dimmer at night
     this.renderer.toneMappingExposure = 0.5 + frame.ambientInt * 0.8;
+
+    // Stars and moon: visible at night (dayTime ~0-0.25 and ~0.75-1)
+    const nightness = Math.max(0, 1 - frame.ambientInt * 4);
+    (this.stars.material as THREE.PointsMaterial).opacity = nightness * 0.9;
+    (this.moon.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
+
+    // Moon position: opposite side of sky from sun
+    const moonAngle = this.dayTime * Math.PI * 2 + Math.PI;
+    const mr = 130;
+    this.moon.position.set(
+      Math.cos(moonAngle) * mr + 32,
+      Math.abs(Math.sin(moonAngle)) * mr,
+      20,
+    );
   }
 
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
@@ -193,6 +215,33 @@ export class SceneManager {
     this.armGroup.add(arm);
   }
 
+  private buildStars(): THREE.Points {
+    const count = 800;
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
+      const r     = 160;
+      positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta) + 32;
+      positions[i * 3 + 1] = Math.abs(r * Math.cos(phi));      // upper hemisphere only
+      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) + 32;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, transparent: true, opacity: 0 });
+    const pts = new THREE.Points(geo, mat);
+    this.scene.add(pts);
+    return pts;
+  }
+
+  private buildMoon(): THREE.Mesh {
+    const geo = new THREE.SphereGeometry(4, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xeeeedd, transparent: true, opacity: 0 });
+    const mesh = new THREE.Mesh(geo, mat);
+    this.scene.add(mesh);
+    return mesh;
+  }
+
   private buildClouds(): void {
     const cloudMat = new THREE.MeshLambertMaterial({
       color: 0xffffff, transparent: true, opacity: 0.85,
@@ -211,25 +260,36 @@ export class SceneManager {
     }
   }
 
-  render(): void {
+  /** Trigger the arm swing animation (call on attack/mine). */
+  swingArm(): void {
+    this.armSwingTimer = this.ARM_SWING_DURATION;
+  }
+
+  render(dt = 0): void {
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     this.renderer.clearDepth();
-    this.renderArm();
+    this.renderArm(dt);
   }
 
-  private renderArm(): void {
+  private renderArm(dt: number): void {
+    if (this.armSwingTimer > 0) this.armSwingTimer = Math.max(0, this.armSwingTimer - dt);
+
     const worldPos  = new THREE.Vector3();
     const worldQuat = new THREE.Quaternion();
     this.camera.getWorldPosition(worldPos);
     this.camera.getWorldQuaternion(worldQuat);
 
-    const localOffset = new THREE.Vector3(0.38, -0.52, -0.75);
+    // Swing: rotate arm forward and back over the swing duration
+    const swingPct = this.armSwingTimer / this.ARM_SWING_DURATION;
+    const swingAngle = Math.sin(swingPct * Math.PI) * 1.2; // 1.2 rad ≈ 69 degrees
+
+    const localOffset = new THREE.Vector3(0.38, -0.52 + swingPct * 0.08, -0.75);
     localOffset.applyQuaternion(worldQuat);
     this.armGroup.position.copy(worldPos).add(localOffset);
 
     const tiltQ = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(0.25, -0.2, 0.12, "YXZ"),
+      new THREE.Euler(0.25 - swingAngle, -0.2, 0.12, "YXZ"),
     );
     this.armGroup.quaternion.copy(worldQuat).multiply(tiltQ);
 
