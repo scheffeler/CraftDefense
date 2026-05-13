@@ -34,9 +34,16 @@ const SURFACE_STEP_SOUND = {
 } as const;
 
 const SMELT_RECIPES: Record<string, string> = {
-  iron_ore: "iron_ingot",
-  sand:     "glass",
+  iron_ore:    "iron_ingot",
+  sand:        "glass",
   cobblestone: "stone",
+};
+const SMELT_TIME = 10; // seconds per item
+const FUEL_TIMES: Record<string, number> = {
+  coal_ore: 80,
+  planks:   15,
+  wood:     15,
+  stick:    5,
 };
 
 export class Game {
@@ -62,6 +69,17 @@ export class Game {
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
   private openChestKey: string | null = null;
+
+  // Furnace state: keyed by "wx,wy,wz"
+  private readonly furnaceStates = new Map<string, {
+    inputItem: ItemStack | null;
+    fuelItem:  ItemStack | null;
+    outputItem: ItemStack | null;
+    smeltProgress: number;   // 0..1
+    fuelRemaining: number;   // seconds remaining on current fuel
+    totalFuelTime: number;   // seconds the current fuel lasts
+  }>();
+  private openFurnaceKey: string | null = null;
 
   private particles!:        ParticleSystem;
   private scene!:            SceneManager;
@@ -262,18 +280,22 @@ export class Game {
         }
       }
 
-      // Check if looking at a furnace — smelt active item
+      // Check if looking at a furnace — open furnace UI
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "furnace") {
-        if (stack && SMELT_RECIPES[stack.itemId]) {
-          const result = SMELT_RECIPES[stack.itemId];
-          this.inventory.removeItem(stack.itemId, 1);
-          this.inventory.addItem(result, 1);
-          this.audio.play("block_place", 0.7);
-          this.refreshHotbar();
-          this.ui.showSmeltNotice(stack.itemId, result);
-          return;
+        const key = `${tb.wx},${tb.wy},${tb.wz}`;
+        if (!this.furnaceStates.has(key)) {
+          this.furnaceStates.set(key, {
+            inputItem: null, fuelItem: null, outputItem: null,
+            smeltProgress: 0, fuelRemaining: 0, totalFuelTime: 0,
+          });
         }
-        return; // clicked furnace but nothing to smelt
+        this.openFurnaceKey = key;
+        const fs = this.furnaceStates.get(key)!;
+        this.ui.showFurnace(true);
+        this.ui.updateFurnaceSlots(fs.inputItem, fs.fuelItem, fs.outputItem);
+        this.ui.updateFurnaceProgress(fs.smeltProgress, fs.totalFuelTime > 0 ? fs.fuelRemaining / fs.totalFuelTime : 0);
+        this.scene.unlockPointer();
+        return;
       }
 
       if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
@@ -530,6 +552,66 @@ export class Game {
       this.scene.lockPointer();
     };
 
+    // Furnace
+    this.ui.onFurnaceInputClick = () => {
+      if (!this.openFurnaceKey) return;
+      const fs = this.furnaceStates.get(this.openFurnaceKey)!;
+      const active = this.inventory.getActiveItem();
+      if (active && SMELT_RECIPES[active.itemId]) {
+        if (!fs.inputItem) {
+          this.inventory.removeItem(active.itemId, 1);
+          fs.inputItem = { itemId: active.itemId, count: 1 };
+        } else {
+          // Swap back to inventory
+          this.inventory.addItem(fs.inputItem.itemId, fs.inputItem.count);
+          fs.inputItem = null;
+        }
+      } else if (fs.inputItem && !active) {
+        this.inventory.addItem(fs.inputItem.itemId, fs.inputItem.count);
+        fs.inputItem = null;
+      }
+      this.ui.updateFurnaceSlots(fs.inputItem, fs.fuelItem, fs.outputItem);
+      this.refreshHotbar();
+    };
+
+    this.ui.onFurnaceFuelClick = () => {
+      if (!this.openFurnaceKey) return;
+      const fs = this.furnaceStates.get(this.openFurnaceKey)!;
+      const active = this.inventory.getActiveItem();
+      if (active && FUEL_TIMES[active.itemId]) {
+        if (!fs.fuelItem) {
+          this.inventory.removeItem(active.itemId, 1);
+          fs.fuelItem = { itemId: active.itemId, count: 1 };
+        } else {
+          this.inventory.addItem(fs.fuelItem.itemId, fs.fuelItem.count);
+          fs.fuelItem = null;
+        }
+      } else if (fs.fuelItem && !active) {
+        this.inventory.addItem(fs.fuelItem.itemId, fs.fuelItem.count);
+        fs.fuelItem = null;
+      }
+      this.ui.updateFurnaceSlots(fs.inputItem, fs.fuelItem, fs.outputItem);
+      this.refreshHotbar();
+    };
+
+    this.ui.onFurnaceOutputClick = () => {
+      if (!this.openFurnaceKey) return;
+      const fs = this.furnaceStates.get(this.openFurnaceKey)!;
+      if (fs.outputItem) {
+        this.inventory.addItem(fs.outputItem.itemId, fs.outputItem.count);
+        fs.outputItem = null;
+        this.audio.play("pickup", 0.5);
+        this.ui.updateFurnaceSlots(fs.inputItem, fs.fuelItem, fs.outputItem);
+        this.refreshHotbar();
+      }
+    };
+
+    this.ui.onFurnaceClose = () => {
+      this.ui.showFurnace(false);
+      this.openFurnaceKey = null;
+      this.scene.lockPointer();
+    };
+
     // UI restart
     this.ui.onRestart = () => this.resetGame();
   }
@@ -590,7 +672,11 @@ export class Game {
     this.audio.updateAmbient(dt, this.scene.daylight);
 
     if (this.phase === "gameover" || this.phase === "win") return;
-    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen()) return;
+
+    // Tick all furnace states even when pointer unlocked
+    this.updateFurnaces(dt);
+
+    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
     // Player movement + bow charge accumulation
@@ -794,6 +880,50 @@ export class Game {
       }
     }
     this.refreshHotbar();
+  }
+
+  // ─── Furnace smelting ─────────────────────────────────────────────────────
+
+  private updateFurnaces(dt: number): void {
+    for (const [key, fs] of this.furnaceStates) {
+      if (!fs.inputItem || !SMELT_RECIPES[fs.inputItem.itemId]) continue;
+
+      // Start burning fuel if idle
+      if (fs.fuelRemaining <= 0 && fs.fuelItem) {
+        const burnTime = FUEL_TIMES[fs.fuelItem.itemId] ?? 0;
+        if (burnTime > 0) {
+          fs.fuelRemaining = burnTime;
+          fs.totalFuelTime = burnTime;
+          fs.fuelItem      = null;
+        }
+      }
+
+      if (fs.fuelRemaining <= 0) continue; // no fuel
+
+      fs.fuelRemaining = Math.max(0, fs.fuelRemaining - dt);
+      fs.smeltProgress = Math.min(1, fs.smeltProgress + dt / SMELT_TIME);
+
+      if (fs.smeltProgress >= 1) {
+        const result = SMELT_RECIPES[fs.inputItem.itemId];
+        fs.smeltProgress = 0;
+        fs.inputItem = null;
+        if (fs.outputItem && fs.outputItem.itemId === result && fs.outputItem.count < 64) {
+          fs.outputItem.count++;
+        } else if (!fs.outputItem) {
+          fs.outputItem = { itemId: result, count: 1 };
+        }
+        this.audio.play("pickup", 0.3);
+      }
+
+      // Live-update furnace UI if open
+      if (this.openFurnaceKey === key) {
+        this.ui.updateFurnaceSlots(fs.inputItem, fs.fuelItem, fs.outputItem);
+        this.ui.updateFurnaceProgress(
+          fs.smeltProgress,
+          fs.totalFuelTime > 0 ? fs.fuelRemaining / fs.totalFuelTime : 0,
+        );
+      }
+    }
   }
 
   // ─── Combat ────────────────────────────────────────────────────────────────

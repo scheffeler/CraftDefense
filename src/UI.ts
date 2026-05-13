@@ -104,6 +104,10 @@ export class UI {
   onRecipeBookClose: () => void = () => {};
   onChestSlotClick: (index: number) => void = () => {};
   onChestClose: () => void = () => {};
+  onFurnaceInputClick: () => void = () => {};
+  onFurnaceFuelClick: () => void = () => {};
+  onFurnaceOutputClick: () => void = () => {};
+  onFurnaceClose: () => void = () => {};
 
   // Legacy TD stubs (backward compat — Game.ts uses these until Phase 12)
   onStartWave: () => void = () => {};
@@ -139,6 +143,13 @@ export class UI {
   private recipeBookOverlay!: HTMLElement;
   private chestOverlay!: HTMLElement;
   private chestSlotEls: HTMLElement[] = [];
+  // Furnace overlay
+  private furnaceOverlay!: HTMLElement;
+  private furnaceInputSlot!: HTMLElement;
+  private furnaceFuelSlot!: HTMLElement;
+  private furnaceOutputSlot!: HTMLElement;
+  private furnaceFireFill!: HTMLElement;
+  private furnaceProgressFill!: HTMLElement;
   private workbenchCells: HTMLElement[][] = [];
   private workbenchResult!: HTMLElement;
   private _workbenchGrid: (string | null)[][] = [
@@ -432,6 +443,7 @@ export class UI {
     this.buildInventoryOverlay();
     this.buildWorkbenchOverlay();
     this.buildChestOverlay();
+    this.buildFurnaceOverlay();
     this.buildRecipeBookOverlay();
     this.buildDeathOverlay();
     this.buildEndOverlay();
@@ -665,6 +677,100 @@ export class UI {
     ov.appendChild(box);
     this.chestOverlay = ov;
     this.container.appendChild(ov);
+  }
+
+  private buildFurnaceOverlay(): void {
+    const ov = div("fps-inventory overlay hidden");
+    ov.style.display = "none";
+
+    const box = div("fps-inv-box");
+    box.style.cssText += "max-width:360px;";
+
+    const title = div("fps-inv-label");
+    title.textContent = "Furnace";
+    title.style.cssText = "font-size:14px;margin-bottom:12px;color:#ff9944;";
+    box.appendChild(title);
+
+    // Main furnace area
+    const furnaceArea = div("fps-furnace-area");
+
+    // Left: input + fuel column
+    const leftCol = div("fps-furnace-col");
+    this.furnaceInputSlot = div("fps-slot fps-furnace-slot");
+    this.furnaceInputSlot.title = "Input (item to smelt)";
+    this.furnaceInputSlot.addEventListener("click", () => this.onFurnaceInputClick());
+    leftCol.appendChild(this.furnaceInputSlot);
+
+    const fireWrap = div("fps-furnace-fire-wrap");
+    const fireBg   = div("fps-furnace-fire-bg");
+    this.furnaceFireFill = div("fps-furnace-fire-fill");
+    fireBg.appendChild(this.furnaceFireFill);
+    fireWrap.appendChild(fireBg);
+    leftCol.appendChild(fireWrap);
+
+    this.furnaceFuelSlot = div("fps-slot fps-furnace-slot");
+    this.furnaceFuelSlot.title = "Fuel (coal, planks, etc.)";
+    this.furnaceFuelSlot.addEventListener("click", () => this.onFurnaceFuelClick());
+    leftCol.appendChild(this.furnaceFuelSlot);
+
+    furnaceArea.appendChild(leftCol);
+
+    // Middle: progress arrow
+    const midCol = div("fps-furnace-col fps-furnace-mid");
+    const arrowWrap = div("fps-furnace-arrow-wrap");
+    const arrowBg   = div("fps-furnace-arrow-bg");
+    this.furnaceProgressFill = div("fps-furnace-arrow-fill");
+    arrowBg.appendChild(this.furnaceProgressFill);
+    arrowWrap.appendChild(arrowBg);
+    midCol.appendChild(arrowWrap);
+    furnaceArea.appendChild(midCol);
+
+    // Right: output slot
+    const rightCol = div("fps-furnace-col fps-furnace-right");
+    this.furnaceOutputSlot = div("fps-slot fps-furnace-slot fps-craft-result");
+    this.furnaceOutputSlot.title = "Output";
+    this.furnaceOutputSlot.addEventListener("click", () => this.onFurnaceOutputClick());
+    rightCol.appendChild(this.furnaceOutputSlot);
+    furnaceArea.appendChild(rightCol);
+
+    box.appendChild(furnaceArea);
+
+    const hint = div("fps-inv-hint");
+    hint.textContent = "Click slots to place/take items · Coal burns for 80s · [E] close";
+    box.appendChild(hint);
+
+    const closeBtn = div("fps-inv-close-btn");
+    closeBtn.textContent = "✕ Close";
+    closeBtn.addEventListener("click", () => this.onFurnaceClose());
+    box.appendChild(closeBtn);
+
+    ov.appendChild(box);
+    this.furnaceOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  isFurnaceOpen(): boolean { return this.furnaceOverlay.style.display !== "none"; }
+
+  showFurnace(open: boolean): void {
+    this.furnaceOverlay.style.display = open ? "flex" : "none";
+    if (!open) return;
+  }
+
+  updateFurnaceSlots(
+    input: import("./Inventory").ItemStack | null,
+    fuel:  import("./Inventory").ItemStack | null,
+    output: import("./Inventory").ItemStack | null,
+  ): void {
+    this.renderStackInSlot(this.furnaceInputSlot,  input);
+    this.renderStackInSlot(this.furnaceFuelSlot,   fuel);
+    this.renderStackInSlot(this.furnaceOutputSlot, output);
+  }
+
+  updateFurnaceProgress(smeltPct: number, fuelPct: number): void {
+    // Fire shrinks as fuel burns (Minecraft: fire goes from full to empty)
+    this.furnaceFireFill.style.height = `${Math.round(fuelPct * 100)}%`;
+    // Arrow fills left to right as smelt progresses
+    this.furnaceProgressFill.style.width = `${Math.round(smeltPct * 100)}%`;
   }
 
   isChestOpen(): boolean { return this.chestOverlay.style.display !== "none"; }
@@ -1186,6 +1292,54 @@ const FPS_CSS = `
   20%  { opacity: 1; transform: translateX(-50%) translateY(0); }
   75%  { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* Furnace UI */
+.fps-furnace-area {
+  display: flex; align-items: center; gap: 12px; justify-content: center;
+  padding: 8px 0;
+}
+.fps-furnace-col {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.fps-furnace-mid {
+  gap: 0;
+}
+.fps-furnace-right {
+  justify-content: center;
+}
+.fps-furnace-slot {
+  width: 48px; height: 48px;
+}
+.fps-furnace-fire-wrap {
+  display: flex; align-items: center; justify-content: center;
+}
+.fps-furnace-fire-bg {
+  width: 20px; height: 28px;
+  background: #3a3a3a;
+  position: relative; overflow: hidden;
+  border: 1px solid #555;
+}
+.fps-furnace-fire-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, #ff4400, #ff8800, #ffdd00);
+  height: 100%;
+  transition: height 0.5s linear;
+}
+.fps-furnace-arrow-wrap {
+  display: flex; align-items: center; justify-content: center;
+}
+.fps-furnace-arrow-bg {
+  width: 44px; height: 20px;
+  background: #555 url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='20'><polygon points='0,4 32,4 32,0 44,10 32,20 32,16 0,16' fill='%23777'/></svg>") no-repeat center;
+  position: relative; overflow: hidden;
+  border: 1px solid #444;
+}
+.fps-furnace-arrow-fill {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  background: linear-gradient(to right, #44cc44, #22ff66);
+  width: 0%;
+  transition: width 0.5s linear;
 }
 
 /* Level-up banner */

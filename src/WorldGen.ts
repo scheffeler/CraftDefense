@@ -37,6 +37,7 @@ export function generateWorld(world: VoxelWorld): void {
   generateSpawnMarkers(world);
   generateWaterFeatures(world);
   generateRuins(world);
+  generateMineShafts(world);
 }
 
 /** Returns [x, z] enemy spawn positions for the given gate. */
@@ -167,39 +168,56 @@ function buildCornerTowers(world: VoxelWorld): void {
 function generateTrees(world: VoxelWorld): void {
   for (let x = 2; x < WORLD_WIDTH - 2; x++) {
     for (let z = 2; z < WORLD_DEPTH - 2; z++) {
-      if (x >= WX1 - 8 && x <= WX2 + 8 && z >= WZ1 - 8 && z <= WZ2 + 8) continue;
+      if (x >= WX1 - 6 && x <= WX2 + 6 && z >= WZ1 - 6 && z <= WZ2 + 6) continue;
       if (z <= 7 || z >= WORLD_DEPTH - 8) continue;
-      if (hash(x, z) % 16 !== 0) continue;
+      if (hash(x, z) % 10 !== 0) continue; // denser: 1/10 vs 1/16
 
       // Find surface height
       let groundY = 0;
       for (let y = 10; y >= 0; y--) {
         if (world.getBlock(x, y, z) !== "air") { groundY = y; break; }
       }
+      // Only grow on grass
+      if (world.getBlock(x, groundY, z) !== "grass") continue;
 
       const h = hash(x * 3, z * 7);
       const trunkHeight = 4 + (h % 3); // 4–6 blocks
+      // 30% chance birch (lighter wood color — we still use "wood" block but vary canopy)
+      const isBirch = (hash(x * 17, z * 23) % 3) === 0;
 
       for (let y = groundY + 1; y <= groundY + trunkHeight; y++) {
         world.setBlock(x, y, z, "wood");
       }
 
-      // Wide 3-layer canopy
-      for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 1; ly++) {
-        const radius = (ly <= groundY + trunkHeight) ? 2 : 1;
-        for (let dx = -radius; dx <= radius; dx++) {
-          for (let dz = -radius; dz <= radius; dz++) {
-            if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
-            const bx = x + dx, bz = z + dz;
-            if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
-            if (world.getBlock(bx, ly, bz) === "air") {
-              world.setBlock(bx, ly, bz, "leaves");
+      if (isBirch) {
+        // Tall, narrow birch canopy
+        for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 2; ly++) {
+          const radius = (ly === groundY + trunkHeight + 2) ? 0 : (ly >= groundY + trunkHeight) ? 1 : 2;
+          for (let dx = -radius; dx <= radius; dx++) {
+            for (let dz = -radius; dz <= radius; dz++) {
+              if (radius === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+              const bx = x + dx, bz = z + dz;
+              if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
+              if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
             }
           }
         }
+        world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
+      } else {
+        // Wide oak canopy — 3 layers
+        for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 1; ly++) {
+          const radius = (ly <= groundY + trunkHeight) ? 2 : 1;
+          for (let dx = -radius; dx <= radius; dx++) {
+            for (let dz = -radius; dz <= radius; dz++) {
+              if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
+              const bx = x + dx, bz = z + dz;
+              if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
+              if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
+            }
+          }
+        }
+        world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
       }
-      // Top cap
-      world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
     }
   }
 }
@@ -337,6 +355,68 @@ function generateWaterFeatures(world: VoxelWorld): void {
           }
         }
       }
+    }
+  }
+}
+
+function generateMineShafts(world: VoxelWorld): void {
+  // Mine shaft entrances in hillside areas — give the underground feel
+  const shaftPositions: [number, number][] = [
+    [8, 25], [15, 18], [50, 22], [55, 40], [12, 50], [48, 52],
+  ];
+
+  for (const [sx, sz] of shaftPositions) {
+    if (inFortressBounds(sx, sz)) continue;
+    if (sz <= 10 || sz >= WORLD_DEPTH - 11) continue;
+
+    // Find the hill surface at this position
+    let surfaceY = 0;
+    for (let y = 10; y >= 0; y--) {
+      if (world.getBlock(sx, y, sz) !== "air") { surfaceY = y; break; }
+    }
+    if (surfaceY < 3) continue; // only in hilly areas with enough depth
+
+    // Carve a 2×2 shaft downward from surfaceY-1 to y=0
+    for (let y = surfaceY - 1; y >= 0; y--) {
+      world.setBlock(sx,     y, sz,     "air");
+      world.setBlock(sx + 1, y, sz,     "air");
+      world.setBlock(sx,     y, sz + 1, "air");
+      world.setBlock(sx + 1, y, sz + 1, "air");
+    }
+
+    // Wooden frame at top of shaft (like Minecraft mine entrance)
+    world.setBlock(sx - 1, surfaceY, sz,     "planks");
+    world.setBlock(sx + 2, surfaceY, sz,     "planks");
+    world.setBlock(sx - 1, surfaceY, sz + 1, "planks");
+    world.setBlock(sx + 2, surfaceY, sz + 1, "planks");
+    world.setBlock(sx,     surfaceY, sz - 1, "planks");
+    world.setBlock(sx + 1, surfaceY, sz - 1, "planks");
+
+    // Torch at shaft entrance
+    world.setBlock(sx, surfaceY, sz - 1, "torch");
+
+    // Horizontal tunnel at y=1 branching east-west
+    const tunnelLen = 5 + (hash(sx, sz) % 6);
+    for (let dx = 0; dx < tunnelLen; dx++) {
+      const tx = sx + 3 + dx;
+      if (tx < 1 || tx >= WORLD_WIDTH - 1) break;
+      world.setBlock(tx, 1, sz,     "air");
+      world.setBlock(tx, 2, sz,     "air");
+      world.setBlock(tx, 1, sz + 1, "air");
+      world.setBlock(tx, 2, sz + 1, "air");
+      // Wooden support every 4 blocks
+      if (dx % 4 === 3) {
+        world.setBlock(tx, 3, sz,     "planks");
+        world.setBlock(tx, 3, sz + 1, "planks");
+        world.setBlock(tx, 1, sz - 1, "planks");
+        world.setBlock(tx, 1, sz + 2, "planks");
+      }
+      // Torch every 6 blocks
+      if (dx % 6 === 5) world.setBlock(tx, 2, sz, "torch");
+      // Ore veins in tunnel walls
+      if (hash(tx * 7, sz * 13) % 5 === 0) world.setBlock(tx, 1, sz - 1, "coal_ore");
+      if (hash(tx * 11, sz * 7) % 8 === 0) world.setBlock(tx, 1, sz - 1, "iron_ore");
+      if (hash(tx * 5,  sz * 17) % 5 === 0) world.setBlock(tx, 1, sz + 2, "coal_ore");
     }
   }
 }
