@@ -7,3 +7,5 @@ src/config/*.js
 .DS_Store
 dev-server-*.log
 screenshots/
+dist_check/
+.claude/
