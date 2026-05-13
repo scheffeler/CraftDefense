@@ -48,6 +48,20 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function makeSvgUri(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+// Pixel-art heart icons (18×18 px)
+const HEART_FULL  = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="2" y="4" width="4" height="2" fill="#c00000"/><rect x="10" y="4" width="4" height="2" fill="#c00000"/><rect x="0" y="6" width="16" height="2" fill="#c00000"/><rect x="0" y="8" width="16" height="4" fill="#c00000"/><rect x="2" y="12" width="12" height="2" fill="#c00000"/><rect x="4" y="14" width="8" height="2" fill="#c00000"/><rect x="6" y="16" width="4" height="2" fill="#c00000"/><rect x="2" y="4" width="2" height="2" fill="#ff4444"/><rect x="10" y="4" width="2" height="2" fill="#ff4444"/></svg>`);
+const HEART_HALF  = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="2" y="4" width="4" height="2" fill="#7a0000"/><rect x="10" y="4" width="4" height="2" fill="#7a0000"/><rect x="0" y="6" width="16" height="2" fill="#7a0000"/><rect x="0" y="8" width="16" height="4" fill="#7a0000"/><rect x="2" y="12" width="12" height="2" fill="#7a0000"/><rect x="4" y="14" width="8" height="2" fill="#7a0000"/><rect x="6" y="16" width="4" height="2" fill="#7a0000"/><rect x="0" y="8" width="8" height="4" fill="#c00000"/><rect x="0" y="6" width="8" height="2" fill="#c00000"/><rect x="2" y="4" width="4" height="2" fill="#c00000"/></svg>`);
+const HEART_EMPTY = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="2" y="4" width="4" height="2" fill="#373737"/><rect x="10" y="4" width="4" height="2" fill="#373737"/><rect x="0" y="6" width="16" height="2" fill="#373737"/><rect x="0" y="8" width="16" height="4" fill="#373737"/><rect x="2" y="12" width="12" height="2" fill="#373737"/><rect x="4" y="14" width="8" height="2" fill="#373737"/><rect x="6" y="16" width="4" height="2" fill="#373737"/></svg>`);
+
+// Pixel-art food/drumstick icons (18×18 px)
+const FOOD_FULL  = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="8" y="2" width="6" height="4" fill="#c8a060"/><rect x="10" y="4" width="6" height="6" fill="#c8a060"/><rect x="8" y="8" width="8" height="4" fill="#aa7030"/><rect x="4" y="10" width="8" height="4" fill="#aa7030"/><rect x="2" y="12" width="8" height="2" fill="#8b5c2a"/><rect x="2" y="14" width="4" height="2" fill="#8b5c2a"/></svg>`);
+const FOOD_HALF  = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="8" y="2" width="6" height="4" fill="#886040"/><rect x="10" y="4" width="6" height="6" fill="#886040"/><rect x="8" y="8" width="8" height="4" fill="#664020"/><rect x="4" y="10" width="8" height="4" fill="#664020"/><rect x="2" y="12" width="8" height="2" fill="#4a3010"/><rect x="2" y="14" width="4" height="2" fill="#4a3010"/></svg>`);
+const FOOD_EMPTY = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="8" y="2" width="6" height="4" fill="#333"/><rect x="10" y="4" width="6" height="6" fill="#333"/><rect x="8" y="8" width="8" height="4" fill="#2a2a2a"/><rect x="4" y="10" width="8" height="4" fill="#2a2a2a"/><rect x="2" y="12" width="8" height="2" fill="#222"/><rect x="2" y="14" width="4" height="2" fill="#222"/></svg>`);
+
 const ITEM_ICONS: Record<string, string> = {};
 function getItemIcon(itemId: string): string {
   if (ITEM_ICONS[itemId]) return ITEM_ICONS[itemId];
@@ -121,9 +135,9 @@ export class UI {
       const el = this.heartEls[i];
       if (i >= totalHearts) { el.style.display = "none"; continue; }
       el.style.display = "";
-      if (hp >= 2) { el.textContent = "♥"; el.style.color = "#c00000"; }
-      else if (hp === 1) { el.textContent = "♥"; el.style.color = "#7a0000"; }
-      else { el.textContent = "♡"; el.style.color = "#373737"; }
+      if (hp >= 2)     el.style.backgroundImage = `url("${HEART_FULL}")`;
+      else if (hp === 1) el.style.backgroundImage = `url("${HEART_HALF}")`;
+      else               el.style.backgroundImage = `url("${HEART_EMPTY}")`;
     }
   }
 
@@ -136,9 +150,9 @@ export class UI {
     for (let i = 0; i < this.hungerEls.length; i++) {
       const food = current - i * 2;
       const el = this.hungerEls[i];
-      if (food >= 2) { el.textContent = "🍖"; el.style.opacity = "1"; }
-      else if (food === 1) { el.textContent = "🍖"; el.style.opacity = "0.5"; }
-      else { el.textContent = "🍖"; el.style.opacity = "0.2"; }
+      if (food >= 2)     { el.style.backgroundImage = `url("${FOOD_FULL}")`; el.style.opacity = "1"; }
+      else if (food === 1) { el.style.backgroundImage = `url("${FOOD_HALF}")`; el.style.opacity = "1"; }
+      else                 { el.style.backgroundImage = `url("${FOOD_EMPTY}")`; el.style.opacity = "1"; }
     }
   }
 
@@ -175,6 +189,15 @@ export class UI {
 
   showDeathScreen(): void { this.deathOverlay.style.display = "flex"; }
   hideDeathScreen(): void { this.deathOverlay.style.display = "none"; }
+
+  /** Shows a big centered announcement that fades out after ~2 seconds. */
+  showWaveAnnouncement(waveNum: number): void {
+    const el = document.createElement("div");
+    el.className = "wave-announce";
+    el.textContent = `WAVE ${waveNum}`;
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }
 
   showFloatingNumber(text: string, color: string, screenX: number, screenY: number): void {
     const div = document.createElement("div");
@@ -310,7 +333,7 @@ export class UI {
     const wrap = div("fps-hearts");
     for (let i = 0; i < 10; i++) {
       const h = div("fps-heart");
-      h.textContent = "♥";
+      h.style.backgroundImage = `url("${HEART_FULL}")`;
       wrap.appendChild(h);
       this.heartEls.push(h);
     }
@@ -321,7 +344,7 @@ export class UI {
     const wrap = div("fps-hunger");
     for (let i = 0; i < 10; i++) {
       const h = div("fps-hunger-icon");
-      h.textContent = "🍖";
+      h.style.backgroundImage = `url("${FOOD_FULL}")`;
       wrap.appendChild(h);
       this.hungerEls.push(h);
     }
@@ -620,9 +643,10 @@ const FPS_CSS = `
   pointer-events: none; z-index: 15;
 }
 .fps-heart {
-  font-size: 14px;
-  color: #c00000;
-  text-shadow: 1px 1px 0 #000;
+  width: 18px; height: 18px;
+  background-size: 18px 18px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
 }
 
 /* Hunger bar — right of center, above hotbar */
@@ -633,8 +657,10 @@ const FPS_CSS = `
   pointer-events: none; z-index: 15;
 }
 .fps-hunger-icon {
-  font-size: 13px;
-  text-shadow: 1px 1px 0 #000;
+  width: 18px; height: 18px;
+  background-size: 18px 18px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
 }
 
 /* XP bar — sits just above hotbar */
@@ -836,5 +862,28 @@ const FPS_CSS = `
   0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
   80%  { opacity: 0.8; }
   100% { opacity: 0; transform: translateX(-50%) translateY(-48px); }
+}
+
+/* Wave announcement banner */
+.wave-announce {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 36px;
+  color: #ffff00;
+  text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  pointer-events: none;
+  z-index: 50;
+  animation: waveAnnounce 2.5s ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes waveAnnounce {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.5); }
+  20%  { opacity: 1; transform: translateX(-50%) scale(1.1); }
+  40%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.0) translateY(-20px); }
 }
 `;

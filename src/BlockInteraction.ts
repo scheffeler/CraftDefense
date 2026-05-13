@@ -17,7 +17,8 @@ const TIER_SPEED: Record<ToolTier, number> = {
 
 export class BlockInteraction {
   private readonly raycaster = new THREE.Raycaster();
-  private readonly targetHighlight: THREE.Mesh;
+  private readonly targetHighlight: THREE.LineSegments;
+  private readonly breakOverlay: THREE.Mesh;
 
   private targetBlock:   { wx: number; wy: number; wz: number } | null = null;
   private adjacentBlock: { wx: number; wy: number; wz: number } | null = null;
@@ -36,13 +37,21 @@ export class BlockInteraction {
     scene: THREE.Scene,
     private readonly camera: THREE.PerspectiveCamera,
   ) {
-    const geo = new THREE.BoxGeometry(1.008, 1.008, 1.008);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x000000, wireframe: true, transparent: true, opacity: 0.6,
-    });
-    this.targetHighlight = new THREE.Mesh(geo, mat);
+    const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
+    const mat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+    this.targetHighlight = new THREE.LineSegments(geo, mat);
+    this.targetHighlight.renderOrder = 999;
     this.targetHighlight.visible = false;
     scene.add(this.targetHighlight);
+
+    const breakGeo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
+    const breakMat = new THREE.MeshBasicMaterial({
+      color: 0x000000, transparent: true, opacity: 0, depthWrite: false,
+    });
+    this.breakOverlay = new THREE.Mesh(breakGeo, breakMat);
+    this.breakOverlay.renderOrder = 998;
+    this.breakOverlay.visible = false;
+    scene.add(this.breakOverlay);
   }
 
   setActiveItem(item: ItemStack | null): void {
@@ -81,8 +90,13 @@ export class BlockInteraction {
 
     if (this.isBreaking && this.targetBlock) {
       this.breakTimer += dt;
+      const progress = this.getBreakProgress();
+      const { wx, wy, wz } = this.targetBlock;
+      this.breakOverlay.position.set(wx + 0.5, wy + 0.5, wz + 0.5);
+      this.breakOverlay.visible = true;
+      (this.breakOverlay.material as THREE.MeshBasicMaterial).opacity = progress * 0.65;
+
       if (this.breakTimer >= this.breakHardness) {
-        const { wx, wy, wz } = this.targetBlock;
         const id = this.world.getBlock(wx, wy, wz);
         if (id !== "air") {
           this.world.setBlock(wx, wy, wz, "air");
@@ -90,7 +104,10 @@ export class BlockInteraction {
           this.onBlockBroken(wx, wy, wz, id, this.willYieldDrops);
         }
         this.breakTimer = 0;
+        this.breakOverlay.visible = false;
       }
+    } else {
+      this.breakOverlay.visible = false;
     }
   }
 
@@ -174,6 +191,7 @@ export class BlockInteraction {
     this.targetBlock   = null;
     this.adjacentBlock = null;
     this.targetHighlight.visible = false;
+    this.breakOverlay.visible = false;
     if (this.isBreaking) this.breakTimer = 0;
   }
 }

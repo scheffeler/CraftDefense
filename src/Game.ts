@@ -12,7 +12,9 @@ import { BlockInteraction } from "./BlockInteraction";
 import { InputManager } from "./InputManager";
 import { UI } from "./UI";
 import { AudioManager } from "./AudioManager";
+import { ParticleSystem } from "./Particles";
 import { BLOCK_BEHAVIORS } from "./config/blocks";
+import { BLOCK_DEFS } from "./Map";
 import { ITEMS } from "./config/items";
 import { getSpawnPositions } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
@@ -32,6 +34,7 @@ export class Game {
   // Hunger depletion timer
   private hungerTimer = 0;
 
+  private particles!:        ParticleSystem;
   private scene!:            SceneManager;
   private gameMap!:          GameMap;
   private flowField!:        FlowField;
@@ -83,6 +86,7 @@ export class Game {
       this.scene.camera,
     );
 
+    this.particles = new ParticleSystem(this.scene.scene);
     this.ui    = new UI(this.container);
     this.audio = new AudioManager();
     this.input = new InputManager(this.scene.renderer.domElement);
@@ -176,6 +180,8 @@ export class Game {
     // Block interaction callbacks
     this.blockInteraction.onBlockBroken = (wx, wy, wz, id, yieldsDrops) => {
       this.audio.play("block_break", 0.55);
+      const blockColor = BLOCK_DEFS[id]?.color ?? 0x888888;
+      this.particles.spawnBlockBreak(wx, wy, wz, blockColor);
       if (yieldsDrops) {
         const behavior = BLOCK_BEHAVIORS[id];
         const drops    = behavior?.drops ?? [id];
@@ -282,6 +288,7 @@ export class Game {
     this.audio.play("wave_start");
     this.ui.setObjective(`Wave ${this.waves.wave} — Defend the fortress!`);
     this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0);
+    this.ui.showWaveAnnouncement(this.waves.wave);
   }
 
   private spawnEnemy(type: EnemyTypeName, gate: "north" | "south"): void {
@@ -389,6 +396,9 @@ export class Game {
 
     // Sync armor value each frame
     this.player.armorValue = this.inventory.getArmorValue();
+
+    // Particles
+    this.particles.update(dt);
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
