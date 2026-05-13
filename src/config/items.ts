@@ -54,6 +54,12 @@ export const ITEMS: Record<string, ItemDef> = {
   apple: { id:"apple", name:"Apple", category:"food", stackSize:64, color:0xdd2222, foodPoints:4 },
   bread: { id:"bread", name:"Bread", category:"food", stackSize:64, color:0xc8a060, foodPoints:5 },
 
+  // --- Farming ---
+  wheat_seeds: { id:"wheat_seeds", name:"Wheat Seeds", category:"material", stackSize:64, color:0x8b8b3a },
+  wheat:       { id:"wheat",       name:"Wheat",       category:"material", stackSize:64, color:0xe8c830 },
+  wood_hoe:    { id:"wood_hoe",    name:"Wood Hoe",    category:"tool",     stackSize:1,  color:0xc8a060, durability:59  },
+  iron_hoe:    { id:"iron_hoe",    name:"Iron Hoe",    category:"tool",     stackSize:1,  color:0xbbbbbb, durability:250 },
+
   // --- Wooden tools & weapons ---
   wood_sword:   { id:"wood_sword",   name:"Wood Sword",   category:"weapon", stackSize:1, color:0xc8a060, damage:4, durability:59  },
   wood_pickaxe: { id:"wood_pickaxe", name:"Wood Pickaxe", category:"tool",   stackSize:1, color:0xc8a060, toolCategory:"pickaxe", tier:"wood",  speedMult:2.0, durability:59  },

@@ -227,6 +227,35 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "torch", count: 4 },
   },
+
+  // --- Hoes ---
+  {
+    id: "wood_hoe",
+    pattern: [
+      [r("planks"), r("planks")],
+      [null,        r("stick") ],
+      [null,        r("stick") ],
+    ],
+    result: { itemId: "wood_hoe", count: 1 },
+  },
+  {
+    id: "iron_hoe",
+    pattern: [
+      [r("iron_ingot"), r("iron_ingot")],
+      [null,            r("stick")     ],
+      [null,            r("stick")     ],
+    ],
+    result: { itemId: "iron_hoe", count: 1 },
+  },
+
+  // --- Bread (3 wheat in a row) ---
+  {
+    id: "bread",
+    pattern: [
+      [r("wheat"), r("wheat"), r("wheat")],
+    ],
+    result: { itemId: "bread", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

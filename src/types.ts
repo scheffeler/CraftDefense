@@ -12,7 +12,8 @@ export type BlockId =
   | "air" | "grass" | "dirt" | "stone" | "wood"
   | "planks" | "cobblestone" | "sand" | "glass" | "leaves" | "obsidian"
   | "iron_ore" | "coal_ore" | "iron_block" | "crafting_table" | "furnace"
-  | "torch" | "chest" | "water";
+  | "torch" | "chest" | "water"
+  | "farmland" | "wheat_0" | "wheat_1" | "wheat_2" | "wheat_3";
 
 export interface BlockDef {
   id: BlockId;

@@ -57,6 +57,7 @@ export class Game {
   private _headBob    = 0;
   private _wasInWater     = false;
   private _nightSpawnTimer = 0;
+  private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
   private openChestKey: string | null = null;
@@ -96,10 +97,12 @@ export class Game {
     this.inventory.addItem("stone_sword", 1);
     this.inventory.addItem("stone_pickaxe", 1);
     this.inventory.addItem("wood_axe", 1);
+    this.inventory.addItem("wood_hoe", 1);
     this.inventory.addItem("cobblestone", 32);
     this.inventory.addItem("wood", 16);
     this.inventory.addItem("torch", 8);
     this.inventory.addItem("apple", 8);
+    this.inventory.addItem("wheat_seeds", 8);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -230,6 +233,34 @@ export class Game {
         return;
       }
 
+      // Hoe on dirt/grass → farmland
+      if (tb && stack?.itemId.endsWith("_hoe")) {
+        const bid = this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz);
+        if (bid === "dirt" || bid === "grass") {
+          this.gameMap.world.setBlock(tb.wx, tb.wy, tb.wz, "farmland");
+          this.gameMap.world.rebuildDirtyChunks();
+          this.audio.play("block_place", 0.5);
+          return;
+        }
+      }
+
+      // Wheat seeds on farmland → plant wheat
+      if (tb && stack?.itemId === "wheat_seeds") {
+        const bid = this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz);
+        if (bid === "farmland") {
+          const ay = tb.wy + 1;
+          if (ay < 32 && this.gameMap.world.getBlock(tb.wx, ay, tb.wz) === "air") {
+            this.gameMap.world.setBlock(tb.wx, ay, tb.wz, "wheat_0");
+            this.gameMap.world.rebuildDirtyChunks();
+            this.inventory.removeItem("wheat_seeds", 1);
+            this.activeCrops.set(`${tb.wx},${ay},${tb.wz}`, 0);
+            this.audio.play("block_place", 0.5);
+            this.refreshHotbar();
+            return;
+          }
+        }
+      }
+
       // Check if looking at a furnace — smelt active item
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "furnace") {
         if (stack && SMELT_RECIPES[stack.itemId]) {
@@ -286,6 +317,14 @@ export class Game {
       this.audio.play("block_break", 0.55);
       const blockColor = BLOCK_DEFS[id]?.color ?? 0x888888;
       this.particles.spawnBlockBreak(wx, wy, wz, blockColor);
+
+      // Farming-specific drop handling
+      if (id === "farmland" || id.startsWith("wheat_")) {
+        if (yieldsDrops) this.handleFarmingBreak(wx, wy, wz, id);
+        if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+        return;
+      }
+
       if (yieldsDrops) {
         const behavior = BLOCK_BEHAVIORS[id];
         const drops    = behavior?.drops ?? [id];
@@ -639,6 +678,9 @@ export class Game {
     // Particles
     this.particles.update(dt);
 
+    // Crop growth
+    this.updateCrops(dt);
+
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.refreshHotbar();
@@ -652,6 +694,58 @@ export class Game {
     } else {
       this.ui.showBlockTooltip(null);
     }
+  }
+
+  // ─── Farming ───────────────────────────────────────────────────────────────
+
+  private updateCrops(dt: number): void {
+    const GROWTH_TIME = 30;
+    for (const [key, timer] of this.activeCrops) {
+      const [x, y, z] = key.split(",").map(Number);
+      const block = this.gameMap.world.getBlock(x, y, z) as string;
+      if (!block.startsWith("wheat_")) {
+        this.activeCrops.delete(key);
+        continue;
+      }
+      const newTimer = timer + dt;
+      if (newTimer < GROWTH_TIME) {
+        this.activeCrops.set(key, newTimer);
+        continue;
+      }
+      const stage = parseInt(block[block.length - 1]);
+      if (stage < 3) {
+        this.gameMap.world.setBlock(x, y, z, `wheat_${stage + 1}` as import("./types").BlockId);
+        this.gameMap.world.rebuildDirtyChunks();
+      }
+      if (stage >= 2) {
+        this.activeCrops.delete(key);
+      } else {
+        this.activeCrops.set(key, 0);
+      }
+    }
+  }
+
+  private handleFarmingBreak(wx: number, wy: number, wz: number, id: string): void {
+    if (id === "farmland") {
+      const above = this.gameMap.world.getBlock(wx, wy + 1, wz) as string;
+      if (above.startsWith("wheat_")) {
+        this.gameMap.world.setBlock(wx, wy + 1, wz, "air");
+        this.gameMap.world.rebuildDirtyChunks();
+        this.activeCrops.delete(`${wx},${wy + 1},${wz}`);
+        this.inventory.addItem("wheat_seeds", 1);
+      }
+      this.inventory.addItem("dirt", 1);
+    } else if (id.startsWith("wheat_")) {
+      const stage = parseInt(id[id.length - 1]);
+      this.activeCrops.delete(`${wx},${wy},${wz}`);
+      if (stage >= 3) {
+        this.inventory.addItem("wheat", 1 + Math.floor(Math.random() * 2));
+        this.inventory.addItem("wheat_seeds", 1 + Math.floor(Math.random() * 2));
+      } else {
+        this.inventory.addItem("wheat_seeds", 1);
+      }
+    }
+    this.refreshHotbar();
   }
 
   // ─── Combat ────────────────────────────────────────────────────────────────

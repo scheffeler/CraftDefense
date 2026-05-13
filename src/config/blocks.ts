@@ -25,4 +25,9 @@ export const BLOCK_BEHAVIORS: Partial<Record<BlockId, BlockBehavior>> = {
   obsidian:       { toolCategory: "pickaxe", requiresTool: true,  drops: []               },
   torch:          { toolCategory: "hand",    requiresTool: false, drops: ["torch"]        },
   chest:          { toolCategory: "axe",     requiresTool: false, drops: ["chest"]        },
+  farmland:       { toolCategory: "shovel",  requiresTool: false, drops: []               },
+  wheat_0:        { toolCategory: "hand",    requiresTool: false, drops: []               },
+  wheat_1:        { toolCategory: "hand",    requiresTool: false, drops: []               },
+  wheat_2:        { toolCategory: "hand",    requiresTool: false, drops: []               },
+  wheat_3:        { toolCategory: "hand",    requiresTool: false, drops: []               },
 };
