@@ -1,0 +1,8 @@
+node_modules/
+dist/
+src/main.js
+src/types.js
+*.tsbuildinfo
+.vite/
+.DS_Store
+dev-server-*.log
