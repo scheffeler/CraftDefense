@@ -938,6 +938,10 @@ export class Game {
     this.ui.updateDayClock(this.scene.dayTime);
     this.refreshHotbar();
 
+    // Compass — extract yaw from camera quaternion
+    const euler = new THREE.Euler().setFromQuaternion(this.scene.camera.quaternion, "YXZ");
+    this.ui.updateCompass(euler.y);
+
     // Minimap — update every frame with enemy positions
     const enemyPositions = this.enemies.getAliveEnemies().map(e => {
       const p = this.enemies.getEnemyPosition(e.id);

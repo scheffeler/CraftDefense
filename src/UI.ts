@@ -130,6 +130,7 @@ export class UI {
   private dayClockCanvas!: HTMLCanvasElement;
   private minimapCanvas!: HTMLCanvasElement;
   private minimapTerrain: ImageData | null = null;
+  private compassEl!: HTMLElement;
   private lockPrompt!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
@@ -418,6 +419,7 @@ export class UI {
     this.buildItemTooltip();
     this.buildDayClock();
     this.buildMinimap();
+    this.buildCompass();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -621,6 +623,22 @@ export class UI {
     ctx.strokeStyle = "#555";
     ctx.lineWidth = 1;
     ctx.strokeRect(0, 0, S, S);
+  }
+
+  private buildCompass(): void {
+    const el = document.createElement("div");
+    el.className = "fps-compass";
+    el.textContent = "N";
+    this.compassEl = el;
+    this.container.appendChild(el);
+  }
+
+  updateCompass(yawRadians: number): void {
+    if (!this.compassEl) return;
+    // yaw 0 = +Z (south), π = -Z (north), π/2 = -X (west), -π/2 = +X (east)
+    const DIRS = ["N","NE","E","SE","S","SW","W","NW"];
+    const idx = Math.round(((yawRadians + Math.PI) / (Math.PI * 2)) * 8) & 7;
+    this.compassEl.textContent = DIRS[idx];
   }
 
   private buildHotbar(): void {
@@ -1171,6 +1189,20 @@ const FPS_CSS = `
   width: 50px; height: 50px;
   pointer-events: none; z-index: 15;
   image-rendering: pixelated;
+}
+
+/* Compass — top center below objective */
+.fps-compass {
+  position: absolute;
+  top: 8px; left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px; color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  background: rgba(0,0,0,0.45);
+  padding: 3px 7px;
+  pointer-events: none; z-index: 15;
+  letter-spacing: 0.05em;
 }
 
 /* Minimap — bottom right above hotbar */
