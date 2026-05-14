@@ -4,7 +4,7 @@
 
 export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win";
 
-export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner";
+export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper";
 export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat
 export type ProjectileType = "arrow" | "cannonball" | "icebolt";
 
@@ -81,6 +81,10 @@ export interface EnemyState {
   useFlowField?: boolean;
   breakTarget?: { x: number; y: number; z: number } | null;
   breakTimer?: number;
+  // Creeper-specific
+  priming?: boolean;
+  primeTimer?: number;
+  flashTimer?: number;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

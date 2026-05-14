@@ -9,7 +9,7 @@ type SoundName =
   | "block_break" | "block_place" | "pickup"
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
-  | "splash";
+  | "splash" | "thunder";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -24,6 +24,10 @@ export class AudioManager {
   private _isDaytime    = true;
   private _cricketNode: OscillatorNode | null = null;
   private _cricketGain: GainNode | null = null;
+
+  // Rain ambient
+  private _rainNode: AudioBufferSourceNode | null = null;
+  private _rainGain: GainNode | null = null;
 
   private ensureCtx(): AudioContext {
     if (!this.ctx) {
@@ -142,6 +146,51 @@ export class AudioManager {
       this._cricketNode = null;
     }
     this._cricketGain = null;
+  }
+
+  setRainIntensity(intensity: number): void {
+    if (intensity < 0.01) {
+      // Fade out and stop
+      if (this._rainGain && this.ctx) {
+        this._rainGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.8);
+        setTimeout(() => {
+          try { this._rainNode?.stop(); } catch { /* ignore */ }
+          this._rainNode = null;
+          this._rainGain = null;
+        }, 2400);
+      }
+      return;
+    }
+
+    const ctx = this.ensureCtx();
+
+    if (!this._rainNode) {
+      // Build white-noise loop buffer (~2 seconds)
+      const dur = 2.0;
+      const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+      const filt = ctx.createBiquadFilter();
+      filt.type = "bandpass";
+      filt.frequency.value = 2200;
+      filt.Q.value = 0.6;
+
+      this._rainGain = ctx.createGain();
+      this._rainGain.gain.value = 0;
+      filt.connect(this._rainGain);
+      this._rainGain.connect(this.ambientGain!);
+
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.connect(filt);
+      src.start();
+      this._rainNode = src;
+    }
+
+    const vol = intensity * 0.28;
+    this._rainGain!.gain.setTargetAtTime(vol, ctx.currentTime, 0.6);
   }
 
   play(sound: SoundName, vol = 1.0): void {
@@ -333,6 +382,14 @@ export class AudioManager {
         noiseBurst(0.22, 180, 0.1);
         noiseBurst(0.14, 3500, 0.06);
         tone(220, 0.12, "sine", 0.3);
+        break;
+      }
+
+      case "thunder": {
+        // Initial crack then long rumble
+        noiseBurst(0.08, 80, 0.03);
+        noiseBurst(1.6, 55, 0.8);
+        tone(40, 0.9, "sawtooth", 0.6);
         break;
       }
     }

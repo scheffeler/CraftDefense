@@ -67,6 +67,29 @@ export class ParticleSystem {
     }
   }
 
+  spawnExplosion(x: number, y: number, z: number): void {
+    const colors = [0xff8800, 0xff4400, 0xffcc00, 0xffffff];
+    for (let i = 0; i < 22; i++) {
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const size  = 0.12 + Math.random() * 0.22;
+      const mesh  = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(x, y, z);
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.random() * Math.PI;
+      const spd   = 4 + Math.random() * 5;
+      this.spawnParticle(
+        mesh,
+        Math.sin(phi) * Math.cos(theta) * spd,
+        Math.cos(phi) * spd * 0.5 + 2,
+        Math.sin(phi) * Math.sin(theta) * spd,
+        0.5 + Math.random() * 0.4,
+      );
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

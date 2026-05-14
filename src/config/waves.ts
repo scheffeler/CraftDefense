@@ -26,10 +26,11 @@ export const WAVE_CONFIGS: WaveConfig[] = [
     { type: "orc",    count: 3,  spawnInterval: 2.5, gate: "south" },
   ]},
 
-  // Wave 5 — First goblin miners (walls at risk!)
+  // Wave 5 — First creepers and goblin miners (walls at risk!)
   { wave: 5, bonusGold: 55, groups: [
     { type: "goblin",       count: 12, spawnInterval: 1.6, gate: "north" },
     { type: "goblin_miner", count: 2,  spawnInterval: 8.0, gate: "north" },
+    { type: "creeper",      count: 1,  spawnInterval: 0.0, gate: "north" },
     { type: "orc",          count: 5,  spawnInterval: 2.5, gate: "south" },
   ]},
 
@@ -41,10 +42,11 @@ export const WAVE_CONFIGS: WaveConfig[] = [
     { type: "orc",          count: 6,  spawnInterval: 2.2, gate: "south" },
   ]},
 
-  // Wave 7 — Heavy orc push, two trolls
+  // Wave 7 — Heavy orc push, two trolls, creepers
   { wave: 7, bonusGold: 80, groups: [
     { type: "orc",          count: 10, spawnInterval: 1.8, gate: "north" },
     { type: "troll",        count: 2,  spawnInterval: 5.0, gate: "north" },
+    { type: "creeper",      count: 2,  spawnInterval: 6.0, gate: "north" },
     { type: "goblin",       count: 20, spawnInterval: 1.0, gate: "south" },
     { type: "goblin_miner", count: 4,  spawnInterval: 5.0, gate: "south" },
   ]},
@@ -62,6 +64,7 @@ export const WAVE_CONFIGS: WaveConfig[] = [
     { type: "orc",          count: 15, spawnInterval: 1.4, gate: "north" },
     { type: "goblin_miner", count: 6,  spawnInterval: 3.5, gate: "north" },
     { type: "troll",        count: 3,  spawnInterval: 5.0, gate: "north" },
+    { type: "creeper",      count: 3,  spawnInterval: 4.0, gate: "north" },
     { type: "goblin",       count: 25, spawnInterval: 0.8, gate: "south" },
     { type: "goblin_miner", count: 4,  spawnInterval: 4.0, gate: "south" },
     { type: "orc",          count: 8,  spawnInterval: 2.0, gate: "south" },

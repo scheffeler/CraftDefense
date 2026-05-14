@@ -21,6 +21,7 @@ import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
 import { PassiveMobManager } from "./PassiveMob";
+import { WeatherSystem } from "./Weather";
 
 const SURFACE_STEP_SOUND = {
   grass:       "step_grass",
@@ -65,6 +66,7 @@ export class Game {
 
   // Hunger depletion timer
   private hungerTimer = 0;
+  private _autoSaveTimer = 0;
   private _regenTimer = 0;
   private _stepTimer  = 0;
   private _headBob    = 0;
@@ -104,6 +106,7 @@ export class Game {
 
   private particles!:        ParticleSystem;
   private passiveMobs!:      PassiveMobManager;
+  private weather!:          WeatherSystem;
   private scene!:            SceneManager;
   private gameMap!:          GameMap;
   private flowField!:        FlowField;
@@ -161,6 +164,11 @@ export class Game {
     );
 
     this.particles = new ParticleSystem(this.scene.scene);
+    this.weather = new WeatherSystem(this.scene.scene);
+    this.weather.onThunder = () => {
+      this.audio.play("thunder", 0.85);
+      this.ui.flashThunder();
+    };
     this.passiveMobs = new PassiveMobManager(this.scene.scene);
     this.passiveMobs.onMobDied = (x, y, z, drops, xp) => {
       for (const d of drops) {
@@ -493,6 +501,36 @@ export class Game {
       this.audio.play("block_break", 0.4);
     };
 
+    this.enemies.onCreeperExplode = (x, y, z, radius) => {
+      this.audio.play("explosion", 0.9);
+      this.scene.shake(0.18, 0.6);
+      this.particles.spawnExplosion(x, y + 0.5, z);
+      // Damage player if in range
+      const pp = this.player.position;
+      const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
+        this.player.damage(6);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+      }
+      // Break nearby blocks
+      if (this.gameMap) {
+        for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+          for (let by = Math.floor(y); by <= Math.ceil(y + radius); by++) {
+            for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+              const ddx = bx - x, ddy = by - y, ddz = bz - z;
+              if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
+              const block = this.gameMap.world.getBlock(bx, by, bz);
+              if (block === "air" || block === "bedrock") continue;
+              if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
+            }
+          }
+        }
+        this.gameMap.world.rebuildDirtyChunks();
+      }
+      this.waves.onEnemyEliminated();
+    };
+
     // Player death
     this.player.onDeath = () => {
       this.phase = "gameover";
@@ -530,6 +568,31 @@ export class Game {
         this.startNextWave();
       }
     };
+
+    // Continue saved game
+    this.ui.onContinueGame = () => {
+      this.loadGame();
+      if (this.mode === "freeplay") {
+        this.ui.setObjective("Free Play — Mine, Build, Explore!");
+        this.ui.updateWaveInfo(0, 10, 0);
+        const mobTypes = ["cow", "sheep", "pig", "chicken"] as const;
+        for (let i = 0; i < 18; i++) {
+          const type = mobTypes[Math.floor(Math.random() * mobTypes.length)];
+          let x: number, z: number;
+          do {
+            x = 4 + Math.random() * 56;
+            z = 4 + Math.random() * 56;
+          } while (x >= 16 && x <= 47 && z >= 16 && z <= 47);
+          this.passiveMobs.spawn(type, x, z);
+        }
+      } else {
+        this.ui.setObjective(`Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`);
+        this.ui.updateWaveInfo(0, this.waves.totalWaves, 0);
+      }
+      this.refreshHUD();
+      this.scene.lockPointer();
+    };
+    if (Game.hasSave()) this.ui.showContinueButton(true);
 
     // Mode selection
     this.ui.onModeSelect = (mode) => {
@@ -894,6 +957,14 @@ export class Game {
       }
     }
 
+    // Auto-save every 60 seconds while playing
+    this._autoSaveTimer += dt;
+    if (this._autoSaveTimer >= 60) {
+      this._autoSaveTimer = 0;
+      this.saveGame();
+      this.ui.showContinueButton(true);
+    }
+
     // Sprint FOV
     this.scene.setFOV(input.sprint && isMovingH ? 85 : 75, dt);
     this.scene.updateShake(dt);
@@ -932,6 +1003,12 @@ export class Game {
 
     // Passive mobs
     this.passiveMobs.update(dt);
+    this.enemies.setPlayerPosition(this.player.position.x, this.player.position.z);
+
+    // Weather
+    this.weather.update(dt, this.scene.camera);
+    this.scene.setWeatherIntensity(this.weather.intensity);
+    this.audio.setRainIntensity(this.weather.intensity);
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
@@ -1194,7 +1271,7 @@ export class Game {
   }
 
   private spawnNightMob(): void {
-    const types: EnemyTypeName[] = ["zombie", "spider", "goblin"];
+    const types: EnemyTypeName[] = ["zombie", "spider", "goblin", "creeper"];
     const type  = types[Math.floor(Math.random() * types.length)];
     const angle = Math.random() * Math.PI * 2;
     const r     = 12 + Math.random() * 8;
@@ -1302,5 +1379,77 @@ export class Game {
     const active = this.inventory.getActiveItem();
     this.scene.updateArmItem(active?.itemId ?? null);
     this.ui.updateItemTooltip(active?.itemId ?? null, active?.durability);
+  }
+
+  // ─── Save / Load ──────────────────────────────────────────────────────────
+
+  static hasSave(): boolean {
+    return !!localStorage.getItem("craftdefense_save");
+  }
+
+  saveGame(): void {
+    try {
+      const save = {
+        version: 1,
+        mode: this.mode,
+        wave: this.waves.wave,
+        dayTime: this.scene.dayTime,
+        playerHealth: this.player.health,
+        playerHunger: this.player.hunger,
+        playerXP: this.player.xp,
+        playerLevel: this.player.level,
+        playerPos: { x: this.player.position.x, y: this.player.position.y, z: this.player.position.z },
+        hotbar: this.inventory.hotbar,
+        backpack: this.inventory.backpack,
+        armor: this.inventory.armor,
+        chestStorage: Object.fromEntries(this.chestStorage),
+        achievements: [...this._achievements],
+      };
+      localStorage.setItem("craftdefense_save", JSON.stringify(save));
+    } catch { /* localStorage not available */ }
+  }
+
+  loadGame(): boolean {
+    try {
+      const raw = localStorage.getItem("craftdefense_save");
+      if (!raw) return false;
+      const save = JSON.parse(raw);
+      if (save.version !== 1) return false;
+
+      this.mode = save.mode ?? "helmsdeep";
+
+      if (save.playerHealth !== undefined) {
+        this.player.health = save.playerHealth;
+        this.player.hunger = save.playerHunger ?? 20;
+        this.player.xp     = save.playerXP ?? 0;
+        this.player.level  = save.playerLevel ?? 0;
+      }
+      if (save.playerPos) {
+        this.player.position.set(save.playerPos.x, save.playerPos.y, save.playerPos.z);
+      }
+      if (save.hotbar) {
+        for (let i = 0; i < save.hotbar.length; i++) this.inventory.hotbar[i] = save.hotbar[i];
+      }
+      if (save.backpack) {
+        for (let i = 0; i < save.backpack.length; i++) this.inventory.backpack[i] = save.backpack[i];
+      }
+      if (save.armor) {
+        Object.assign(this.inventory.armor, save.armor);
+      }
+      if (save.chestStorage) {
+        for (const [k, v] of Object.entries(save.chestStorage)) {
+          this.chestStorage.set(k, v as any);
+        }
+      }
+      if (save.achievements) {
+        for (const ach of save.achievements) this._achievements.add(ach as string);
+      }
+
+      return true;
+    } catch { return false; }
+  }
+
+  deleteSave(): void {
+    localStorage.removeItem("craftdefense_save");
   }
 }

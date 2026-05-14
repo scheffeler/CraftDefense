@@ -96,6 +96,7 @@ export class UI {
   onRestart: () => void = () => {};
   onPointerLockRequest: () => void = () => {};
   onModeSelect: (mode: "helmsdeep" | "freeplay") => void = () => {};
+  onContinueGame: () => void = () => {};
   onPauseResume: () => void = () => {};
   onPauseReturnTitle: () => void = () => {};
   onCraftingSlotClick: (row: number, col: number) => void = () => {};
@@ -133,6 +134,7 @@ export class UI {
   private minimapTerrain: ImageData | null = null;
   private compassEl!: HTMLElement;
   private lockPrompt!: HTMLElement;
+  private continueBtn!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
   private deathOverlay!: HTMLElement;
@@ -248,6 +250,10 @@ export class UI {
 
   showPointerLockPrompt(show: boolean): void {
     this.lockPrompt.style.display = show ? "flex" : "none";
+  }
+
+  showContinueButton(show: boolean): void {
+    this.continueBtn.style.display = show ? "block" : "none";
   }
 
   showInventory(show: boolean, inventory?: Inventory): void {
@@ -367,8 +373,14 @@ export class UI {
     const el = document.createElement("div");
     el.className = "damage-vignette";
     this.container.appendChild(el);
-    // Remove after animation completes
     setTimeout(() => el.remove(), 600);
+  }
+
+  flashThunder(): void {
+    const el = document.createElement("div");
+    el.className = "thunder-flash";
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 300);
   }
 
   // ─── Legacy TD stubs ──────────────────────────────────────────────────────
@@ -431,6 +443,9 @@ export class UI {
       <div class="fps-lock-box">
         <div class="fps-lock-title">HELM'S DEEP</div>
         <div class="fps-lock-sub">A Minecraft-Style Fortress Survival</div>
+        <button class="fps-continue-btn" id="btn-continue" style="display:none">
+          ▶ Continue Game
+        </button>
         <div class="fps-mode-row">
           <button class="fps-mode-btn" id="btn-helmsdeep">
             <span class="fps-mode-icon">⚔</span>
@@ -449,6 +464,7 @@ export class UI {
           R: recipe book &nbsp;|&nbsp; 1-9: hotbar &nbsp;|&nbsp; Esc: unlock
         </div>
       </div>`;
+    this.continueBtn = this.lockPrompt.querySelector("#btn-continue") as HTMLElement;
     this.lockPrompt.querySelector("#btn-helmsdeep")!.addEventListener("click", (e) => {
       e.stopPropagation();
       this.onModeSelect("helmsdeep");
@@ -458,6 +474,10 @@ export class UI {
       e.stopPropagation();
       this.onModeSelect("freeplay");
       this.onPointerLockRequest();
+    });
+    this.continueBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.onContinueGame();
     });
     this.container.appendChild(this.lockPrompt);
 
@@ -1417,6 +1437,23 @@ const FPS_CSS = `
   font-size: 8px; color: rgba(255,255,255,0.3);
   line-height: 2;
 }
+.fps-continue-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 0;
+  margin-bottom: 18px;
+  background: #2a6e2a;
+  border: 3px solid #4caf50;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-shadow: 1px 1px 0 #000;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.fps-continue-btn:hover { background: #3a9e3a; border-color: #8bc34a; }
 .fps-mode-row {
   display: flex; gap: 16px; justify-content: center;
   margin-bottom: 24px;
@@ -1686,6 +1723,19 @@ const FPS_CSS = `
 @keyframes damageFlash {
   0%   { opacity: 1; }
   30%  { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+.thunder-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 59;
+  background: rgba(200,220,255,0.55);
+  animation: thunderFlash 0.3s ease-out forwards;
+}
+@keyframes thunderFlash {
+  0%   { opacity: 1; }
+  15%  { opacity: 0.85; }
   100% { opacity: 0; }
 }
 .fps-recipe-book {

@@ -76,6 +76,7 @@ export class SceneManager {
   // Underwater effect
   private _underwaterEffect = false;
 
+
   // Screen shake
   private _shakeTimer = 0;
   private _shakeMagnitude = 0;
@@ -221,6 +222,20 @@ export class SceneManager {
   /** Enable/disable the underwater fog effect. */
   setUnderwaterEffect(inWater: boolean): void {
     this._underwaterEffect = inWater;
+  }
+
+  /** 0 = clear, 1 = heavy rain — darkens sky, tightens fog. */
+  setWeatherIntensity(intensity: number): void {
+    if (this._underwaterEffect || intensity < 0.01) return;
+    const frame = sampleDayCycle(this._dayTime);
+    const rainy = 0x556677;
+    const fogRainy = 0x445566;
+    const t = intensity;
+    (this.scene.background as THREE.Color).setHex(lerpHex(frame.sky, rainy, t * 0.7));
+    (this.scene.fog as THREE.Fog).color.setHex(lerpHex(frame.fog, fogRainy, t * 0.7));
+    (this.scene.fog as THREE.Fog).far = 130 - t * 70; // rain reduces visibility
+    this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
+    this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
   }
 
   /** Call when hotbar active slot changes. itemId = null for empty hand. */

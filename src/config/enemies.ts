@@ -119,4 +119,20 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
       { itemId: "stick",      chance: 0.5, count: 4 },
     ],
   },
+  creeper: {
+    type: "creeper",
+    name: "Creeper",
+    maxHealth: 40,
+    speed: 2.5,
+    reward: 20,
+    damage: 6,   // explosion damage (applied in Game.ts)
+    color: 0x1a7a1a,
+    headColor: 0x1a7a1a,
+    scale: 0.9,
+    xpReward: 10,
+    drops: [
+      { itemId: "coal_ore", chance: 0.5, count: 1 },
+      { itemId: "flint",    chance: 0.3, count: 2 },
+    ],
+  },
 };

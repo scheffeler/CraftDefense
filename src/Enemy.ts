@@ -15,7 +15,7 @@ const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
 // All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
 const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
   "goblin", "orc", "troll", "goblin_miner",
-  "zombie", "spider", "golem",
+  "zombie", "spider", "golem", "creeper",
 ]);
 
 export class EnemyManager {
@@ -30,6 +30,15 @@ export class EnemyManager {
   onEnemyReachedBase: (state: EnemyState) => void = () => {};
   onEnemyDied:        (state: EnemyState) => void = () => {};
   onWallBroken: (wx: number, wz: number) => void = () => {};
+  onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
+
+  private _playerX = 32;
+  private _playerZ = 32;
+
+  setPlayerPosition(x: number, z: number): void {
+    this._playerX = x;
+    this._playerZ = z;
+  }
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -227,6 +236,61 @@ export class EnemyManager {
       }
     }
 
+    // Creeper priming logic
+    if (state.config.type === "creeper") {
+      const dx = this._playerX - pos.x;
+      const dz = this._playerZ - pos.z;
+      const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+      const dxBase = FORTRESS_CENTER_X - pos.x;
+      const dzBase = FORTRESS_CENTER_Z - pos.z;
+      const distToBase = Math.sqrt(dxBase * dxBase + dzBase * dzBase);
+      const inRange = distToPlayer < 3.5 || distToBase < 3.5;
+
+      if (inRange) {
+        if (!state.priming) {
+          state.priming = true;
+          state.primeTimer = 0;
+          state.flashTimer = 0;
+        }
+        state.primeTimer = (state.primeTimer ?? 0) + dt;
+        state.flashTimer = (state.flashTimer ?? 0) + dt;
+
+        // Flash body white/green rapidly as fuse gets closer
+        const flashRate = 4 + (state.primeTimer ?? 0) * 3;
+        if ((state.flashTimer ?? 0) >= 1 / flashRate) {
+          state.flashTimer = 0;
+          const isWhite = Math.floor((state.primeTimer ?? 0) * flashRate) % 2 === 0;
+          group.traverse(c => {
+            const m = c as THREE.Mesh;
+            if (m.isMesh) {
+              const mat = m.material as THREE.MeshLambertMaterial;
+              if (mat.name !== "face") {
+                mat.emissive?.setHex(isWhite ? 0xaaffaa : 0x001100);
+              }
+            }
+          });
+        }
+
+        // Explode after 1.8 seconds
+        if ((state.primeTimer ?? 0) >= 1.8) {
+          this.onCreeperExplode(pos.x, pos.y, pos.z, 3.5);
+          state.alive = false;
+          state.dying = true;
+          state.dyingTimer = 0.01;
+          return;
+        }
+        return; // stand still while priming
+      } else if (state.priming) {
+        // Out of range — cancel priming
+        state.priming = false;
+        state.primeTimer = 0;
+        group.traverse(c => {
+          const m = c as THREE.Mesh;
+          if (m.isMesh) (m.material as THREE.MeshLambertMaterial).emissive?.setHex(0);
+        });
+      }
+    }
+
     // Move in flow direction
     if (flow.dx !== 0 || flow.dz !== 0) {
       pos.x += flow.dx * state.speed * dt;
@@ -249,6 +313,8 @@ export class EnemyManager {
 
     if (type === "spider") {
       this.buildSpiderMesh(group);
+    } else if (type === "creeper") {
+      this.buildCreeperMesh(group);
     } else {
       this.buildHumanoidMesh(group, type);
     }
@@ -286,6 +352,52 @@ export class EnemyManager {
         leg.name = `leg_${i}_${side}`;
         group.add(leg);
       }
+    }
+  }
+
+  private buildCreeperMesh(group: THREE.Group): void {
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x1a7a1a });
+
+    // Body (tall narrow box)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.7, 0.28), bodyMat);
+    body.position.y = 0.65;
+    body.castShadow = true;
+    body.name = "creeper_body";
+    group.add(body);
+
+    // Head (square)
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.48, 0.48), bodyMat);
+    head.position.y = 1.24;
+    head.castShadow = true;
+    head.name = "creeper_head";
+    group.add(head);
+
+    // Creeper face — dark rectangular "sad" mouth + two eyes
+    const faceMat = new THREE.MeshLambertMaterial({ color: 0x000000, emissive: 0x001100 });
+    // Eyes
+    for (const ex of [-0.09, 0.09]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.01), faceMat);
+      eye.position.set(ex, 1.30, 0.245);
+      group.add(eye);
+    }
+    // Nose bridge
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.01), faceMat);
+    nose.position.set(0, 1.17, 0.245);
+    group.add(nose);
+    // Mouth corners (characteristic Creeper "N" shape)
+    for (const mx of [-0.14, 0.14]) {
+      const mPart = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.01), faceMat);
+      mPart.position.set(mx, 1.10, 0.245);
+      group.add(mPart);
+    }
+
+    // Four stubby legs
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x166016 });
+    for (const [lx, lz] of [[-0.1, -0.05], [0.1, -0.05], [-0.1, 0.05], [0.1, 0.05]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.18), legMat);
+      leg.position.set(lx, 0.14, lz);
+      leg.castShadow = true;
+      group.add(leg);
     }
   }
 
