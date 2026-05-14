@@ -321,6 +321,58 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "bread", count: 1 },
   },
+
+  // --- Bed (3 planks + 3 wool) ---
+  {
+    id: "bed",
+    pattern: [
+      [r("wool"),   r("wool"),   r("wool")  ],
+      [r("planks"), r("planks"), r("planks")],
+    ],
+    result: { itemId: "bed", count: 1 },
+  },
+
+  // --- Paper (from wheat, simplified) ---
+  {
+    id: "paper",
+    pattern: [
+      [r("wheat"), r("wheat"), r("wheat")],
+    ],
+    result: { itemId: "paper", count: 3 },
+  },
+
+  // --- Book (3 paper + wool) ---
+  {
+    id: "book",
+    pattern: [
+      [r("paper")],
+      [r("paper")],
+      [r("paper")],
+    ],
+    result: { itemId: "book", count: 1 },
+  },
+
+  // --- Bookshelf (6 planks + 3 books) ---
+  {
+    id: "bookshelf",
+    pattern: [
+      [r("planks"), r("planks"), r("planks")],
+      [r("book"),   r("book"),   r("book")  ],
+      [r("planks"), r("planks"), r("planks")],
+    ],
+    result: { itemId: "bookshelf", count: 1 },
+  },
+
+  // --- Enchanting table (obsidian + diamonds + book) ---
+  {
+    id: "enchanting_table",
+    pattern: [
+      [null,          r("book"),    null         ],
+      [r("diamond"),  r("obsidian"), r("diamond") ],
+      [r("obsidian"), r("obsidian"), r("obsidian")],
+    ],
+    result: { itemId: "enchanting_table", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

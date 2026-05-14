@@ -89,6 +89,9 @@ export class Game {
   }>();
   private openFurnaceKey: string | null = null;
 
+  // Enchanting table
+  private _enchantItem: import("./Inventory").ItemStack | null = null;
+
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
 
@@ -234,7 +237,7 @@ export class Game {
         // Show pause menu only if game is in progress (pointer was locked and user pressed Esc)
         if (this.phase !== "gameover" && this.phase !== "win" &&
             !this.ui.isInventoryOpen() && !this.ui.isWorkbenchOpen() &&
-            !this.ui.isChestOpen() && !this.ui.isFurnaceOpen()) {
+            !this.ui.isChestOpen() && !this.ui.isFurnaceOpen() && !this.ui.isEnchantingOpen()) {
           this.ui.showPause(true);
         }
         this.ui.showInventory(false);
@@ -273,6 +276,10 @@ export class Game {
 
     // Inventory toggle (E)
     this.input.onInventoryToggle = () => {
+      if (this.ui.isEnchantingOpen()) {
+        this.ui.onEnchantClose();
+        return;
+      }
       if (this.ui.isWorkbenchOpen()) {
         this.ui.showWorkbench(false);
         if (!this.scene.isPointerLocked) this.scene.lockPointer();
@@ -355,6 +362,24 @@ export class Game {
             return;
           }
         }
+      }
+
+      // Check if looking at enchanting table — open enchanting UI
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "enchanting_table") {
+        this._openEnchantingTable();
+        return;
+      }
+
+      // Check if looking at a bed — sleep to skip night
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "bed") {
+        if (!this.scene.isDay) {
+          this.scene.skipToMorning();
+          this.audio.play("step_wood", 0.4);
+          this.ui.showAchievement("Good Morning!", "Slept through the night");
+        } else {
+          this.ui.showAchievement("Not sleepy", "You can only sleep at night");
+        }
+        return;
       }
 
       // Check if looking at a furnace — open furnace UI
@@ -780,6 +805,58 @@ export class Game {
       this.scene.lockPointer();
     };
 
+    // Enchanting table
+    this.ui.onEnchantPick = (index: number) => {
+      if (index < 0) {
+        // Item slot clicked — move active item in/out
+        const active = this.inventory.getActiveItem();
+        if (active) {
+          this._enchantItem = { ...active };
+          this.inventory.removeItem(active.itemId, 1);
+          this.refreshHotbar();
+        } else if (this._enchantItem) {
+          this.inventory.addItem(this._enchantItem.itemId, this._enchantItem.count);
+          this._enchantItem = null;
+          this.refreshHotbar();
+        }
+        this._refreshEnchantUI();
+        return;
+      }
+      if (!this._enchantItem) return;
+      const opts = this._buildEnchantOptions(this._enchantItem);
+      const chosen = opts[index];
+      if (!chosen || this.player.level < chosen.cost) return;
+      // Spend levels
+      for (let i = 0; i < chosen.cost; i++) {
+        if (this.player.level > 0) this.player.level--;
+      }
+      // Apply enchantment
+      this._enchantItem.enchantments = [...(this._enchantItem.enchantments ?? []), chosen.id];
+      // Return item with enchantment
+      this.inventory.addItem(this._enchantItem.itemId, 1);
+      // Patch back the enchantments onto the newly added stack
+      const slot = this.inventory.hotbar.findIndex(s => s?.itemId === this._enchantItem!.itemId && !s.enchantments?.length);
+      const bpSlot = this.inventory.backpack.findIndex(s => s?.itemId === this._enchantItem!.itemId && !s.enchantments?.length);
+      if (slot >= 0) this.inventory.hotbar[slot]!.enchantments = this._enchantItem.enchantments;
+      else if (bpSlot >= 0) this.inventory.backpack[bpSlot]!.enchantments = this._enchantItem.enchantments;
+      this._enchantItem = null;
+      this.audio.play("pickup", 0.7);
+      this.refreshHotbar();
+      this.refreshXPBar();
+      this._refreshEnchantUI();
+    };
+
+    this.ui.onEnchantClose = () => {
+      // Return item to inventory if any
+      if (this._enchantItem) {
+        this.inventory.addItem(this._enchantItem.itemId, this._enchantItem.count);
+        this._enchantItem = null;
+        this.refreshHotbar();
+      }
+      this.ui.showEnchanting(false);
+      this.scene.lockPointer();
+    };
+
     // UI restart
     this.ui.onRestart = () => this.resetGame();
   }
@@ -1192,6 +1269,64 @@ export class Game {
     this.refreshHotbar();
   }
 
+  // ─── Enchanting table ─────────────────────────────────────────────────────
+
+  private static readonly ENCHANT_POOL: Array<{
+    id: string; name: string; cost: number;
+    categories: string[]; // item categories this applies to
+  }> = [
+    { id: "sharpness_1",  name: "Sharpness I",       cost: 1, categories: ["weapon"] },
+    { id: "sharpness_2",  name: "Sharpness II",      cost: 2, categories: ["weapon"] },
+    { id: "efficiency_1", name: "Efficiency I",      cost: 1, categories: ["tool"] },
+    { id: "efficiency_2", name: "Efficiency II",     cost: 2, categories: ["tool"] },
+    { id: "protection_1", name: "Protection I",      cost: 1, categories: ["armor"] },
+    { id: "protection_2", name: "Protection II",     cost: 2, categories: ["armor"] },
+    { id: "unbreaking_1", name: "Unbreaking I",      cost: 1, categories: ["weapon", "tool", "armor"] },
+    { id: "fortune_1",    name: "Fortune I",         cost: 2, categories: ["tool"] },
+    { id: "power_1",      name: "Power I",           cost: 1, categories: ["weapon"] },
+    { id: "fire_aspect",  name: "Fire Aspect I",     cost: 2, categories: ["weapon"] },
+    { id: "thorns_1",     name: "Thorns I",          cost: 2, categories: ["armor"] },
+    { id: "feather_fall", name: "Feather Falling I", cost: 1, categories: ["armor"] },
+  ];
+
+  private _buildEnchantOptions(item: import("./Inventory").ItemStack): Array<{ id: string; name: string; cost: number }> {
+    const { ENCHANT_POOL } = Game;
+    const itemDef = ITEMS[item.itemId];
+    if (!itemDef) return [];
+    const cat = itemDef.category;
+    const valid = ENCHANT_POOL.filter(e =>
+      e.categories.includes(cat) && !(item.enchantments ?? []).includes(e.id),
+    );
+    // Pick 3 deterministically shuffled by item + level
+    const seed = (item.itemId.charCodeAt(0) + this.player.level * 7) % valid.length;
+    const picked: typeof valid = [];
+    for (let i = 0; i < Math.min(3, valid.length); i++) {
+      picked.push(valid[(seed + i * 3) % valid.length]);
+    }
+    return picked;
+  }
+
+  private _openEnchantingTable(): void {
+    this.scene.unlockPointer();
+    this.ui.showEnchanting(true);
+    this._refreshEnchantUI();
+  }
+
+  private _refreshEnchantUI(): void {
+    const opts = this._enchantItem ? this._buildEnchantOptions(this._enchantItem) : [];
+    this.ui.updateEnchanting(this._enchantItem, this.player.level, opts);
+  }
+
+  /** Returns bonus damage from enchantments on the given item. */
+  getEnchantDamageBonus(item: import("./Inventory").ItemStack | null): number {
+    if (!item?.enchantments) return 0;
+    let bonus = 0;
+    if (item.enchantments.includes("sharpness_1")) bonus += 2;
+    if (item.enchantments.includes("sharpness_2")) bonus += 4;
+    if (item.enchantments.includes("power_1"))     bonus += 2;
+    return bonus;
+  }
+
   // ─── Furnace smelting ─────────────────────────────────────────────────────
 
   private updateFurnaces(dt: number): void {
@@ -1295,7 +1430,7 @@ export class Game {
     if (this.phase !== "playing" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
-    const damage  = itemDef?.damage ?? 1;
+    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack);
 
     const result = this.player.tryMeleeAttack();
     if (!result) return;

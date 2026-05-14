@@ -2,9 +2,10 @@ import { ITEMS } from "./config/items";
 import type { ArmorSlot } from "./config/items";
 
 export interface ItemStack {
-  itemId:     string;
-  count:      number;
-  durability?: number;  // remaining uses; undefined = no durability
+  itemId:        string;
+  count:         number;
+  durability?:   number;
+  enchantments?: string[];  // e.g. ["sharpness_1", "unbreaking_1"]
 }
 
 export type SlotArea = "hotbar" | "backpack" | "armor";

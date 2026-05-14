@@ -27,6 +27,21 @@ function inFortressBounds(x: number, z: number): boolean {
   return x >= WX1 && x <= WX2 && z >= WZ1 && z <= WZ2;
 }
 
+type Biome = "forest" | "desert" | "taiga";
+
+function getBiome(x: number, z: number): Biome {
+  if (inFortressBounds(x, z)) return "forest";
+  if (z <= 10 || z >= WORLD_DEPTH - 11) return "forest";
+  const bx = Math.floor(x / 22), bz = Math.floor(z / 22);
+  const n1 = (hash(bx * 9871 + 3001, bz * 7649 + 2003) % 1000) / 1000;
+  const fx = Math.floor(x / 11), fz = Math.floor(z / 11);
+  const n2 = (hash(fx * 4567 + 1001, fz * 3457 + 5003) % 1000) / 1000;
+  const n = n1 * 0.75 + n2 * 0.25;
+  if (n < 0.28) return "desert";
+  if (n > 0.70) return "taiga";
+  return "forest";
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -36,6 +51,8 @@ export function generateWorld(world: VoxelWorld): void {
   generateFortress(world);
   generateInterior(world);
   generateTrees(world);
+  generateCacti(world);
+  generateVillages(world);
   generateSpawnMarkers(world);
   generateWaterFeatures(world);
   generateRuins(world);
@@ -56,10 +73,8 @@ export function getSpawnPositions(gate: "north" | "south"): Array<[number, numbe
 function generateTerrain(world: VoxelWorld): void {
   for (let x = 0; x < WORLD_WIDTH; x++) {
     for (let z = 0; z < WORLD_DEPTH; z++) {
-      // Bedrock layer (unbreakable)
       world.setBlock(x, 0, z, "bedrock");
 
-      // Underground stone + ores (y=1..G-1)
       for (let y = 1; y < G; y++) {
         const oreHash = hash(x * 1009 + y * 317, z * 769);
         if (y <= 2 && oreHash % 28 === 0) {
@@ -82,28 +97,37 @@ function generateTerrain(world: VoxelWorld): void {
         continue;
       }
 
-      // Keep enemy spawn zones flat
       if (z <= 8 || z >= WORLD_DEPTH - 9) {
         world.setBlock(x, G, z, "grass");
         continue;
       }
 
-      // Hills outside fortress: up to 5 blocks tall above surface
+      const biome = getBiome(x, z);
       const n = smoothNoise(x, z);
-      const hillHeight = Math.floor(n * 5.5); // 0–5 blocks above G
+      const hillHeight = Math.floor(n * 5.5);
 
-      // Surface + hill column
       for (let y = 0; y <= hillHeight; y++) {
-        if (y <= hillHeight - 3) {
-          world.setBlock(x, G + y, z, "stone");
-        } else if (y < hillHeight) {
-          world.setBlock(x, G + y, z, "dirt");
+        if (biome === "desert") {
+          // Sand surface over stone base
+          world.setBlock(x, G + y, z, y < hillHeight - 1 ? "stone" : "sand");
         } else {
-          world.setBlock(x, G + y, z, "grass");
+          // Forest / taiga: normal grass-dirt-stone layering
+          if (y <= hillHeight - 3) {
+            world.setBlock(x, G + y, z, "stone");
+          } else if (y < hillHeight) {
+            world.setBlock(x, G + y, z, "dirt");
+          } else {
+            world.setBlock(x, G + y, z, "grass");
+          }
         }
       }
 
-      // Ore veins in stone part of hills
+      // Snow cap one block above surface in taiga
+      if (biome === "taiga") {
+        world.setBlock(x, G + hillHeight + 1, z, "snow");
+      }
+
+      // Ore veins in exposed stone part of hills
       if (hillHeight >= 3) {
         const stoneTop = hillHeight - 3;
         for (let y = 0; y <= stoneTop; y++) {
@@ -190,52 +214,111 @@ function generateTrees(world: VoxelWorld): void {
     for (let z = 2; z < WORLD_DEPTH - 2; z++) {
       if (x >= WX1 - 6 && x <= WX2 + 6 && z >= WZ1 - 6 && z <= WZ2 + 6) continue;
       if (z <= 7 || z >= WORLD_DEPTH - 8) continue;
+
+      const biome = getBiome(x, z);
+      if (biome === "desert") continue;
+
       if (hash(x, z) % 10 !== 0) continue;
 
-      // Find surface height (scan from above)
+      let groundY = G;
+      for (let y = G + 12; y >= G; y--) {
+        if (world.getBlock(x, y, z) !== "air") { groundY = y; break; }
+      }
+
+      const top = world.getBlock(x, groundY, z);
+      if (top !== "grass" && top !== "snow") continue;
+
+      if (biome === "taiga") {
+        placePineTree(world, x, groundY, z);
+      } else {
+        placeOakBirchTree(world, x, groundY, z);
+      }
+    }
+  }
+}
+
+function placePineTree(world: VoxelWorld, x: number, groundY: number, z: number): void {
+  const trunkHeight = 5 + (hash(x * 3, z * 7) % 4); // 5–8
+
+  for (let y = groundY + 1; y <= groundY + trunkHeight; y++) {
+    world.setBlock(x, y, z, "wood");
+  }
+
+  // Conical canopy: wider at base, narrower toward tip
+  const layers = [2, 2, 2, 1, 1, 1, 0] as const;
+  const canopyBase = groundY + trunkHeight - 3;
+  for (let li = 0; li < layers.length; li++) {
+    const ly = canopyBase + li;
+    const radius = layers[li];
+    if (radius === 0) {
+      world.setBlock(x, ly, z, "leaves");
+      continue;
+    }
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dz = -radius; dz <= radius; dz++) {
+        if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
+        const bx = x + dx, bz = z + dz;
+        if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
+        if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
+      }
+    }
+  }
+}
+
+function placeOakBirchTree(world: VoxelWorld, x: number, groundY: number, z: number): void {
+  const h = hash(x * 3, z * 7);
+  const trunkHeight = 4 + (h % 3);
+  const isBirch = (hash(x * 17, z * 23) % 3) === 0;
+
+  for (let y = groundY + 1; y <= groundY + trunkHeight; y++) {
+    world.setBlock(x, y, z, "wood");
+  }
+
+  if (isBirch) {
+    for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 2; ly++) {
+      const radius = (ly === groundY + trunkHeight + 2) ? 0 : (ly >= groundY + trunkHeight) ? 1 : 2;
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          if (radius === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+          const bx = x + dx, bz = z + dz;
+          if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
+          if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
+        }
+      }
+    }
+    world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
+  } else {
+    for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 1; ly++) {
+      const radius = (ly <= groundY + trunkHeight) ? 2 : 1;
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
+          const bx = x + dx, bz = z + dz;
+          if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
+          if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
+        }
+      }
+    }
+    world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
+  }
+}
+
+function generateCacti(world: VoxelWorld): void {
+  for (let x = 2; x < WORLD_WIDTH - 2; x++) {
+    for (let z = 2; z < WORLD_DEPTH - 2; z++) {
+      if (getBiome(x, z) !== "desert") continue;
+      if (z <= 7 || z >= WORLD_DEPTH - 8) continue;
+      if (hash(x * 31, z * 37) % 25 !== 0) continue;
+
       let groundY = G;
       for (let y = G + 10; y >= G; y--) {
         if (world.getBlock(x, y, z) !== "air") { groundY = y; break; }
       }
-      if (world.getBlock(x, groundY, z) !== "grass") continue;
+      if (world.getBlock(x, groundY, z) !== "sand") continue;
 
-      const h = hash(x * 3, z * 7);
-      const trunkHeight = 4 + (h % 3); // 4–6 blocks
-      // 30% chance birch (lighter wood color — we still use "wood" block but vary canopy)
-      const isBirch = (hash(x * 17, z * 23) % 3) === 0;
-
-      for (let y = groundY + 1; y <= groundY + trunkHeight; y++) {
-        world.setBlock(x, y, z, "wood");
-      }
-
-      if (isBirch) {
-        // Tall, narrow birch canopy
-        for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 2; ly++) {
-          const radius = (ly === groundY + trunkHeight + 2) ? 0 : (ly >= groundY + trunkHeight) ? 1 : 2;
-          for (let dx = -radius; dx <= radius; dx++) {
-            for (let dz = -radius; dz <= radius; dz++) {
-              if (radius === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-              const bx = x + dx, bz = z + dz;
-              if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
-              if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
-            }
-          }
-        }
-        world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
-      } else {
-        // Wide oak canopy — 3 layers
-        for (let ly = groundY + trunkHeight - 1; ly <= groundY + trunkHeight + 1; ly++) {
-          const radius = (ly <= groundY + trunkHeight) ? 2 : 1;
-          for (let dx = -radius; dx <= radius; dx++) {
-            for (let dz = -radius; dz <= radius; dz++) {
-              if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
-              const bx = x + dx, bz = z + dz;
-              if (bx < 0 || bz < 0 || bx >= WORLD_WIDTH || bz >= WORLD_DEPTH) continue;
-              if (world.getBlock(bx, ly, bz) === "air") world.setBlock(bx, ly, bz, "leaves");
-            }
-          }
-        }
-        world.setBlock(x, groundY + trunkHeight + 2, z, "leaves");
+      const height = 1 + (hash(x * 5, z * 7) % 3);
+      for (let y = 1; y <= height; y++) {
+        world.setBlock(x, groundY + y, z, "cactus");
       }
     }
   }
@@ -470,6 +553,155 @@ function generateCaves(world: VoxelWorld): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Village generation
+// ---------------------------------------------------------------------------
+
+function findSurfaceY(world: VoxelWorld, x: number, z: number): number {
+  for (let y = G + 12; y >= G; y--) {
+    if (world.getBlock(x, y, z) !== "air") return y;
+  }
+  return G;
+}
+
+function generateVillages(world: VoxelWorld): void {
+  buildVillage(world,  9, 13);  // NW village
+  buildVillage(world, 53, 50);  // SE village
+}
+
+function buildVillage(world: VoxelWorld, cx: number, cz: number): void {
+  if (inFortressBounds(cx, cz)) return;
+  if (cz <= 10 || cz >= WORLD_DEPTH - 11) return;
+
+  const surfY = findSurfaceY(world, cx, cz);
+
+  buildVillageWell(world, cx, cz, surfY);
+  buildVillageHouse(world, cx - 8, cz, surfY);
+  buildVillageHouse(world, cx + 4, cz, surfY);
+  buildVillageHouse(world, cx, cz - 8, surfY);
+  buildVillageFarm(world, cx + 4, cz + 4, surfY);
+
+  // Cobblestone paths connecting well to each house
+  for (let x = cx - 6; x <= cx + 3; x++) {
+    const sy = findSurfaceY(world, x, cz);
+    if (world.getBlock(x, sy, cz) !== "water") world.setBlock(x, sy, cz, "cobblestone");
+  }
+  for (let z = cz - 6; z <= cz + 3; z++) {
+    const sy = findSurfaceY(world, cx, z);
+    if (world.getBlock(cx, sy, z) !== "water") world.setBlock(cx, sy, z, "cobblestone");
+  }
+  // Torches along path every 3 blocks
+  for (let x = cx - 5; x <= cx + 2; x += 3) {
+    const sy = findSurfaceY(world, x, cz);
+    world.setBlock(x, sy + 1, cz, "torch");
+  }
+}
+
+function buildVillageWell(world: VoxelWorld, cx: number, cz: number, surfY: number): void {
+  // 3×3 cobblestone ring, 3 high; water inside at surface
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const bx = cx + dx, bz = cz + dz;
+      if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+      if (dx === 0 && dz === 0) {
+        world.setBlock(bx, surfY, bz, "water");
+        continue;
+      }
+      for (let y = surfY; y <= surfY + 2; y++) {
+        world.setBlock(bx, y, bz, "cobblestone");
+      }
+    }
+  }
+  // Overhang: two wood posts + plank beam
+  if (cx - 1 >= 1 && cx + 1 < WORLD_WIDTH - 1) {
+    world.setBlock(cx - 1, surfY + 3, cz, "wood");
+    world.setBlock(cx + 1, surfY + 3, cz, "wood");
+    for (let dx = -1; dx <= 1; dx++) {
+      world.setBlock(cx + dx, surfY + 4, cz, "planks");
+    }
+  }
+}
+
+function buildVillageHouse(world: VoxelWorld, hx: number, hz: number, refY: number): void {
+  const W = 5, D = 4;
+  // Use terrain height at house center
+  const cx2 = hx + 2, cz2 = hz + 1;
+  if (cx2 < 1 || cz2 < 1 || cx2 >= WORLD_WIDTH - 1 || cz2 >= WORLD_DEPTH - 1) return;
+  const floorY = Math.max(refY, findSurfaceY(world, cx2, cz2));
+
+  // Clear interior air
+  for (let dx = 0; dx < W; dx++) {
+    for (let dz = 0; dz < D; dz++) {
+      const bx = hx + dx, bz = hz + dz;
+      if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+      for (let y = floorY; y <= floorY + 5; y++) world.setBlock(bx, y, bz, "air");
+    }
+  }
+
+  // Cobblestone floor
+  for (let dx = 0; dx < W; dx++) {
+    for (let dz = 0; dz < D; dz++) {
+      const bx = hx + dx, bz = hz + dz;
+      if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+      world.setBlock(bx, floorY, bz, "cobblestone");
+    }
+  }
+
+  // Planks walls, 3 high; glass windows, door gap
+  for (let y = 1; y <= 3; y++) {
+    for (let dx = 0; dx < W; dx++) {
+      for (let dz = 0; dz < D; dz++) {
+        if (dx !== 0 && dx !== W - 1 && dz !== 0 && dz !== D - 1) continue; // interior
+        const bx = hx + dx, bz = hz + dz;
+        if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+        // Door opening: front face (dz===0), center column
+        if (dz === 0 && dx === 2 && y <= 2) continue;
+        // Glass windows
+        if (y === 2 && (dz === 0 || dz === D - 1) && (dx === 1 || dx === 3)) {
+          world.setBlock(bx, floorY + y, bz, "glass"); continue;
+        }
+        world.setBlock(bx, floorY + y, bz, "planks");
+      }
+    }
+  }
+
+  // Wooden roof slab
+  for (let dx = -1; dx <= W; dx++) {
+    for (let dz = -1; dz <= D; dz++) {
+      const bx = hx + dx, bz = hz + dz;
+      if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+      world.setBlock(bx, floorY + 4, bz, "planks");
+    }
+  }
+
+  // Interior furnishings
+  const bx1 = hx + 1, bz1 = hz + 1;
+  const bx2 = hx + 3, bz2 = hz + 2;
+  if (bx1 < WORLD_WIDTH - 1 && bz1 < WORLD_DEPTH - 1)
+    world.setBlock(bx1, floorY + 1, bz1, "crafting_table");
+  if (bx2 < WORLD_WIDTH - 1 && bz2 < WORLD_DEPTH - 1)
+    world.setBlock(bx2, floorY + 1, bz2, "chest");
+  // Torch inside
+  if (hx + 1 < WORLD_WIDTH - 1 && hz + 3 < WORLD_DEPTH - 1)
+    world.setBlock(hx + 1, floorY + 3, hz + 3, "torch");
+  // Torch above door outside
+  if (hx + 2 < WORLD_WIDTH - 1 && hz - 1 >= 1)
+    world.setBlock(hx + 2, floorY + 3, hz - 1, "torch");
+}
+
+function buildVillageFarm(world: VoxelWorld, fx: number, fz: number, refY: number): void {
+  const WHEAT_STAGES = ["wheat_0", "wheat_1", "wheat_2", "wheat_3"] as const;
+  for (let dx = 0; dx < 5; dx++) {
+    for (let dz = 0; dz < 3; dz++) {
+      const bx = fx + dx, bz = fz + dz;
+      if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+      const ly = Math.max(refY, findSurfaceY(world, bx, bz));
+      world.setBlock(bx, ly, bz, "farmland");
+      world.setBlock(bx, ly + 1, bz, WHEAT_STAGES[(dx + dz * 2) % 4]);
+    }
+  }
+}
+
 function generateRuins(world: VoxelWorld): void {
   const ruins: [number, number][] = [
     [6, 25], [12, 40], [55, 28], [50, 42], [14, 20], [50, 18],
@@ -481,11 +713,12 @@ function generateRuins(world: VoxelWorld): void {
 
     const h = 2 + (hash(rx, rz) % 3);
     const len = 3 + (hash(rx * 3, rz) % 4);
+    const ruinBlock = getBiome(rx, rz) === "desert" ? "sand" : "cobblestone";
 
     for (let i = 0; i < len; i++) {
       for (let y = 1; y <= h; y++) {
         if (hash(rx + i, y * 17 + rz) % 4 === 0) continue;
-        world.setBlock(rx + i, G + y, rz, "cobblestone");
+        world.setBlock(rx + i, G + y, rz, ruinBlock);
       }
     }
 
@@ -493,7 +726,7 @@ function generateRuins(world: VoxelWorld): void {
     for (let i = 0; i < arm; i++) {
       for (let y = 1; y <= Math.max(1, h - 1); y++) {
         if (hash(rz + i, y * 11 + rx) % 3 === 0) continue;
-        world.setBlock(rx, G + y, rz + i, "cobblestone");
+        world.setBlock(rx, G + y, rz + i, ruinBlock);
       }
     }
   }

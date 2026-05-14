@@ -66,6 +66,15 @@ export const ITEMS: Record<string, ItemDef> = {
   cooked_chicken:  { id:"cooked_chicken",  name:"Cooked Chicken",  category:"food", stackSize:64, color:0xdd8844, foodPoints:6 },
   wool:            { id:"wool",            name:"Wool",            category:"material", stackSize:64, color:0xeeeeee },
 
+  // --- Bed ---
+  bed: { id:"bed", name:"Bed", category:"block", stackSize:64, color:0xcc3333, placesBlock:"bed" },
+
+  // --- Books & enchanting ---
+  paper:            { id:"paper",            name:"Paper",            category:"material", stackSize:64, color:0xf0eedd },
+  book:             { id:"book",             name:"Book",             category:"material", stackSize:64, color:0xc8a060 },
+  bookshelf:        { id:"bookshelf",        name:"Bookshelf",        category:"block",    stackSize:64, color:0xc8a060, placesBlock:"bookshelf"        },
+  enchanting_table: { id:"enchanting_table", name:"Enchanting Table", category:"block",    stackSize:64, color:0xaa0022, placesBlock:"enchanting_table" },
+
   // --- Farming ---
   wheat_seeds: { id:"wheat_seeds", name:"Wheat Seeds", category:"material", stackSize:64, color:0x8b8b3a },
   wheat:       { id:"wheat",       name:"Wheat",       category:"material", stackSize:64, color:0xe8c830 },

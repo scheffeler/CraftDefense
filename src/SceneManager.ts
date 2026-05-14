@@ -142,6 +142,7 @@ export class SceneManager {
   }
   get dayNumber(): number { return Math.floor(this._totalDays) + 1; }
   get isDay(): boolean { return this.daylight > 0.3; }
+  skipToMorning(): void { this._dayTime = 0.25; }
 
   lockPointer():   void { this.controls.lock(); }
   unlockPointer(): void { this.controls.unlock(); }

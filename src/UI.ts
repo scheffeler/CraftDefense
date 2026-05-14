@@ -111,6 +111,8 @@ export class UI {
   onFurnaceFuelClick: () => void = () => {};
   onFurnaceOutputClick: () => void = () => {};
   onFurnaceClose: () => void = () => {};
+  onEnchantPick: (index: number) => void = () => {};
+  onEnchantClose: () => void = () => {};
 
   // Legacy TD stubs (backward compat — Game.ts uses these until Phase 12)
   onStartWave: () => void = () => {};
@@ -160,6 +162,11 @@ export class UI {
   private furnaceOutputSlot!: HTMLElement;
   private furnaceFireFill!: HTMLElement;
   private furnaceProgressFill!: HTMLElement;
+  // Enchanting overlay
+  private enchantOverlay!: HTMLElement;
+  private enchantItemSlot!: HTMLElement;
+  private enchantOptionEls: HTMLElement[] = [];
+  private enchantLevelEl!: HTMLElement;
   private workbenchCells: HTMLElement[][] = [];
   private workbenchResult!: HTMLElement;
   private _workbenchGrid: (string | null)[][] = [
@@ -485,6 +492,7 @@ export class UI {
     this.buildWorkbenchOverlay();
     this.buildChestOverlay();
     this.buildFurnaceOverlay();
+    this.buildEnchantingOverlay();
     this.buildRecipeBookOverlay();
     this.buildPauseOverlay();
     this.buildDeathOverlay();
@@ -933,6 +941,98 @@ export class UI {
     if (!open) return;
   }
 
+  private buildEnchantingOverlay(): void {
+    const ov = div("fps-inventory overlay hidden");
+    ov.style.display = "none";
+    ov.style.cssText += "position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(0,0,0,0.75);";
+
+    const box = div("fps-inv-box");
+    box.style.cssText = "background:#1a0a2a;border:2px solid #6a2060;border-radius:6px;padding:16px 20px;min-width:340px;";
+
+    const title = div("");
+    title.style.cssText = "font-size:14px;margin-bottom:4px;color:#cc44ff;text-align:center;letter-spacing:0.05em;";
+    title.textContent = "Enchanting Table";
+    box.appendChild(title);
+
+    const hint = div("");
+    hint.style.cssText = "font-size:10px;color:#888;margin-bottom:12px;text-align:center;";
+    hint.textContent = "Place item to enchant · Costs XP levels";
+    box.appendChild(hint);
+
+    // Item input slot
+    const inputRow = div("fps-furnace-area");
+    inputRow.style.cssText = "justify-content:center;margin-bottom:12px;";
+    const inputLabel = div("");
+    inputLabel.style.cssText = "font-size:10px;color:#aaa;margin-right:8px;align-self:center;";
+    inputLabel.textContent = "Item:";
+    this.enchantItemSlot = div("fps-slot fps-furnace-slot");
+    this.enchantItemSlot.style.cssText += "border-color:#6a2060;";
+    this.enchantItemSlot.title = "Item to enchant";
+    this.enchantItemSlot.addEventListener("click", () => {
+      // handled by Game.ts via onEnchantPick(-1) convention — just trigger a refresh
+      this.onEnchantPick(-1);
+    });
+    inputRow.appendChild(inputLabel);
+    inputRow.appendChild(this.enchantItemSlot);
+    box.appendChild(inputRow);
+
+    // Player level display
+    this.enchantLevelEl = div("");
+    this.enchantLevelEl.style.cssText = "font-size:11px;color:#88ff44;text-align:center;margin-bottom:10px;";
+    this.enchantLevelEl.textContent = "XP Level: 0";
+    box.appendChild(this.enchantLevelEl);
+
+    // 3 enchantment option rows
+    this.enchantOptionEls = [];
+    for (let i = 0; i < 3; i++) {
+      const row = div("fps-enchant-option");
+      row.dataset["index"] = String(i);
+      row.addEventListener("click", () => this.onEnchantPick(i));
+      box.appendChild(row);
+      this.enchantOptionEls.push(row);
+    }
+
+    const closeBtn = div("fps-inv-close-btn");
+    closeBtn.textContent = "✕ Close";
+    closeBtn.addEventListener("click", () => this.onEnchantClose());
+    box.appendChild(closeBtn);
+
+    ov.appendChild(box);
+    this.enchantOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  isEnchantingOpen(): boolean { return this.enchantOverlay.style.display !== "none"; }
+
+  showEnchanting(open: boolean): void {
+    this.enchantOverlay.style.display = open ? "flex" : "none";
+  }
+
+  updateEnchanting(
+    item: import("./Inventory").ItemStack | null,
+    playerLevel: number,
+    options: Array<{ name: string; cost: number; id: string }>,
+  ): void {
+    this.renderStackInSlot(this.enchantItemSlot, item);
+    this.enchantLevelEl.textContent = `XP Level: ${playerLevel}`;
+    for (let i = 0; i < 3; i++) {
+      const el = this.enchantOptionEls[i];
+      const opt = options[i];
+      if (!opt || !item) {
+        el.style.opacity = "0.4";
+        el.innerHTML = `<span class="fps-enchant-name">—</span>`;
+        el.dataset["disabled"] = "1";
+        continue;
+      }
+      el.dataset["disabled"] = playerLevel < opt.cost ? "1" : "0";
+      el.style.opacity = playerLevel < opt.cost ? "0.4" : "1";
+      el.innerHTML = `
+        <span class="fps-enchant-name">${opt.name}</span>
+        <span class="fps-enchant-cost">${opt.cost} level${opt.cost !== 1 ? "s" : ""}</span>
+      `;
+    }
+  }
+
   updateFurnaceSlots(
     input: import("./Inventory").ItemStack | null,
     fuel:  import("./Inventory").ItemStack | null,
@@ -1111,6 +1211,10 @@ export class UI {
 
   private renderStackInSlot(el: HTMLElement, stack: ItemStack | null): void {
     this.renderIdInSlot(el, stack?.itemId ?? null, stack?.count);
+
+    // Enchantment glow
+    const hasEnchants = (stack?.enchantments?.length ?? 0) > 0;
+    el.classList.toggle("fps-slot-enchanted", hasEnchants);
 
     // Durability bar — shown below the icon when item is damaged
     let durBar = el.querySelector<HTMLElement>(".slot-dur-bar");
@@ -1402,6 +1506,14 @@ const FPS_CSS = `
   height: 2px; border-radius: 1px;
   pointer-events: none;
 }
+.fps-slot-enchanted {
+  box-shadow: inset 0 0 8px rgba(170,0,255,0.6), 0 0 4px rgba(170,0,255,0.4);
+  animation: enchant-shimmer 2s infinite;
+}
+@keyframes enchant-shimmer {
+  0%,100% { box-shadow: inset 0 0 8px rgba(170,0,255,0.6), 0 0 4px rgba(170,0,255,0.4); }
+  50%      { box-shadow: inset 0 0 12px rgba(200,80,255,0.9), 0 0 8px rgba(200,80,255,0.6); }
+}
 
 /* Pointer lock splash — 3D world visible behind frosted overlay */
 .fps-lock-prompt {
@@ -1640,6 +1752,19 @@ const FPS_CSS = `
   width: 0%;
   transition: width 0.5s linear;
 }
+
+/* Enchanting table UI */
+.fps-enchant-option {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; margin-bottom: 6px;
+  background: #2a0a3a; border: 1px solid #6a2060;
+  border-radius: 4px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.fps-enchant-option:hover { background: #3a1050; border-color: #cc44ff; }
+.fps-enchant-option[data-disabled="1"] { cursor: not-allowed; pointer-events: none; }
+.fps-enchant-name { font-size: 11px; color: #cc88ff; }
+.fps-enchant-cost { font-size: 10px; color: #88ff44; }
 
 /* Level-up banner */
 .level-up-announce {

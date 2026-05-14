@@ -14,7 +14,10 @@ export type BlockId =
   | "iron_ore" | "coal_ore" | "iron_block" | "crafting_table" | "furnace"
   | "torch" | "chest" | "water"
   | "farmland" | "wheat_0" | "wheat_1" | "wheat_2" | "wheat_3"
-  | "bedrock" | "gravel" | "gold_ore" | "diamond_ore";
+  | "bedrock" | "gravel" | "gold_ore" | "diamond_ore"
+  | "snow" | "cactus"
+  | "bookshelf" | "enchanting_table"
+  | "bed";
 
 export interface BlockDef {
   id: BlockId;
