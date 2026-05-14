@@ -1289,9 +1289,9 @@ export class Game {
       this._lastLevel = lvl;
       this.ui.showLevelUp(lvl);
     }
-    if (lvl >= thresholds.length - 1) { this.ui.updateXP(1, 1); return; }
+    if (lvl >= thresholds.length - 1) { this.ui.updateXP(1, 1, lvl + 1); return; }
     const lo = thresholds[lvl], hi = thresholds[lvl + 1];
-    this.ui.updateXP(this.player.xp - lo, hi - lo);
+    this.ui.updateXP(this.player.xp - lo, hi - lo, lvl + 1);
   }
 
   private refreshHotbar(): void {

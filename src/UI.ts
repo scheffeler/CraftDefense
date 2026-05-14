@@ -123,6 +123,7 @@ export class UI {
   private heartEls: HTMLElement[] = [];
   private hungerEls: HTMLElement[] = [];
   private xpBarFill!: HTMLElement;
+  private xpLevelEl!: HTMLElement;
   private itemTooltip!: HTMLElement;
   private blockTooltip!: HTMLElement;
   private elWaveInfo!: HTMLElement;
@@ -191,9 +192,10 @@ export class UI {
     }
   }
 
-  updateXP(current: number, max: number): void {
+  updateXP(current: number, max: number, level?: number): void {
     const pct = max > 0 ? Math.min(1, current / max) * 100 : 0;
     this.xpBarFill.style.width = `${pct}%`;
+    if (level !== undefined && this.xpLevelEl) this.xpLevelEl.textContent = String(level);
   }
 
   updateHunger(current: number, _max: number): void {
@@ -507,6 +509,9 @@ export class UI {
     this.xpBarFill.style.width = "0%";
     track.appendChild(this.xpBarFill);
     this.container.appendChild(track);
+    this.xpLevelEl = div("fps-xp-level");
+    this.xpLevelEl.textContent = "1";
+    this.container.appendChild(this.xpLevelEl);
   }
 
   private buildDayClock(): void {
@@ -1078,6 +1083,29 @@ export class UI {
 
   private renderStackInSlot(el: HTMLElement, stack: ItemStack | null): void {
     this.renderIdInSlot(el, stack?.itemId ?? null, stack?.count);
+
+    // Durability bar — shown below the icon when item is damaged
+    let durBar = el.querySelector<HTMLElement>(".slot-dur-bar");
+    if (stack?.durability !== undefined && stack.itemId) {
+      const def = ITEMS[stack.itemId];
+      const maxDur = def?.durability ?? 1;
+      const pct = Math.max(0, Math.min(1, stack.durability / maxDur));
+      if (pct < 1) {
+        if (!durBar) {
+          durBar = document.createElement("div");
+          durBar.className = "slot-dur-bar";
+          el.appendChild(durBar);
+        }
+        const hue = Math.round(pct * 120); // red → yellow → green
+        durBar.style.width = `${Math.round(pct * 100)}%`;
+        durBar.style.background = `hsl(${hue},100%,50%)`;
+        durBar.style.display = "block";
+      } else if (durBar) {
+        durBar.style.display = "none";
+      }
+    } else if (durBar) {
+      durBar.style.display = "none";
+    }
   }
 
   private renderIdInSlot(el: HTMLElement, itemId: string | null, count?: number): void {
@@ -1270,6 +1298,14 @@ const FPS_CSS = `
   background: #80ff20;
   transition: width 0.3s;
 }
+.fps-xp-level {
+  position: absolute;
+  bottom: 72px; left: 50%; transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: #80ff20;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none; z-index: 15;
+}
 
 /* Block name tooltip — appears just below crosshair */
 .fps-block-tooltip {
@@ -1332,6 +1368,11 @@ const FPS_CSS = `
   position: absolute; bottom: 1px; right: 2px;
   font-size: 9px; font-weight: bold;
   color: #fff; text-shadow: 1px 1px 0 #000;
+}
+.slot-dur-bar {
+  position: absolute; bottom: 2px; left: 2px; right: 2px;
+  height: 2px; border-radius: 1px;
+  pointer-events: none;
 }
 
 /* Pointer lock splash — 3D world visible behind frosted overlay */
