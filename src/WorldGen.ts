@@ -32,6 +32,8 @@ type Biome = "forest" | "desert" | "taiga";
 function getBiome(x: number, z: number): Biome {
   if (inFortressBounds(x, z)) return "forest";
   if (z <= 10 || z >= WORLD_DEPTH - 11) return "forest";
+  // Forest buffer zone around the fortress
+  if (x >= WX1 - 5 && x <= WX2 + 5 && z >= WZ1 - 5 && z <= WZ2 + 5) return "forest";
   const bx = Math.floor(x / 22), bz = Math.floor(z / 22);
   const n1 = (hash(bx * 9871 + 3001, bz * 7649 + 2003) % 1000) / 1000;
   const fx = Math.floor(x / 11), fz = Math.floor(z / 11);
@@ -45,6 +47,11 @@ function getBiome(x: number, z: number): Biome {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+/** Positions of pre-generated dungeon chests for Game.ts loot seeding. */
+export const DUNGEON_CHEST_POSITIONS: Array<[number, number, number]> = [
+  [8,  3, 30], [55, 3, 25], [12, 3, 45], [50, 3, 48], [30, 3, 8],
+];
+
 export function generateWorld(world: VoxelWorld): void {
   generateTerrain(world);
   generateCaves(world);
@@ -53,6 +60,8 @@ export function generateWorld(world: VoxelWorld): void {
   generateTrees(world);
   generateCacti(world);
   generateVillages(world);
+  generateDesertTemples(world);
+  generateDungeons(world);
   generateSpawnMarkers(world);
   generateWaterFeatures(world);
   generateRuins(world);
@@ -549,6 +558,119 @@ function generateCaves(world: VoxelWorld): void {
       y += dy + ((hash(w * 100 + s, 31) % 100) / 100 - 0.5) * 0.25;
       z += dz + ((hash(w * 100 + s, 32) % 100) / 100 - 0.5) * 0.5;
       y = Math.max(1, Math.min(G - 1, y));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Desert temples
+// ---------------------------------------------------------------------------
+
+function generateDesertTemples(world: VoxelWorld): void {
+  const temples: [number, number][] = [[14, 15], [48, 48]];
+  for (const [cx, cz] of temples) {
+    if (inFortressBounds(cx, cz)) continue;
+    if (getBiome(cx, cz) !== "desert") {
+      // Try nearby if not in desert
+      const alt: [number, number][] = [[cx + 6, cz], [cx, cz + 6], [cx - 6, cz]];
+      let placed = false;
+      for (const [ax, az] of alt) {
+        if (!inFortressBounds(ax, az) && getBiome(ax, az) === "desert" && az > 10 && az < WORLD_DEPTH - 11) {
+          buildDesertTemple(world, ax, az);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) continue;
+    } else {
+      buildDesertTemple(world, cx, cz);
+    }
+  }
+}
+
+function buildDesertTemple(world: VoxelWorld, cx: number, cz: number): void {
+  if (cz <= 10 || cz >= WORLD_DEPTH - 11) return;
+  const surfY = findSurfaceY(world, cx, cz);
+  const BASE = 9;
+
+  // Stepped pyramid: 5 layers
+  for (let layer = 0; layer < 5; layer++) {
+    const half = Math.floor(BASE / 2) - layer;
+    const y = surfY + layer;
+    for (let dx = -half; dx <= half; dx++) {
+      for (let dz = -half; dz <= half; dz++) {
+        const bx = cx + dx, bz = cz + dz;
+        if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+        world.setBlock(bx, y, bz, "sand");
+      }
+    }
+  }
+
+  // Hollow interior at base layer
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      const bx = cx + dx, bz = cz + dz;
+      if (bx < 1 || bz < 1 || bx >= WORLD_WIDTH - 1 || bz >= WORLD_DEPTH - 1) continue;
+      for (let y = surfY + 1; y <= surfY + 2; y++) world.setBlock(bx, y, bz, "air");
+    }
+  }
+
+  // Entry stairway on south face
+  for (let step = 0; step <= 3; step++) {
+    const bz = cz + 4 + step;
+    if (bz < 1 || bz >= WORLD_DEPTH - 1) continue;
+    world.setBlock(cx, surfY + step, bz, "cobblestone");
+  }
+  // Entry door gap
+  world.setBlock(cx, surfY + 1, cz + 4, "air");
+  world.setBlock(cx, surfY + 2, cz + 4, "air");
+
+  // Interior chest with treasure
+  world.setBlock(cx, surfY + 1, cz, "chest");
+  // Torches inside
+  world.setBlock(cx - 2, surfY + 2, cz - 2, "torch");
+  world.setBlock(cx + 2, surfY + 2, cz - 2, "torch");
+}
+
+// ---------------------------------------------------------------------------
+// Dungeons (underground cobblestone rooms with chests)
+// ---------------------------------------------------------------------------
+
+function generateDungeons(world: VoxelWorld): void {
+  for (const [dx, roomY, dz] of DUNGEON_CHEST_POSITIONS) {
+    if (dz <= 10 || dz >= WORLD_DEPTH - 11) continue;
+    const x0 = dx - 2, z0 = dz - 2;
+    const W = 5, D = 5, H = 4;
+
+    // Cobblestone floor and ceiling
+    for (let x = x0 - 1; x <= x0 + W; x++) {
+      for (let z = z0 - 1; z <= z0 + D; z++) {
+        if (x < 1 || z < 1 || x >= WORLD_WIDTH - 1 || z >= WORLD_DEPTH - 1) continue;
+        world.setBlock(x, roomY - 1, z, "cobblestone");
+        world.setBlock(x, roomY + H, z, "cobblestone");
+      }
+    }
+    // Cobblestone walls + clear interior
+    for (let x = x0; x < x0 + W; x++) {
+      for (let y = roomY; y < roomY + H; y++) {
+        for (let z = z0; z < z0 + D; z++) {
+          if (x < 1 || z < 1 || x >= WORLD_WIDTH - 1 || z >= WORLD_DEPTH - 1) continue;
+          const onWall = x === x0 || x === x0 + W - 1 || z === z0 || z === z0 + D - 1;
+          world.setBlock(x, y, z, onWall ? "cobblestone" : "air");
+        }
+      }
+    }
+    // Torches
+    world.setBlock(x0 + 1, roomY + 2, z0 + 1, "torch");
+    world.setBlock(x0 + 3, roomY + 2, z0 + 1, "torch");
+    world.setBlock(x0 + 1, roomY + 2, z0 + 3, "torch");
+    world.setBlock(x0 + 3, roomY + 2, z0 + 3, "torch");
+    // Chest (center)
+    world.setBlock(dx, roomY, dz, "chest");
+    // Entry passage upward (2×1 shaft from room to surface)
+    for (let y = roomY + H; y <= G + 1; y++) {
+      if (dx < 1 || dx >= WORLD_WIDTH - 1 || dz < 1 || dz >= WORLD_DEPTH - 1) continue;
+      world.setBlock(dx, y, dz, "air");
     }
   }
 }

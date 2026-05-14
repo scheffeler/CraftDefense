@@ -16,7 +16,7 @@ import { ParticleSystem } from "./Particles";
 import { BLOCK_BEHAVIORS } from "./config/blocks";
 import { BLOCK_DEFS } from "./Map";
 import { ITEMS } from "./config/items";
-import { getSpawnPositions } from "./WorldGen";
+import { getSpawnPositions, DUNGEON_CHEST_POSITIONS } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
@@ -205,6 +205,24 @@ export class Game {
       null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, null, null, null,
     ]);
+
+    // Dungeon chests — varied loot per dungeon
+    const dungeonLoots: Array<Array<{itemId:string;count:number}|null>> = [
+      [{ itemId:"iron_pickaxe", count:1 }, { itemId:"iron_ingot", count:4 }, { itemId:"coal_ore", count:6 }, { itemId:"bread", count:3 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      [{ itemId:"bow",          count:1 }, { itemId:"arrow_item", count:16 }, { itemId:"cooked_beef", count:4 }, { itemId:"flint", count:4 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+    ];
+    for (let i = 0; i < DUNGEON_CHEST_POSITIONS.length; i++) {
+      const [cx, cy, cz] = DUNGEON_CHEST_POSITIONS[i];
+      this.chestStorage.set(`${cx},${cy},${cz}`, dungeonLoots[i % dungeonLoots.length]);
+    }
 
     this.ui    = new UI(this.container);
     this.audio = new AudioManager();
