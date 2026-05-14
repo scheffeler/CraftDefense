@@ -4,7 +4,7 @@
 
 export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win";
 
-export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper";
+export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton";
 export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat
 export type ProjectileType = "arrow" | "cannonball" | "icebolt";
 
@@ -85,6 +85,8 @@ export interface EnemyState {
   priming?: boolean;
   primeTimer?: number;
   flashTimer?: number;
+  // Skeleton-specific
+  shootCooldown?: number;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

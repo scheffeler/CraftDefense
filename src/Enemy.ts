@@ -15,13 +15,26 @@ const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
 // All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
 const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
   "goblin", "orc", "troll", "goblin_miner",
-  "zombie", "spider", "golem", "creeper",
+  "zombie", "spider", "golem", "creeper", "skeleton",
 ]);
+
+interface SkeletonArrow {
+  mesh: THREE.Mesh;
+  vel: THREE.Vector3;
+  damage: number;
+  life: number;
+  active: boolean;
+}
+
+const SKELETON_ARROW_POOL = 30;
+const SKELETON_SHOOT_RANGE = 7.5;
+const SKELETON_SHOOT_INTERVAL = 2.2;
 
 export class EnemyManager {
   private readonly enemies   = new Map<number, EnemyState>();
   private readonly meshes    = new Map<number, THREE.Group>();
   private readonly healthBars = new Map<number, { bar: THREE.Mesh; bg: THREE.Mesh }>();
+  private readonly skeletonArrows: SkeletonArrow[] = [];
   private idCounter = 0;
 
   private flowField: FlowField | null = null;
@@ -31,19 +44,31 @@ export class EnemyManager {
   onEnemyDied:        (state: EnemyState) => void = () => {};
   onWallBroken: (wx: number, wz: number) => void = () => {};
   onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
+  onSkeletonArrowHit: (damage: number) => void = () => {};
 
   private _playerX = 32;
   private _playerZ = 32;
+  private _playerY = 8;
 
-  setPlayerPosition(x: number, z: number): void {
+  setPlayerPosition(x: number, z: number, y = 8): void {
     this._playerX = x;
     this._playerZ = z;
+    this._playerY = y;
   }
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly camera: THREE.Camera,
-  ) {}
+  ) {
+    const geo = new THREE.CylinderGeometry(0.03, 0.03, 0.45, 4);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x8b6914 });
+    for (let i = 0; i < SKELETON_ARROW_POOL; i++) {
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      scene.add(mesh);
+      this.skeletonArrows.push({ mesh, vel: new THREE.Vector3(), damage: 0, life: 0, active: false });
+    }
+  }
 
   setFlowField(ff: FlowField): void { this.flowField = ff; }
   setWorld(w: VoxelWorld):     void { this.world = w; }
@@ -127,6 +152,36 @@ export class EnemyManager {
       }
 
       this.updateHealthBar(id, state, group.position);
+    }
+
+    // Update skeleton arrows
+    const GRAVITY = 18;
+    const ARROW_KILL_DIST = 0.7;
+    for (const arrow of this.skeletonArrows) {
+      if (!arrow.active) continue;
+      arrow.life -= dt;
+      if (arrow.life <= 0) {
+        arrow.active = false;
+        arrow.mesh.visible = false;
+        continue;
+      }
+      arrow.vel.y -= GRAVITY * dt;
+      arrow.mesh.position.addScaledVector(arrow.vel, dt);
+      // Orient arrow along velocity
+      const len = arrow.vel.length();
+      if (len > 0.01) {
+        arrow.mesh.lookAt(arrow.mesh.position.clone().add(arrow.vel));
+        arrow.mesh.rotation.x += Math.PI / 2;
+      }
+      // Check hit against player
+      const dx = arrow.mesh.position.x - this._playerX;
+      const dy = arrow.mesh.position.y - this._playerY;
+      const dz = arrow.mesh.position.z - this._playerZ;
+      if (dx * dx + dy * dy + dz * dz < ARROW_KILL_DIST * ARROW_KILL_DIST) {
+        this.onSkeletonArrowHit(arrow.damage);
+        arrow.active = false;
+        arrow.mesh.visible = false;
+      }
     }
   }
 
@@ -291,6 +346,32 @@ export class EnemyManager {
       }
     }
 
+    // Skeleton ranged attack
+    if (state.config.type === "skeleton") {
+      const dx = this._playerX - pos.x;
+      const dz = this._playerZ - pos.z;
+      const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+
+      if (distToPlayer < SKELETON_SHOOT_RANGE) {
+        // Face the player
+        group.rotation.y = Math.atan2(dx, dz);
+
+        // Tick shoot cooldown
+        state.shootCooldown = (state.shootCooldown ?? 0) - dt;
+        if (state.shootCooldown <= 0) {
+          state.shootCooldown = SKELETON_SHOOT_INTERVAL;
+          this.fireSkeletonArrow(pos, state.config.damage);
+        }
+        // Move slower when in shooting range
+        const moveSpeed = state.speed * 0.3;
+        pos.x += flow.dx * moveSpeed * dt;
+        pos.z += flow.dz * moveSpeed * dt;
+        state.movePhase += dt * moveSpeed * 4;
+        this.animateLegs(id, state.movePhase);
+        return;
+      }
+    }
+
     // Move in flow direction
     if (flow.dx !== 0 || flow.dz !== 0) {
       pos.x += flow.dx * state.speed * dt;
@@ -305,6 +386,29 @@ export class EnemyManager {
     this.animateLegs(id, state.movePhase);
   }
 
+  private fireSkeletonArrow(from: THREE.Vector3, damage: number): void {
+    const arrow = this.skeletonArrows.find(a => !a.active);
+    if (!arrow) return;
+
+    const tx = this._playerX, ty = this._playerY + 0.8, tz = this._playerZ;
+    const dx = tx - from.x, dy = ty - from.y, dz = tz - from.z;
+    const horiz = Math.sqrt(dx * dx + dz * dz);
+    const speed = 10;
+
+    arrow.active = true;
+    arrow.damage = damage;
+    arrow.life = 4;
+    arrow.mesh.position.set(from.x, from.y + 1.1, from.z);
+    arrow.mesh.visible = true;
+
+    const spd3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    arrow.vel.set(
+      dx / spd3d * speed,
+      (dy + horiz * 0.15) / spd3d * speed, // slight upward arc
+      dz / spd3d * speed,
+    );
+  }
+
   // ─── Mesh building ─────────────────────────────────────────────────────────
 
   private buildMesh(type: EnemyTypeName, scale: number): THREE.Group {
@@ -315,6 +419,8 @@ export class EnemyManager {
       this.buildSpiderMesh(group);
     } else if (type === "creeper") {
       this.buildCreeperMesh(group);
+    } else if (type === "skeleton") {
+      this.buildSkeletonMesh(group);
     } else {
       this.buildHumanoidMesh(group, type);
     }
@@ -398,6 +504,71 @@ export class EnemyManager {
       leg.position.set(lx, 0.14, lz);
       leg.castShadow = true;
       group.add(leg);
+    }
+  }
+
+  private buildSkeletonMesh(group: THREE.Group): void {
+    const boneMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+    const darkMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
+
+    // Torso (narrower than zombie — bones showing)
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.55, 0.22), boneMat);
+    torso.position.y = 0.72;
+    torso.castShadow = true;
+    group.add(torso);
+
+    // Head
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.38, 0.38), boneMat);
+    head.position.y = 1.24;
+    head.castShadow = true;
+    group.add(head);
+
+    // Skull eye sockets (dark)
+    const eyeMat = new THREE.MeshLambertMaterial({ color: 0x000000, emissive: 0x220000, emissiveIntensity: 0.8 });
+    for (const ex of [-0.09, 0.09]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.01), eyeMat);
+      eye.position.set(ex, 1.28, 0.2);
+      group.add(eye);
+    }
+    // Nose socket
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.01), eyeMat);
+    nose.position.set(0, 1.18, 0.2);
+    group.add(nose);
+
+    // Thin arms/legs
+    for (const [ax, i] of [[-0.26, 0], [0.26, 1]] as [number, number][]) {
+      const armPivot = new THREE.Object3D();
+      armPivot.position.set(ax, 0.88, 0);
+      armPivot.name = `armpivot_${i}`;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), darkMat);
+      arm.position.y = -0.20;
+      armPivot.add(arm);
+      group.add(armPivot);
+    }
+
+    // Bow in right hand
+    const bowMat = new THREE.MeshLambertMaterial({ color: 0x8b6914 });
+    const bowBody = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.04), bowMat);
+    const bowTop  = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.12), bowMat);
+    const bowBot  = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.12), bowMat);
+    bowTop.position.y = 0.21;
+    bowBot.position.y = -0.21;
+    const bow = new THREE.Group();
+    bow.add(bowBody); bow.add(bowTop); bow.add(bowBot);
+    bow.position.set(0.30, 0.82, 0.18);
+    bow.rotation.z = 0.15;
+    group.add(bow);
+
+    // Thin legs
+    for (const [lx, i] of [[-0.1, 0], [0.1, 1]] as [number, number][]) {
+      const legPivot = new THREE.Object3D();
+      legPivot.position.set(lx, 0.48, 0);
+      legPivot.name = `legpivot_${i}`;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), darkMat);
+      leg.position.y = -0.22;
+      leg.castShadow = true;
+      legPivot.add(leg);
+      group.add(legPivot);
     }
   }
 

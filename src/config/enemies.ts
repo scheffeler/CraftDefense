@@ -119,6 +119,22 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
       { itemId: "stick",      chance: 0.5, count: 4 },
     ],
   },
+  skeleton: {
+    type: "skeleton",
+    name: "Skeleton",
+    maxHealth: 30,
+    speed: 2.0,
+    reward: 15,
+    damage: 2,   // arrow damage
+    color: 0xdddddd,
+    headColor: 0xeeeeee,
+    scale: 0.95,
+    xpReward: 10,
+    drops: [
+      { itemId: "arrow_item", chance: 0.6, count: 4 },
+      { itemId: "flint",      chance: 0.3, count: 1 },
+    ],
+  },
   creeper: {
     type: "creeper",
     name: "Creeper",

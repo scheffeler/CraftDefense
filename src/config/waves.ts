@@ -13,10 +13,11 @@ export const WAVE_CONFIGS: WaveConfig[] = [
     { type: "goblin", count: 5,  spawnInterval: 2.5, gate: "south" },
   ]},
 
-  // Wave 3 — Orcs join the assault
+  // Wave 3 — Orcs and skeletons join the assault
   { wave: 3, bonusGold: 35, groups: [
-    { type: "goblin", count: 10, spawnInterval: 1.8, gate: "north" },
-    { type: "orc",    count: 3,  spawnInterval: 3.0, gate: "north" },
+    { type: "goblin",   count: 10, spawnInterval: 1.8, gate: "north" },
+    { type: "orc",      count: 3,  spawnInterval: 3.0, gate: "north" },
+    { type: "skeleton", count: 2,  spawnInterval: 5.0, gate: "north" },
   ]},
 
   // Wave 4 — Mixed orc and goblin assault, both gates

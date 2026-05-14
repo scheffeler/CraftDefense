@@ -501,6 +501,13 @@ export class Game {
       this.audio.play("block_break", 0.4);
     };
 
+    this.enemies.onSkeletonArrowHit = (damage) => {
+      this.player.damage(damage);
+      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.ui.showDamageVignette();
+      this.audio.play("player_hurt", 0.5);
+    };
+
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
       this.audio.play("explosion", 0.9);
       this.scene.shake(0.18, 0.6);
@@ -1003,7 +1010,7 @@ export class Game {
 
     // Passive mobs
     this.passiveMobs.update(dt);
-    this.enemies.setPlayerPosition(this.player.position.x, this.player.position.z);
+    this.enemies.setPlayerPosition(this.player.position.x, this.player.position.z, this.player.position.y);
 
     // Weather
     this.weather.update(dt, this.scene.camera);
@@ -1271,7 +1278,7 @@ export class Game {
   }
 
   private spawnNightMob(): void {
-    const types: EnemyTypeName[] = ["zombie", "spider", "goblin", "creeper"];
+    const types: EnemyTypeName[] = ["zombie", "spider", "goblin", "creeper", "skeleton"];
     const type  = types[Math.floor(Math.random() * types.length)];
     const angle = Math.random() * Math.PI * 2;
     const r     = 12 + Math.random() * 8;
