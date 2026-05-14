@@ -20,6 +20,7 @@ import { getSpawnPositions } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
+import { PassiveMobManager } from "./PassiveMob";
 
 const SURFACE_STEP_SOUND = {
   grass:       "step_grass",
@@ -34,11 +35,14 @@ const SURFACE_STEP_SOUND = {
 } as const;
 
 const SMELT_RECIPES: Record<string, string> = {
-  iron_ore:    "iron_ingot",
-  gold_ore:    "gold_ingot",
-  diamond_ore: "diamond",
-  sand:        "glass",
-  cobblestone: "stone",
+  iron_ore:      "iron_ingot",
+  gold_ore:      "gold_ingot",
+  diamond_ore:   "diamond",
+  sand:          "glass",
+  cobblestone:   "stone",
+  raw_beef:      "cooked_beef",
+  raw_porkchop:  "cooked_porkchop",
+  raw_chicken:   "cooked_chicken",
 };
 const SMELT_TIME = 10; // seconds per item
 const FUEL_TIMES: Record<string, number> = {
@@ -99,6 +103,7 @@ export class Game {
   }> = [];
 
   private particles!:        ParticleSystem;
+  private passiveMobs!:      PassiveMobManager;
   private scene!:            SceneManager;
   private gameMap!:          GameMap;
   private flowField!:        FlowField;
@@ -156,6 +161,17 @@ export class Game {
     );
 
     this.particles = new ParticleSystem(this.scene.scene);
+    this.passiveMobs = new PassiveMobManager(this.scene.scene);
+    this.passiveMobs.onMobDied = (x, y, z, drops, xp) => {
+      for (const d of drops) {
+        for (let i = 0; i < d.count; i++) {
+          this.spawnItemEntity(x + (Math.random() - 0.5) * 0.6, y, z + (Math.random() - 0.5) * 0.6, d.itemId);
+        }
+      }
+      this.player.addXP(xp);
+      this.refreshXPBar();
+      this.audio.play("death", 0.35);
+    };
 
     // Pre-populate world chests with loot
     const craftShackChest = `38,${7},30`;
@@ -521,9 +537,21 @@ export class Game {
       if (mode === "freeplay") {
         this.ui.setObjective("Free Play — Mine, Build, Explore!");
         this.ui.updateWaveInfo(0, 10, 0);
+        // Spawn passive mobs scattered across the world
+        const mobTypes: Array<"cow" | "sheep" | "pig" | "chicken"> = ["cow", "sheep", "pig", "chicken"];
+        for (let i = 0; i < 18; i++) {
+          const type = mobTypes[Math.floor(Math.random() * mobTypes.length)];
+          let x: number, z: number;
+          do {
+            x = 4 + Math.random() * 56;
+            z = 4 + Math.random() * 56;
+          } while (x >= 16 && x <= 47 && z >= 16 && z <= 47); // avoid fortress
+          this.passiveMobs.spawn(type, x, z);
+        }
       } else {
         this.ui.setObjective(`Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`);
         this.ui.updateWaveInfo(0, this.waves.totalWaves, 0);
+        this.passiveMobs.reset();
       }
     };
 
@@ -902,6 +930,9 @@ export class Game {
       }
     }
 
+    // Passive mobs
+    this.passiveMobs.update(dt);
+
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.ui.updateDayClock(this.scene.dayTime);
@@ -1179,13 +1210,20 @@ export class Game {
 
     this.audio.play("swing");
     this.scene.swingArm();
+    let hitSomething = false;
     for (const state of this.enemies.getAliveEnemies()) {
       const pos = this.enemies.getEnemyPosition(state.id);
       if (pos && pos.distanceTo(result.center) <= result.radius) {
         this.enemies.damage(state.id, damage);
         this.audio.play("hit", 0.4);
         this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
+        hitSomething = true;
       }
+    }
+    // Also check passive mobs (in free play)
+    if (!hitSomething && this.mode === "freeplay") {
+      const hit = this.passiveMobs.damage(result.center.x, result.center.z, damage, result.radius);
+      if (hit) this.audio.play("hit", 0.35);
     }
   }
 

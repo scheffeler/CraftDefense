@@ -56,8 +56,15 @@ export const ITEMS: Record<string, ItemDef> = {
   diamond:      { id:"diamond",      name:"Diamond",      category:"material", stackSize:64, color:0x55ffff },
 
   // --- Food ---
-  apple: { id:"apple", name:"Apple", category:"food", stackSize:64, color:0xdd2222, foodPoints:4 },
-  bread: { id:"bread", name:"Bread", category:"food", stackSize:64, color:0xc8a060, foodPoints:5 },
+  apple:           { id:"apple",           name:"Apple",           category:"food", stackSize:64, color:0xdd2222, foodPoints:4 },
+  bread:           { id:"bread",           name:"Bread",           category:"food", stackSize:64, color:0xc8a060, foodPoints:5 },
+  raw_beef:        { id:"raw_beef",        name:"Raw Beef",        category:"food", stackSize:64, color:0xcc5533, foodPoints:3 },
+  cooked_beef:     { id:"cooked_beef",     name:"Cooked Beef",     category:"food", stackSize:64, color:0x8b3010, foodPoints:8 },
+  raw_porkchop:    { id:"raw_porkchop",    name:"Raw Porkchop",    category:"food", stackSize:64, color:0xff9999, foodPoints:3 },
+  cooked_porkchop: { id:"cooked_porkchop", name:"Cooked Porkchop", category:"food", stackSize:64, color:0xcc6644, foodPoints:8 },
+  raw_chicken:     { id:"raw_chicken",     name:"Raw Chicken",     category:"food", stackSize:64, color:0xf0d0a0, foodPoints:2 },
+  cooked_chicken:  { id:"cooked_chicken",  name:"Cooked Chicken",  category:"food", stackSize:64, color:0xdd8844, foodPoints:6 },
+  wool:            { id:"wool",            name:"Wool",            category:"material", stackSize:64, color:0xeeeeee },
 
   // --- Farming ---
   wheat_seeds: { id:"wheat_seeds", name:"Wheat Seeds", category:"material", stackSize:64, color:0x8b8b3a },

@@ -97,6 +97,7 @@ export class SceneManager {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.autoClear = false;
+    this.renderer.domElement.id = "game-canvas";
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();

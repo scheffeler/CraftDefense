@@ -25,9 +25,17 @@ await page.goto(`http://localhost:5175/?_t=${ts}`, { waitUntil: 'load' });
 await page.waitForSelector('canvas', { timeout: 10000 });
 await page.waitForTimeout(3500);
 
+// Tag the Three.js canvas if it doesn't already have an id
+await page.evaluate(() => {
+  const canvases = document.querySelectorAll('canvas');
+  // Three.js canvas is always the first canvas in the container
+  if (canvases.length > 0 && !canvases[0].id) canvases[0].id = 'game-canvas';
+});
+
+// Only scale the Three.js renderer canvas — leave HUD canvases alone
 await page.addStyleTag({ content: `
   #app { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
-  canvas { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
+  #game-canvas { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
 ` });
 await page.evaluate(() => window.dispatchEvent(new Event('resize')));
 await page.waitForTimeout(400);
@@ -44,7 +52,6 @@ await page.evaluate(() => {
   const game = window.__game;
   if (!game || !game.scene) return;
   const cam = game.scene.camera;
-  cam.position.copy = () => cam.position; // freeze position
   cam.position.set(32, 8.62, 36);
   cam.lookAt(32, 8.0, 18);
 });
@@ -57,9 +64,11 @@ await page.evaluate(() => {
   document.querySelectorAll('.fps-lock-prompt').forEach(el => {
     el.style.display = '';
   });
-  // unfreeze camera
   const game = window.__game;
-  if (game?.scene?.camera) delete game.scene.camera.position.copy;
+  if (game?.scene?.camera) {
+    game.scene.camera.position.set(18, 28, 18);
+    game.scene.camera.lookAt(32, 7, 32);
+  }
 });
 await page.waitForTimeout(200);
 await page.screenshot({ path: 'screenshots/title.png' });
