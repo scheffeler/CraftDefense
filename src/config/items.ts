@@ -88,6 +88,17 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_pickaxe: { id:"iron_pickaxe", name:"Iron Pickaxe", category:"tool",   stackSize:1, color:0xbbbbbb, toolCategory:"pickaxe", tier:"iron",  speedMult:6.0, durability:250 },
   iron_axe:     { id:"iron_axe",     name:"Iron Axe",     category:"tool",   stackSize:1, color:0xbbbbbb, toolCategory:"axe",     tier:"iron",  speedMult:6.0, durability:250 },
 
+  // --- Diamond tools & weapons ---
+  diamond_sword:   { id:"diamond_sword",   name:"Diamond Sword",   category:"weapon", stackSize:1, color:0x55ffff, damage:10, durability:1561 },
+  diamond_pickaxe: { id:"diamond_pickaxe", name:"Diamond Pickaxe", category:"tool",   stackSize:1, color:0x55ffff, toolCategory:"pickaxe", tier:"diamond", speedMult:8.0, durability:1561 },
+  diamond_axe:     { id:"diamond_axe",     name:"Diamond Axe",     category:"tool",   stackSize:1, color:0x55ffff, toolCategory:"axe",     tier:"diamond", speedMult:8.0, durability:1561 },
+
+  // --- Diamond armor ---
+  diamond_helmet:     { id:"diamond_helmet",     name:"Diamond Helmet",     category:"armor", stackSize:1, color:0x55ffff, armorValue:3,  armorSlot:"head"  },
+  diamond_chestplate: { id:"diamond_chestplate", name:"Diamond Chestplate", category:"armor", stackSize:1, color:0x55ffff, armorValue:8,  armorSlot:"chest" },
+  diamond_leggings:   { id:"diamond_leggings",   name:"Diamond Leggings",   category:"armor", stackSize:1, color:0x55ffff, armorValue:6,  armorSlot:"legs"  },
+  diamond_boots:      { id:"diamond_boots",      name:"Diamond Boots",      category:"armor", stackSize:1, color:0x55ffff, armorValue:3,  armorSlot:"feet"  },
+
   // --- Bow ---
   bow: { id:"bow", name:"Bow", category:"weapon", stackSize:1, color:0x8b6914, damage:8, durability:384 },
 

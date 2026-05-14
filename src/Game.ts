@@ -501,6 +501,10 @@ export class Game {
       this.audio.play("block_break", 0.4);
     };
 
+    this.enemies.onCreeperPrime = () => {
+      this.audio.play("creeper_hiss", 0.75);
+    };
+
     this.enemies.onSkeletonArrowHit = (damage) => {
       this.player.damage(damage);
       this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);

@@ -44,6 +44,7 @@ export class EnemyManager {
   onEnemyDied:        (state: EnemyState) => void = () => {};
   onWallBroken: (wx: number, wz: number) => void = () => {};
   onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
+  onCreeperPrime: () => void = () => {};
   onSkeletonArrowHit: (damage: number) => void = () => {};
 
   private _playerX = 32;
@@ -306,6 +307,7 @@ export class EnemyManager {
           state.priming = true;
           state.primeTimer = 0;
           state.flashTimer = 0;
+          this.onCreeperPrime();
         }
         state.primeTimer = (state.primeTimer ?? 0) + dt;
         state.flashTimer = (state.flashTimer ?? 0) + dt;

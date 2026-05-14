@@ -9,7 +9,7 @@ type SoundName =
   | "block_break" | "block_place" | "pickup"
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
-  | "splash" | "thunder";
+  | "splash" | "thunder" | "creeper_hiss";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -390,6 +390,24 @@ export class AudioManager {
         noiseBurst(0.08, 80, 0.03);
         noiseBurst(1.6, 55, 0.8);
         tone(40, 0.9, "sawtooth", 0.6);
+        break;
+      }
+
+      case "creeper_hiss": {
+        // Rising white-noise hiss (s s s s)
+        const hissDur = 1.6;
+        const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * hissDur), ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (i / d.length);
+        const filt = ctx.createBiquadFilter();
+        filt.type = "highpass"; filt.frequency.value = 2000;
+        const src = ctx.createBufferSource();
+        const hissGain = ctx.createGain();
+        hissGain.gain.setValueAtTime(0, ctx.currentTime);
+        hissGain.gain.linearRampToValueAtTime(vol * 0.6, ctx.currentTime + hissDur * 0.7);
+        hissGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + hissDur);
+        src.buffer = buf; src.connect(filt); filt.connect(hissGain); hissGain.connect(dest);
+        src.start(); src.stop(ctx.currentTime + hissDur);
         break;
       }
     }

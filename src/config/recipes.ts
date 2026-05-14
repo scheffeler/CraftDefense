@@ -179,6 +179,71 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "iron_boots", count: 1 },
   },
 
+  // --- Diamond tools & weapons ---
+  {
+    id: "diamond_pickaxe",
+    pattern: [
+      [r("diamond"), r("diamond"), r("diamond")],
+      [null,         r("stick"),   null        ],
+      [null,         r("stick"),   null        ],
+    ],
+    result: { itemId: "diamond_pickaxe", count: 1 },
+  },
+  {
+    id: "diamond_sword",
+    pattern: [
+      [r("diamond")],
+      [r("diamond")],
+      [r("stick")  ],
+    ],
+    result: { itemId: "diamond_sword", count: 1 },
+  },
+  {
+    id: "diamond_axe",
+    pattern: [
+      [r("diamond"), r("diamond")],
+      [r("diamond"), r("stick")  ],
+      [null,         r("stick")  ],
+    ],
+    result: { itemId: "diamond_axe", count: 1 },
+  },
+
+  // --- Diamond armor ---
+  {
+    id: "diamond_helmet",
+    pattern: [
+      [r("diamond"), r("diamond"), r("diamond")],
+      [r("diamond"), null,         r("diamond")],
+    ],
+    result: { itemId: "diamond_helmet", count: 1 },
+  },
+  {
+    id: "diamond_chestplate",
+    pattern: [
+      [r("diamond"), null,         r("diamond")],
+      [r("diamond"), r("diamond"), r("diamond")],
+      [r("diamond"), r("diamond"), r("diamond")],
+    ],
+    result: { itemId: "diamond_chestplate", count: 1 },
+  },
+  {
+    id: "diamond_leggings",
+    pattern: [
+      [r("diamond"), r("diamond"), r("diamond")],
+      [r("diamond"), null,         r("diamond")],
+      [r("diamond"), null,         r("diamond")],
+    ],
+    result: { itemId: "diamond_leggings", count: 1 },
+  },
+  {
+    id: "diamond_boots",
+    pattern: [
+      [r("diamond"), null,         r("diamond")],
+      [r("diamond"), null,         r("diamond")],
+    ],
+    result: { itemId: "diamond_boots", count: 1 },
+  },
+
   // --- Bow ---
   {
     id: "bow",
