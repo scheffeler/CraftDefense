@@ -95,6 +95,9 @@ export class Game {
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
 
+  // Gun fire cooldowns
+  private pistolCooldown = 0;
+
   // Achievement tracking
   private readonly _achievements = new Set<string>();
 
@@ -201,7 +204,8 @@ export class Game {
       { itemId: "apple",         count: 6 },
       { itemId: "arrow_item",    count: 12 },
       { itemId: "cobblestone",   count: 32 },
-      null, null, null, null, null,
+      { itemId: "gunpowder",     count: 4 },
+      null, null, null, null,
       null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, null, null, null,
     ]);
@@ -212,7 +216,7 @@ export class Game {
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"bow",          count:1 }, { itemId:"arrow_item", count:16 }, { itemId:"cooked_beef", count:4 }, { itemId:"flint", count:4 },
+      [{ itemId:"pistol",        count:1 }, { itemId:"bullet", count:24 }, { itemId:"gunpowder", count:6 }, { itemId:"iron_ingot", count:4 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
@@ -322,9 +326,14 @@ export class Game {
       this.ui.showRecipeBook(nowOpen);
     };
 
-    // Left click — melee attack (mining is handled by isLeftMouseDown in update)
+    // Left click — melee attack or gun fire (mining handled by isLeftMouseDown in update)
     this.input.onLeftClick = () => {
       if (this.ui.isInventoryOpen()) return;
+      const activeStack = this.inventory.getActiveItem();
+      if (activeStack?.itemId === "pistol") {
+        this.tryPistolShot();
+        return;
+      }
       if (!this.blockInteraction.getTargetBlock()) this.tryMeleeAttack();
     };
 
@@ -958,6 +967,9 @@ export class Game {
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
+    // Decrement gun cooldowns
+    this.pistolCooldown = Math.max(0, this.pistolCooldown - dt);
+
     // Player movement + bow charge accumulation
     const input = this.input.getMovementInput();
     this.player.update(dt, input);
@@ -1472,6 +1484,64 @@ export class Game {
     }
   }
 
+  private tryPistolShot(): void {
+    if (this.phase !== "playing" && this.mode !== "freeplay") return;
+    if (this.pistolCooldown > 0) return;
+
+    const stack   = this.inventory.getActiveItem();
+    const itemDef = stack ? ITEMS[stack.itemId] : null;
+    if (!itemDef || itemDef.id !== "pistol") return;
+
+    const ammoId = itemDef.ammoId ?? "bullet";
+    if (!this.inventory.hasItem(ammoId, 1)) {
+      this.audio.play("ui_click", 0.3);
+      this.pistolCooldown = 0.5;
+      return;
+    }
+
+    this.pistolCooldown = itemDef.fireRate ?? 0.35;
+
+    // Hitscan: find closest enemy on the look ray
+    const origin  = this.player.getCameraPosition();
+    const dir     = this.player.getLookDirection();
+    const maxRange = itemDef.range ?? 60;
+    const hitRadius = 0.85;
+
+    let closestId = -1;
+    let closestT  = maxRange;
+
+    for (const state of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(state.id);
+      if (!pos) continue;
+      const delta = pos.clone().sub(origin);
+      const t = delta.dot(dir);
+      if (t <= 0 || t > maxRange) continue;
+      const lateral = delta.clone().sub(dir.clone().multiplyScalar(t)).length();
+      if (lateral < hitRadius && t < closestT) {
+        closestT  = t;
+        closestId = state.id;
+      }
+    }
+
+    const damage = (itemDef.damage ?? 12) + this.getEnchantDamageBonus(stack);
+
+    if (closestId >= 0) {
+      this.enemies.damage(closestId, damage);
+      const pos = this.enemies.getEnemyPosition(closestId);
+      if (pos) {
+        this.audio.play("hit", 0.45);
+        this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
+        this.particles.spawnBlockBreak(pos.x, pos.y + 1, pos.z, 0xff4444);
+      }
+    }
+
+    this.inventory.removeItem(ammoId, 1);
+    this.audio.play("pistol_shot", 0.85);
+    this.scene.shake(0.05, 0.18);
+    this.scene.swingArm();
+    this.refreshHotbar();
+  }
+
   private unlockAchievement(id: string, title: string, desc: string): void {
     if (this._achievements.has(id)) return;
     this._achievements.add(id);
@@ -1543,6 +1613,15 @@ export class Game {
     const active = this.inventory.getActiveItem();
     this.scene.updateArmItem(active?.itemId ?? null);
     this.ui.updateItemTooltip(active?.itemId ?? null, active?.durability);
+
+    // Ammo counter for guns
+    const itemDef = active ? ITEMS[active.itemId] : null;
+    if (itemDef?.ammoId) {
+      const ammoCount = this.inventory.countItem(itemDef.ammoId);
+      this.ui.updateAmmoDisplay(ammoCount);
+    } else {
+      this.ui.updateAmmoDisplay(null);
+    }
   }
 
   // ─── Save / Load ──────────────────────────────────────────────────────────

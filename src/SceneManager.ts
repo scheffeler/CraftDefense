@@ -249,11 +249,42 @@ export class SceneManager {
     const def = ITEMS[itemId];
     if (!def) return;
 
-    const itemMesh = this.buildItemMesh(def.category, def.color);
+    const itemMesh = this.buildItemMesh(def.id, def.category, def.color);
     if (itemMesh) this.armGroup.add(itemMesh);
   }
 
-  private buildItemMesh(category: string, color: number): THREE.Object3D | null {
+  private buildItemMesh(itemId: string, category: string, color: number): THREE.Object3D | null {
+    if (itemId === "pistol") {
+      const g = new THREE.Group();
+      const metalMat = new THREE.MeshLambertMaterial({ color: 0x445566 });
+      const gripMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a22 });
+      const slideMat = new THREE.MeshLambertMaterial({ color: 0x556677 });
+
+      // Grip (handle) — vertical below slide
+      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.07), gripMat);
+      grip.position.set(-0.01, 0.05, 0.01);
+      grip.rotation.x = 0.18;
+      g.add(grip);
+
+      // Slide/body — main block
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.04), slideMat);
+      body.position.set(-0.01, 0.24, -0.01);
+      g.add(body);
+
+      // Barrel — thinner, extends above body
+      const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.03), metalMat);
+      barrel.position.set(-0.01, 0.39, -0.01);
+      g.add(barrel);
+
+      // Trigger guard
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.04), gripMat);
+      guard.position.set(-0.01, 0.14, -0.01);
+      g.add(guard);
+
+      g.rotation.z = 0.3;
+      return g;
+    }
+
     if (category === "block") {
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), mat);

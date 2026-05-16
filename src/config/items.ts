@@ -24,6 +24,10 @@ export interface ItemDef {
   armorSlot?:    ArmorSlot;
   // Placeable block
   placesBlock?:  BlockId;
+  // Ranged gun weapon
+  ammoId?:       string;
+  fireRate?:     number;   // seconds between shots
+  range?:        number;   // max hitscan range in blocks
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -110,6 +114,19 @@ export const ITEMS: Record<string, ItemDef> = {
 
   // --- Bow ---
   bow: { id:"bow", name:"Bow", category:"weapon", stackSize:1, color:0x8b6914, damage:8, durability:384 },
+
+  // --- Gunpowder (dropped by creepers) ---
+  gunpowder: { id:"gunpowder", name:"Gunpowder", category:"material", stackSize:64, color:0x444444 },
+
+  // --- Bullets (ammo for pistol) ---
+  bullet: { id:"bullet", name:"Bullet", category:"material", stackSize:64, color:0xcccccc },
+
+  // --- Pistol ---
+  pistol: {
+    id:"pistol", name:"Pistol", category:"weapon", stackSize:1,
+    color:0x445566, damage:12, durability:250,
+    ammoId:"bullet", fireRate:0.35, range:60,
+  },
 
   // --- Iron armor ---
   iron_helmet:     { id:"iron_helmet",     name:"Iron Helmet",     category:"armor", stackSize:1, color:0xbbbbbb, armorValue:2, armorSlot:"head"  },

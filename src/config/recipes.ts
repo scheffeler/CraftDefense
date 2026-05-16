@@ -265,6 +265,27 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "arrow_item", count: 4 },
   },
 
+  // --- Bullets (gunpowder + iron ingot → 8 bullets) ---
+  {
+    id: "bullets",
+    pattern: [
+      [r("iron_ingot")],
+      [r("gunpowder") ],
+    ],
+    result: { itemId: "bullet", count: 8 },
+  },
+
+  // --- Pistol ---
+  {
+    id: "pistol",
+    pattern: [
+      [r("iron_ingot"), r("iron_ingot"), null          ],
+      [r("iron_ingot"), r("stick"),      r("iron_ingot")],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "pistol", count: 1 },
+  },
+
   // --- Glass from sand (normally needs furnace, simplified here) ---
   {
     id: "glass",

@@ -9,7 +9,8 @@ type SoundName =
   | "block_break" | "block_place" | "pickup"
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
-  | "splash" | "thunder" | "creeper_hiss";
+  | "splash" | "thunder" | "creeper_hiss"
+  | "pistol_shot";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -408,6 +409,24 @@ export class AudioManager {
         hissGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + hissDur);
         src.buffer = buf; src.connect(filt); filt.connect(hissGain); hissGain.connect(dest);
         src.start(); src.stop(ctx.currentTime + hissDur);
+        break;
+      }
+
+      case "pistol_shot": {
+        // Sharp gunshot: low bang + high crack + metallic click
+        noiseBurst(0.5, 60, 0.05);           // low body thud
+        noiseBurst(0.25, 3000, 0.015);        // high crack
+        tone(80, 0.08, "sawtooth", 0.7);      // bass boom
+        tone(2400, 0.012, "square", 0.3);     // snap
+        // Quick metallic tick (shell casing)
+        const tickTime = ctx.currentTime + 0.06;
+        const tickOsc = ctx.createOscillator();
+        const tickGain = ctx.createGain();
+        tickOsc.type = "sine"; tickOsc.frequency.value = 1800;
+        tickGain.gain.setValueAtTime(vol * 0.2, tickTime);
+        tickGain.gain.exponentialRampToValueAtTime(0.001, tickTime + 0.025);
+        tickOsc.connect(tickGain); tickGain.connect(dest);
+        tickOsc.start(tickTime); tickOsc.stop(tickTime + 0.03);
         break;
       }
     }

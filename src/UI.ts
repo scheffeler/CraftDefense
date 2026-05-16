@@ -137,6 +137,7 @@ export class UI {
   private compassEl!: HTMLElement;
   private lockPrompt!: HTMLElement;
   private continueBtn!: HTMLElement;
+  private ammoDisplay!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
   private deathOverlay!: HTMLElement;
@@ -685,6 +686,20 @@ export class UI {
       this.hotbarSlots.push(slot);
     }
     this.container.appendChild(bar);
+
+    // Ammo display (shown when a gun is equipped)
+    this.ammoDisplay = div("fps-ammo-display");
+    this.ammoDisplay.style.display = "none";
+    this.container.appendChild(this.ammoDisplay);
+  }
+
+  updateAmmoDisplay(count: number | null): void {
+    if (count === null) {
+      this.ammoDisplay.style.display = "none";
+    } else {
+      this.ammoDisplay.textContent = `⚙ ${count}`;
+      this.ammoDisplay.style.display = "block";
+    }
   }
 
   private buildInventoryOverlay(): void {
@@ -1464,6 +1479,15 @@ const FPS_CSS = `
 }
 
 /* Hotbar — Minecraft dark gray, square slots */
+.fps-ammo-display {
+  position: absolute;
+  bottom: 68px; right: 16px;
+  color: #fff; font-size: 18px; font-family: monospace;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+  pointer-events: none; z-index: 15;
+  letter-spacing: 1px;
+}
+
 .fps-hotbar {
   position: absolute;
   bottom: 10px; left: 50%; transform: translateX(-50%);
