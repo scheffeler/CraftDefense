@@ -218,7 +218,8 @@ export class Game {
       [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"sniper_rifle", count:1 }, { itemId:"sniper_ammo", count:16 }, { itemId:"pistol", count:1 }, { itemId:"bullet", count:16 },
-       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+       { itemId:"shotgun", count:1 }, { itemId:"shotgun_shell", count:12 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
@@ -1509,35 +1510,47 @@ export class Game {
 
     this.gunCooldown = def.gunCooldown ?? 1;
     const range      = def.gunRange ?? 30;
-    const hitRadius  = def.id === "sniper_rifle" ? 1.2 : 0.85;
     const damage     = def.damage ?? 10;
     const isSniper   = def.id === "sniper_rifle";
+    const isShotgun  = def.id === "shotgun";
 
     const from = this.player.getCameraPosition();
     const dir  = this.player.getLookDirection();
 
-    let closestT  = range;
-    let closestId = -1;
+    if (isShotgun) {
+      this.fireShotgunPellets(from, dir, range, damage);
+    } else {
+      const hitRadius = isSniper ? 1.2 : 0.85;
+      let closestT  = range;
+      let closestId = -1;
 
-    for (const state of this.enemies.getAliveEnemies()) {
-      const pos = this.enemies.getEnemyPosition(state.id);
-      if (!pos) continue;
-      const toEnemy = pos.clone().sub(from);
-      const t       = toEnemy.dot(dir);
-      if (t < 0 || t > range) continue;
-      const closest = from.clone().addScaledVector(dir, t);
-      if (closest.distanceTo(pos) < hitRadius && t < closestT) {
-        closestT  = t;
-        closestId = state.id;
+      for (const state of this.enemies.getAliveEnemies()) {
+        const pos = this.enemies.getEnemyPosition(state.id);
+        if (!pos) continue;
+        const toEnemy = pos.clone().sub(from);
+        const t       = toEnemy.dot(dir);
+        if (t < 0 || t > range) continue;
+        const closest = from.clone().addScaledVector(dir, t);
+        if (closest.distanceTo(pos) < hitRadius && t < closestT) {
+          closestT  = t;
+          closestId = state.id;
+        }
       }
-    }
 
-    const hitPos = closestId >= 0 ? this.enemies.getEnemyPosition(closestId) : null;
-    if (closestId >= 0 && hitPos) {
-      this.enemies.damage(closestId, damage);
-      this.showDamageNumber(damage, hitPos.x, hitPos.y + 1.8, hitPos.z);
-      this.particles.spawnBulletImpact(hitPos.x, hitPos.y + 1, hitPos.z);
-      this.audio.play("hit", isSniper ? 0.25 : 0.45);
+      const hitPos = closestId >= 0 ? this.enemies.getEnemyPosition(closestId) : null;
+      if (closestId >= 0 && hitPos) {
+        this.enemies.damage(closestId, damage);
+        this.showDamageNumber(damage, hitPos.x, hitPos.y + 1.8, hitPos.z);
+        this.particles.spawnBulletImpact(hitPos.x, hitPos.y + 1, hitPos.z);
+        this.audio.play("hit", isSniper ? 0.25 : 0.45);
+      }
+
+      if (isSniper) {
+        const endPos = hitPos
+          ? hitPos.clone().add(new THREE.Vector3(0, 1, 0))
+          : from.clone().addScaledVector(dir, range);
+        this.spawnTracerLine(from, endPos);
+      }
     }
 
     if (ammoId) {
@@ -1546,15 +1559,67 @@ export class Game {
     }
 
     this.scene.swingArm();
-    this.scene.shake(isSniper ? 0.18 : 0.05, isSniper ? 0.25 : 0.18);
-    this.audio.play(isSniper ? "sniper_fire" : "pistol_shot", isSniper ? 0.9 : 0.85);
+    this.scene.shake(
+      isSniper ? 0.18 : isShotgun ? 0.16 : 0.05,
+      isSniper ? 0.25 : isShotgun ? 0.22 : 0.18,
+    );
+    this.audio.play(
+      isSniper ? "sniper_fire" : isShotgun ? "shotgun_blast" : "pistol_shot",
+      isSniper ? 0.9 : isShotgun ? 1.0 : 0.85,
+    );
+  }
 
-    if (isSniper) {
-      const endPos = hitPos
-        ? hitPos.clone().add(new THREE.Vector3(0, 1, 0))
-        : from.clone().addScaledVector(dir, range);
-      this.spawnTracerLine(from, endPos);
+  /** Fire 6 spread pellets in a cone — each pellet can hit a different enemy. */
+  private fireShotgunPellets(from: THREE.Vector3, dir: THREE.Vector3, range: number, totalDamage: number): void {
+    const PELLETS   = 6;
+    const SPREAD    = 0.13; // half-cone ~7.5 degrees
+    const pelletDmg = Math.round(totalDamage / PELLETS);
+
+    const right = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+    const up    = new THREE.Vector3().crossVectors(right, dir).normalize();
+
+    const hitDamageMap = new Map<number, number>();
+
+    for (let p = 0; p < PELLETS; p++) {
+      const sx = (Math.random() - 0.5) * 2 * SPREAD;
+      const sy = (Math.random() - 0.5) * 2 * SPREAD;
+      const pelletDir = dir.clone()
+        .addScaledVector(right, Math.sin(sx))
+        .addScaledVector(up,    Math.sin(sy))
+        .normalize();
+
+      let closestT  = range;
+      let closestId = -1;
+
+      for (const state of this.enemies.getAliveEnemies()) {
+        const pos = this.enemies.getEnemyPosition(state.id);
+        if (!pos) continue;
+        const toEnemy = pos.clone().sub(from);
+        const t       = toEnemy.dot(pelletDir);
+        if (t < 0 || t > range) continue;
+        const closest = from.clone().addScaledVector(pelletDir, t);
+        if (closest.distanceTo(pos) < 0.9 && t < closestT) {
+          closestT  = t;
+          closestId = state.id;
+        }
+      }
+
+      if (closestId >= 0) {
+        hitDamageMap.set(closestId, (hitDamageMap.get(closestId) ?? 0) + pelletDmg);
+      }
     }
+
+    let anyHit = false;
+    for (const [enemyId, dmg] of hitDamageMap) {
+      this.enemies.damage(enemyId, dmg);
+      const pos = this.enemies.getEnemyPosition(enemyId);
+      if (pos) {
+        this.showDamageNumber(dmg, pos.x, pos.y + 1.8, pos.z);
+        this.particles.spawnBulletImpact(pos.x, pos.y + 1, pos.z);
+        anyHit = true;
+      }
+    }
+    if (anyHit) this.audio.play("hit", 0.55);
   }
 
   private spawnTracerLine(from: THREE.Vector3, to: THREE.Vector3): void {

@@ -144,4 +144,12 @@ export const ITEMS: Record<string, ItemDef> = {
     damage:28, durability:60,
     weaponType:"gun", ammoType:"sniper_ammo", gunRange:60, gunCooldown:2.2,
   },
+
+  // --- Shotgun (6 pellets, short range, pump-action) ---
+  shotgun_shell: { id:"shotgun_shell", name:"Shotgun Shell", category:"material", stackSize:64, color:0xcc6622 },
+  shotgun: {
+    id:"shotgun", name:"Shotgun", category:"weapon", stackSize:1,
+    color:0x8b4513, damage:24, durability:150,
+    weaponType:"gun", ammoType:"shotgun_shell", gunRange:15, gunCooldown:1.2,
+  },
 };

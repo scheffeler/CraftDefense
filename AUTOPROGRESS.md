@@ -45,3 +45,24 @@
 - Playwright uses `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (executablePath override needed)
 - TypeScript 6.0.2 requires `moduleResolution: "bundler"` (not `"Node"`)
 - Both `pistolCooldown` and `gunCooldown` were present; consolidated to single `gunCooldown`
+
+## 2026-05-16 — Shotgun (Run 3)
+
+### What was done
+- Added **Shotgun** pump-action weapon:
+  - Fires **6 pellets** per shot in a ±7.5° spread cone
+  - 24 total damage (4 per pellet), stacks if multiple pellets hit same enemy
+  - 15-block max range (short-range / close-quarters focus)
+  - 1.2s pump-action cooldown between shots, consumes `shotgun_shell` ammo
+  - Distinct **double-barrel viewmodel**: two parallel iron barrels, wooden stock/fore-end, receiver, trigger guard
+  - **`shotgun_blast`** sound: deep bassy boom with overlapping noise layers + low oscillators
+  - Heavy camera shake (0.16 magnitude / 0.22s) to simulate recoil
+- Added **`shotgun_shell`** ammo (stackable ×64): gunpowder + iron_ingot = 8 shells
+- Added **shotgun crafting recipe**: iron_ingots (top) + planks + iron_ingot (middle) = shotgun
+- Dungeon chest #3 now includes: shotgun + 12 shotgun_shells
+- `fireShotgunPellets()` method handles spread with `Map<enemyId, accumulated damage>`
+
+### Ideas for next run
+- **Crossbow**: right-click charges (holds charge), fires a bolt projectile (physical arc), bolt = flint + stick
+- **Raygun**: chain-lightning hitscan (jumps to 3 nearby enemies), uses energy_cell, cyan glow, no cooldown but limited energy
+- **Shotgun polish**: spread indicator on crosshair, pump recoil animation, muzzle flash

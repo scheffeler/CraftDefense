@@ -10,7 +10,8 @@ type SoundName =
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
   | "splash" | "thunder" | "creeper_hiss"
-  | "pistol_shot" | "sniper_fire" | "scope_in";
+  | "pistol_shot" | "sniper_fire" | "scope_in"
+  | "shotgun_blast";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -463,6 +464,16 @@ export class AudioManager {
         sClickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
         sClickOsc.connect(sClickGain); sClickGain.connect(dest);
         sClickOsc.start(); sClickOsc.stop(ctx.currentTime + 0.04);
+        break;
+      }
+
+      case "shotgun_blast": {
+        // Loud bassy boom: multiple overlapping noise layers
+        noiseBurst(0.08, 120, 0.04);   // deep body thud
+        noiseBurst(0.05, 2500, 0.008); // high crack
+        noiseBurst(0.25, 80,  0.14);   // long low rumble
+        tone(90,  0.10, "square", 0.6);
+        tone(55,  0.18, "sawtooth", 0.4);
         break;
       }
     }

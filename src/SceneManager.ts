@@ -249,9 +249,14 @@ export class SceneManager {
     const def = ITEMS[itemId];
     if (!def) return;
 
-    const itemMesh = def.weaponType === "gun"
-      ? (def.id === "pistol" ? this.buildPistolMesh() : this.buildGunMesh(def.color))
-      : this.buildItemMesh(def.category, def.color);
+    let itemMesh: THREE.Object3D | null;
+    if (def.weaponType === "gun") {
+      if (def.id === "pistol")  itemMesh = this.buildPistolMesh();
+      else if (def.id === "shotgun") itemMesh = this.buildShotgunMesh();
+      else itemMesh = this.buildGunMesh(def.color);
+    } else {
+      itemMesh = this.buildItemMesh(def.category, def.color);
+    }
     if (itemMesh) this.armGroup.add(itemMesh);
   }
 
@@ -280,6 +285,47 @@ export class SceneManager {
     g.add(guard);
 
     g.rotation.z = 0.3;
+    return g;
+  }
+
+  /** Pump-action shotgun — wide double-barrel, wooden stock. */
+  private buildShotgunMesh(): THREE.Object3D {
+    const g = new THREE.Group();
+    const metalMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const woodMat  = new THREE.MeshLambertMaterial({ color: 0x7a3b10 });
+    const darkMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+
+    // Wide double-barrel body running front-to-back along local Z
+    const barrelL = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 0.34), metalMat);
+    barrelL.position.set(-0.03, 0.27, -0.08);
+    g.add(barrelL);
+
+    const barrelR = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 0.34), metalMat);
+    barrelR.position.set(0.03, 0.27, -0.08);
+    g.add(barrelR);
+
+    // Receiver block connecting the two barrels
+    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.14), darkMat);
+    receiver.position.set(0.0, 0.26, 0.10);
+    g.add(receiver);
+
+    // Pump fore-end (wooden slide under barrels)
+    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.05, 0.10), woodMat);
+    pump.position.set(0.0, 0.22, -0.05);
+    g.add(pump);
+
+    // Stock (wooden grip/stock)
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 0.12), woodMat);
+    stock.position.set(0.0, 0.21, 0.19);
+    stock.rotation.x = -0.15;
+    g.add(stock);
+
+    // Guard / trigger area
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.07), darkMat);
+    guard.position.set(0.0, 0.19, 0.09);
+    g.add(guard);
+
+    g.position.set(0.02, 0.06, 0.0);
     return g;
   }
 

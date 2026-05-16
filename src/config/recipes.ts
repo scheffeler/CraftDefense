@@ -413,6 +413,26 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "sniper_rifle", count: 1 },
   },
+
+  // --- Shotgun Shell (gunpowder + iron ingot = 8 shells) ---
+  {
+    id: "shotgun_shell",
+    pattern: [
+      [r("gunpowder"), r("iron_ingot")],
+    ],
+    result: { itemId: "shotgun_shell", count: 8 },
+  },
+
+  // --- Shotgun (iron barrels + wood stock) ---
+  {
+    id: "shotgun",
+    pattern: [
+      [r("iron_ingot"), r("iron_ingot"), r("iron_ingot")],
+      [r("planks"),     r("planks"),     r("iron_ingot")],
+      [null,            null,            null           ],
+    ],
+    result: { itemId: "shotgun", count: 1 },
+  },
 ];
 
 // Silence unused helper warning
