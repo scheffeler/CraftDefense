@@ -63,6 +63,7 @@ export class SceneManager {
   private readonly DAY_DURATION = 600; // 10 real minutes per game day
   private sunLight!: THREE.DirectionalLight;
   private ambientLight!: THREE.AmbientLight;
+  private fillLight!: THREE.DirectionalLight;
 
   // Sky elements
   private readonly stars: THREE.Points;
@@ -167,22 +168,24 @@ export class SceneManager {
     }
 
     this.ambientLight.color.setHex(frame.ambientColor);
-    this.ambientLight.intensity = frame.ambientInt;
+    this.ambientLight.intensity = frame.ambientInt * 0.68;
 
     this.sunLight.intensity = frame.sunInt;
     this.sunLight.color.setHex(frame.sunColor);
+    this.fillLight.intensity = frame.ambientInt * 0.16;
 
-    // Animate sun position around world center
+    // Animate sun position. Height follows -cos so the sun is overhead at noon
+    // (t=0.5) and below the horizon at midnight — in phase with DAY_FRAMES.
     const angle = this._dayTime * Math.PI * 2;
     const r = 100;
     this.sunLight.position.set(
-      Math.cos(angle) * r,
       Math.sin(angle) * r,
+      -Math.cos(angle) * r,
       20,
     );
 
     // Tone mapping exposure: brighter at noon, dimmer at night
-    this.renderer.toneMappingExposure = 0.5 + frame.ambientInt * 0.8;
+    this.renderer.toneMappingExposure = 0.62 + frame.ambientInt * 0.42;
 
     // Stars and moon: visible at night
     const nightness = Math.max(0, 1 - frame.ambientInt * 4);
@@ -193,8 +196,8 @@ export class SceneManager {
     const moonAngle = this._dayTime * Math.PI * 2 + Math.PI;
     const mr = 130;
     this.moon.position.set(
-      Math.cos(moonAngle) * mr + 32,
-      Math.abs(Math.sin(moonAngle)) * mr,
+      Math.sin(moonAngle) * mr + 32,
+      -Math.cos(moonAngle) * mr,
       20,
     );
 
@@ -205,8 +208,8 @@ export class SceneManager {
     const sunColor = lerpHex(0xff8833, 0xffee88, Math.min(1, (frame.ambientInt - 0.4) * 5));
     (this.sun.material as THREE.MeshBasicMaterial).color.setHex(sunColor);
     this.sun.position.set(
-      Math.cos(angle) * 130 + 32,
-      Math.abs(Math.sin(angle)) * 130,
+      Math.sin(angle) * 130 + 32,
+      -Math.cos(angle) * 130,
       20,
     );
 
@@ -235,7 +238,7 @@ export class SceneManager {
     (this.scene.background as THREE.Color).setHex(lerpHex(frame.sky, rainy, t * 0.7));
     (this.scene.fog as THREE.Fog).color.setHex(lerpHex(frame.fog, fogRainy, t * 0.7));
     (this.scene.fog as THREE.Fog).far = 130 - t * 70; // rain reduces visibility
-    this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
+    this.ambientLight.intensity = frame.ambientInt * 0.68 * (1 - t * 0.4);
     this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
   }
 
@@ -413,7 +416,7 @@ export class SceneManager {
   }
 
   private setupLighting(): void {
-    this.ambientLight = new THREE.AmbientLight(0xb0c8e8, 0.9);
+    this.ambientLight = new THREE.AmbientLight(0xb0c8e8, 0.5);
     this.scene.add(this.ambientLight);
 
     this.sunLight = new THREE.DirectionalLight(0xffe8b0, 1.6);
@@ -426,15 +429,14 @@ export class SceneManager {
     this.sunLight.shadow.camera.right =  90;
     this.sunLight.shadow.camera.top   =  90;
     this.sunLight.shadow.camera.bottom = -90;
+    this.sunLight.shadow.normalBias = 0.04;
     this.scene.add(this.sunLight);
 
-    const fill1 = new THREE.DirectionalLight(0x88aacc, 0.5);
-    fill1.position.set(-30, 20, -20);
-    this.scene.add(fill1);
-
-    const fill2 = new THREE.DirectionalLight(0x9ab4cc, 0.4);
-    fill2.position.set(0, 15, 60);
-    this.scene.add(fill2);
+    // A single weak sky-fill so faces in shadow aren't pure black. Its intensity
+    // is driven by the day/night cycle in updateDayNight() so nights stay dark.
+    this.fillLight = new THREE.DirectionalLight(0x88aacc, 0.12);
+    this.fillLight.position.set(-30, 20, -20);
+    this.scene.add(this.fillLight);
   }
 
   private onResize(): void {

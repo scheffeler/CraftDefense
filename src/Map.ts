@@ -45,6 +45,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
   bookshelf:        { id: "bookshelf",        name: "Bookshelf",        color: 0xc8a060, topColor: 0x7a3a14, hardness: 1.5,  placeable: true,  transparent: false },
   enchanting_table: { id: "enchanting_table", name: "Enchanting Table", color: 0x1a0a2a, topColor: 0xaa0022, hardness: 5.0,  placeable: true,  transparent: false },
   bed:              { id: "bed",              name: "Bed",              color: 0xcc3333, topColor: 0xaa2222, hardness: 0.2,  placeable: true,  transparent: false },
+  tnt:              { id: "tnt",              name: "TNT",              color: 0xcc1111, topColor: 0x111111, hardness: 0.0,  placeable: true,  transparent: false },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];
@@ -62,7 +63,8 @@ class Chunk {
   readonly cx: number;
   readonly cz: number;
   readonly data: Uint8Array;
-  mesh: THREE.Mesh | null = null;
+  mesh: THREE.Mesh | null = null;             // opaque + alpha-tested geometry
+  transparentMesh: THREE.Mesh | null = null;  // blended geometry (water, glass)
   dirty = true;
 
   constructor(cx: number, cz: number) {
@@ -137,7 +139,7 @@ export class VoxelWorld {
 
     const pixel = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
     const border = (ox: number) => {
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
       ctx.fillRect(ox, 0, S, 1); ctx.fillRect(ox, S-1, S, 1);
       ctx.fillRect(ox, 0, 1, S); ctx.fillRect(ox+S-1, 0, 1, S);
     };
@@ -350,19 +352,27 @@ export class VoxelWorld {
   }
 
   private rebuildChunkMesh(chunk: Chunk): void {
-    if (chunk.mesh) {
-      this.chunkMeshGroup.remove(chunk.mesh);
-      chunk.mesh.geometry.dispose();
-      (chunk.mesh.material as THREE.Material).dispose();
-      chunk.mesh = null;
-    }
+    const disposeMesh = (mesh: THREE.Mesh | null) => {
+      if (!mesh) return;
+      this.chunkMeshGroup.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    };
+    disposeMesh(chunk.mesh);
+    disposeMesh(chunk.transparentMesh);
+    chunk.mesh = null;
+    chunk.transparentMesh = null;
 
-    const positions: number[] = [];
-    const normals: number[]   = [];
-    const colors: number[]    = [];
-    const uvs: number[]       = [];
-    const indices: number[]   = [];
-    let vi = 0;
+    // Two batches: opaque/alpha-tested geometry and blended see-through geometry.
+    interface Batch {
+      positions: number[]; normals: number[]; colors: number[];
+      uvs: number[]; indices: number[]; vi: number;
+    }
+    const makeBatch = (): Batch =>
+      ({ positions: [], normals: [], colors: [], uvs: [], indices: [], vi: 0 });
+    const opaque = makeBatch();
+    const glassy = makeBatch();
+    const isSeeThrough = (id: BlockId) => id === "water" || id === "glass";
 
     const isSolidAO = (bx: number, by: number, bz: number): boolean => {
       const bid = this.getBlock(bx, by, bz);
@@ -372,6 +382,7 @@ export class VoxelWorld {
       s1 && s2 ? 0.5 : 1.0 - (s1 ? 0.2 : 0) - (s2 ? 0.2 : 0) - (c ? 0.1 : 0);
 
     const addFace = (
+      batch: Batch,
       ox: number, oy: number, oz: number,
       ax: number, ay: number, az: number,
       bx: number, by: number, bz: number,
@@ -381,6 +392,8 @@ export class VoxelWorld {
       texIdx = 13,
       ao0 = 1.0, ao1 = 1.0, ao2 = 1.0, ao3 = 1.0
     ) => {
+      const { positions, normals, colors, uvs, indices } = batch;
+      const vi = batch.vi;
       positions.push(ox, oy, oz, ox+ax, oy+ay, oz+az, ox+bx, oy+by, oz+bz, ox+ax+bx, oy+ay+by, oz+az+bz);
       for (let i = 0; i < 4; i++) normals.push(nx, ny, nz);
       const s = shade;
@@ -390,15 +403,17 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      // Inset UVs half a texel so neighbouring atlas tiles don't bleed at seams.
+      const u0 = texIdx / 16 + 0.5 / 256, u1 = (texIdx + 1) / 16 - 0.5 / 256;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
-      // Flip quad diagonal when AO values require it to avoid seam artifacts
+      // Triangle winding is CCW so faces are front-facing (outward) for the
+      // FrontSide material. The diagonal is flipped by AO to avoid seam artifacts.
       if (ao0 + ao3 > ao1 + ao2) {
-        indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2);
+        indices.push(vi, vi+2, vi+1, vi+1, vi+2, vi+3);
       } else {
-        indices.push(vi+1, vi+3, vi, vi+3, vi+2, vi);
+        indices.push(vi+1, vi, vi+3, vi+3, vi, vi+2);
       }
-      vi += 4;
+      batch.vi += 4;
     };
 
     const offX = chunk.cx * CHUNK_SIZE;
@@ -411,6 +426,7 @@ export class VoxelWorld {
           if (id === "air") continue;
           const def = BLOCK_DEFS[id];
           const wx = offX + lx, wy = ly, wz = offZ + lz;
+          const batch = isSeeThrough(id) ? glassy : opaque;
 
           const c = def.color;
           const r = ((c >> 16) & 0xff) / 255;
@@ -449,6 +465,8 @@ export class VoxelWorld {
           for (let fi = 0; fi < 6; fi++) {
             const [nx, ny, nz] = neighbors[fi];
             const nbId = this.getBlock(wx + nx, wy + ny, wz + nz);
+            // Cull faces shared by two blocks of the same type (water/glass/leaves).
+            if (nbId === id) continue;
             if (nbId !== "air" && !BLOCK_DEFS[nbId].transparent) continue;
             const f = faces[fi];
             const fTexIdx = getBlockTexIndex(id, f.n[1]);
@@ -456,19 +474,22 @@ export class VoxelWorld {
             let fr = f.cr, fg = f.cg, fb = f.cb;
             if (fTexIdx !== 13) fr = fg = fb = 1.0;
 
-            // Per-vertex AO: check adjacent blocks in tangent directions only
+            // Per-vertex AO: sample the 8 cells touching the face on its air
+            // side (offset by the face normal) along the two tangent directions.
             const [tax, tay, taz] = f.a;
             const [tbx, tby, tbz] = f.b;
-            const s1n = isSolidAO(wx - tax, wy - tay, wz - taz);
-            const s1p = isSolidAO(wx + tax, wy + tay, wz + taz);
-            const s2n = isSolidAO(wx - tbx, wy - tby, wz - tbz);
-            const s2p = isSolidAO(wx + tbx, wy + tby, wz + tbz);
-            const ao0 = vertAO(s1n, s2n, isSolidAO(wx - tax - tbx, wy - tay - tby, wz - taz - tbz));
-            const ao1 = vertAO(s1p, s2n, isSolidAO(wx + tax - tbx, wy + tay - tby, wz + taz - tbz));
-            const ao2 = vertAO(s1n, s2p, isSolidAO(wx - tax + tbx, wy - tay + tby, wz - taz + tbz));
-            const ao3 = vertAO(s1p, s2p, isSolidAO(wx + tax + tbx, wy + tay + tby, wz + taz + tbz));
+            const ox = wx + nx, oy = wy + ny, oz = wz + nz;
+            const s1n = isSolidAO(ox - tax, oy - tay, oz - taz);
+            const s1p = isSolidAO(ox + tax, oy + tay, oz + taz);
+            const s2n = isSolidAO(ox - tbx, oy - tby, oz - tbz);
+            const s2p = isSolidAO(ox + tbx, oy + tby, oz + tbz);
+            const ao0 = vertAO(s1n, s2n, isSolidAO(ox - tax - tbx, oy - tay - tby, oz - taz - tbz));
+            const ao1 = vertAO(s1p, s2n, isSolidAO(ox + tax - tbx, oy + tay - tby, oz + taz - tbz));
+            const ao2 = vertAO(s1n, s2p, isSolidAO(ox - tax + tbx, oy - tay + tby, oz - taz + tbz));
+            const ao3 = vertAO(s1p, s2p, isSolidAO(ox + tax + tbx, oy + tay + tby, oz + taz + tbz));
 
             addFace(
+              batch,
               wx + (f.n[0] < 0 ? 0 : f.n[0] > 0 ? 1 : 0),
               wy + (f.n[1] < 0 ? 0 : f.n[1] > 0 ? 1 : 0),
               wz + (f.n[2] < 0 ? 0 : f.n[2] > 0 ? 1 : 0),
@@ -484,25 +505,40 @@ export class VoxelWorld {
       }
     }
 
-    if (positions.length === 0) return;
+    const buildMesh = (batch: Batch, material: THREE.Material): THREE.Mesh | null => {
+      if (batch.positions.length === 0) return null;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(batch.positions, 3));
+      geo.setAttribute("normal",   new THREE.Float32BufferAttribute(batch.normals, 3));
+      geo.setAttribute("color",    new THREE.Float32BufferAttribute(batch.colors, 3));
+      geo.setAttribute("uv",       new THREE.Float32BufferAttribute(batch.uvs, 2));
+      geo.setIndex(batch.indices);
+      geo.computeBoundsTree();
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.receiveShadow = true;
+      // Chunk meshes receive shadows but don't cast — terrain self-shadowing on
+      // flat voxel faces produces shadow acne. Per-face shading gives depth.
+      mesh.castShadow = false;
+      this.chunkMeshGroup.add(mesh);
+      return mesh;
+    };
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute("normal",   new THREE.Float32BufferAttribute(normals, 3));
-    geo.setAttribute("color",    new THREE.Float32BufferAttribute(colors, 3));
-    geo.setAttribute("uv",       new THREE.Float32BufferAttribute(uvs, 2));
-    geo.setIndex(indices);
-    geo.computeBoundsTree();
-
-    const mat = new THREE.MeshLambertMaterial({
+    // Opaque pass: alphaTest gives leaves a clean cutout instead of black pixels.
+    chunk.mesh = buildMesh(opaque, new THREE.MeshLambertMaterial({
       vertexColors: true,
       map: this.blockTex,
       side: THREE.FrontSide,
-    });
-    chunk.mesh = new THREE.Mesh(geo, mat);
-    chunk.mesh.receiveShadow = true;
-    chunk.mesh.castShadow = false;
-    this.chunkMeshGroup.add(chunk.mesh);
+      alphaTest: 0.5,
+    }));
+    // Blended pass: water and glass render see-through.
+    chunk.transparentMesh = buildMesh(glassy, new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      map: this.blockTex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false,
+    }));
   }
 
   getChunkMeshes(): THREE.Mesh[] {

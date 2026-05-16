@@ -17,7 +17,12 @@ import { BLOCK_BEHAVIORS } from "./config/blocks";
 import { BLOCK_DEFS } from "./Map";
 import { ITEMS } from "./config/items";
 import { getSpawnPositions, DUNGEON_CHEST_POSITIONS } from "./WorldGen";
-import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
+import {
+  FORTRESS_CENTER_X, FORTRESS_CENTER_Z, PLAYER_START_Y,
+  FLAG_X, FLAG_Z, FLAG_MAX_HEALTH, GROUND_OFFSET,
+} from "./config/map";
+import { findSafeSpawn } from "./Physics";
+import { Flag } from "./Flag";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
 import { PassiveMobManager } from "./PassiveMob";
@@ -58,8 +63,8 @@ export class Game {
   private mode: "helmsdeep" | "freeplay" = "helmsdeep";
   private lastTime = 0;
 
-  // Initial build phase before wave 1 (seconds)
-  private buildPhaseTimer = 60;
+  // Initial build phase before wave 1 (seconds) — long enough to build a fort
+  private buildPhaseTimer = 180;
 
   // Torch point lights keyed by "wx,wy,wz"
   private readonly torchLights = new Map<string, THREE.PointLight>();
@@ -122,6 +127,7 @@ export class Game {
   private input!:            InputManager;
   private ui!:               UI;
   private audio!:            AudioManager;
+  private flag!:             Flag;
 
   constructor(private readonly container: HTMLElement) {}
 
@@ -141,14 +147,21 @@ export class Game {
     this.flowField = new FlowField(this.gameMap.world);
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
 
-    this.player    = new Player(this.gameMap.world, this.scene.camera, 32, 32);
+    // The flag the player defends — stands on the starter platform at the centre.
+    this.flag = new Flag(this.scene.scene, FLAG_X, FLAG_Z, GROUND_OFFSET + 1, FLAG_MAX_HEALTH);
+
+    // Spawn in the open clearing, a few blocks north of the flag.
+    const spawn = findSafeSpawn(this.gameMap.world, FLAG_X, PLAYER_START_Y, 26);
+    this.player    = new Player(this.gameMap.world, this.scene.camera, spawn.x, spawn.z);
+    this.player.position.copy(spawn);
     this.inventory = new Inventory();
     this.inventory.addItem("stone_sword", 1);
     this.inventory.addItem("stone_pickaxe", 1);
     this.inventory.addItem("wood_axe", 1);
     this.inventory.addItem("wood_hoe", 1);
-    this.inventory.addItem("cobblestone", 32);
+    this.inventory.addItem("cobblestone", 64);
     this.inventory.addItem("wood", 16);
+    this.inventory.addItem("dirt", 32);
     this.inventory.addItem("torch", 8);
     this.inventory.addItem("apple", 8);
     this.inventory.addItem("wheat_seeds", 8);
@@ -241,7 +254,7 @@ export class Game {
     this.wireCallbacks();
     this.refreshHUD();
     this.ui.setObjective(
-      `Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`,
+      `Build defenses around the flag! Wave 1 in ${Math.ceil(this.buildPhaseTimer)}s.`,
     );
     this.ui.showPointerLockPrompt(true);
   }
@@ -527,11 +540,27 @@ export class Game {
     };
 
     this.enemies.onEnemyReachedBase = (state) => {
-      this.player.damage(state.config.damage);
-      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-      this.ui.showDamageVignette();
-      this.scene.shake(0.08, 0.4);
-      this.audio.play("player_hurt", 0.7);
+      if (this.mode === "helmsdeep") {
+        // Survival: the enemy strikes the flag, not the player.
+        const fellNow = this.flag.takeDamage(state.config.damage);
+        this.ui.updateFlagHealth(this.flag.health, this.flag.maxHealth);
+        this.ui.showDamageVignette();
+        this.scene.shake(0.1, 0.4);
+        this.audio.play("player_hurt", 0.6);
+        if (fellNow) {
+          this.phase = "gameover";
+          this.ui.showEnd("gameover", "The flag has fallen — the horde overran your defenses.");
+          this.audio.play("player_death");
+          if (this.scene.isPointerLocked) this.scene.unlockPointer();
+        }
+      } else {
+        // Free Play: night mobs that reach the player hurt the player.
+        this.player.damage(state.config.damage);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+        this.scene.shake(0.08, 0.4);
+        this.audio.play("player_hurt", 0.7);
+      }
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
         this.waves.wave, this.waves.totalWaves, this.enemies.getAliveEnemies().length,
@@ -598,7 +627,7 @@ export class Game {
       this.audio.play("wave_complete");
       if (this.waves.isLastWave()) {
         this.phase = "win";
-        this.ui.showEnd("victory", `All ${wave} waves survived! The fortress holds!`);
+        this.ui.showEnd("victory", `All ${wave} waves survived — the flag still stands!`);
         this.audio.play("victory");
         if (this.scene.isPointerLocked) this.scene.unlockPointer();
       } else {
@@ -606,7 +635,7 @@ export class Game {
         const nextWave = wave + 1;
         const secs     = this.waves.betweenWaveDuration;
         this.ui.setObjective(
-          `Wave ${wave} cleared! Reinforce the walls. Wave ${nextWave} in ${secs}s.`,
+          `Wave ${wave} cleared! Reinforce your defenses. Wave ${nextWave} in ${secs}s.`,
         );
         this.ui.updateWaveInfo(wave, this.waves.totalWaves, 0);
       }
@@ -616,7 +645,7 @@ export class Game {
       const nextWave = this.waves.wave + 1;
       if (secondsLeft > 0) {
         this.ui.setObjective(
-          `Reinforce the walls. Wave ${nextWave} in ${secondsLeft}s.`,
+          `Reinforce your defenses. Wave ${nextWave} in ${secondsLeft}s.`,
         );
       } else {
         this.startNextWave();
@@ -640,8 +669,10 @@ export class Game {
           this.passiveMobs.spawn(type, x, z);
         }
       } else {
-        this.ui.setObjective(`Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`);
+        this.ui.setObjective(`Build defenses around the flag! Wave 1 in ${Math.ceil(this.buildPhaseTimer)}s.`);
         this.ui.updateWaveInfo(0, this.waves.totalWaves, 0);
+        this.ui.updateFlagHealth(this.flag.health, this.flag.maxHealth);
+        this.ui.showFlagBar(true);
       }
       this.refreshHUD();
       this.scene.lockPointer();
@@ -666,8 +697,10 @@ export class Game {
           this.passiveMobs.spawn(type, x, z);
         }
       } else {
-        this.ui.setObjective(`Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`);
+        this.ui.setObjective(`Build defenses around the flag! Wave 1 in ${Math.ceil(this.buildPhaseTimer)}s.`);
         this.ui.updateWaveInfo(0, this.waves.totalWaves, 0);
+        this.ui.updateFlagHealth(this.flag.health, this.flag.maxHealth);
+        this.ui.showFlagBar(true);
         this.passiveMobs.reset();
       }
     };
@@ -885,7 +918,7 @@ export class Game {
     this.phase = "playing";
     this.waves.startWave((type, gate) => this.spawnEnemy(type, gate));
     this.audio.play("wave_start");
-    this.ui.setObjective(`Wave ${this.waves.wave} — Defend the fortress!`);
+    this.ui.setObjective(`Wave ${this.waves.wave} — Defend the flag!`);
     this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0);
     this.ui.showWaveAnnouncement(this.waves.wave);
   }
@@ -935,6 +968,7 @@ export class Game {
     // Day/night cycle runs even while paused/locked
     this.scene.updateDayNight(dt);
     this.audio.updateAmbient(dt, this.scene.daylight);
+    this.flag.update(dt);
 
     // Title screen orbit: slowly rotate camera around fortress when pointer not locked
     if (!this.scene.isPointerLocked && this.phase !== "gameover" && this.phase !== "win") {
@@ -992,11 +1026,8 @@ export class Game {
     // Block interaction (mining)
     const activeStack = this.inventory.getActiveItem();
     this.blockInteraction.setActiveItem(activeStack);
-    if (this.input.isLeftMouseDown() && this.blockInteraction.getTargetBlock()) {
-      this.blockInteraction.startBreaking();
-    } else {
-      this.blockInteraction.stopBreaking();
-    }
+    const wantBreak = this.input.isLeftMouseDown() && !!this.blockInteraction.getTargetBlock();
+    this.blockInteraction.setBreaking(wantBreak);
     this.blockInteraction.update(dt);
 
     // Wave + enemy logic
@@ -1007,7 +1038,7 @@ export class Game {
           const secs = Math.ceil(this.buildPhaseTimer);
           if (secs > 0) {
             if (Math.ceil(this.buildPhaseTimer + dt) !== secs) {
-              this.ui.setObjective(`Build fortifications! Wave 1 begins in ${secs}s.`);
+              this.ui.setObjective(`Build defenses around the flag! Wave 1 in ${secs}s.`);
             }
           } else {
             this.startNextWave();
@@ -1019,7 +1050,9 @@ export class Game {
         this.waves.update(dt);
         this.updateCombat(dt);
         const count = this.enemies.getAliveEnemies().length;
-        this.ui.setObjective(`Defend the fortress! ${count} enemies remaining.`);
+        this.ui.setObjective(
+          `Defend the flag! ${count} enemies — Flag HP ${Math.ceil(this.flag.health)}/${this.flag.maxHealth}`,
+        );
       }
     } else if (this.mode === "freeplay") {
       // Night mob spawning
@@ -1563,6 +1596,7 @@ export class Game {
         playerXP: this.player.xp,
         playerLevel: this.player.level,
         playerPos: { x: this.player.position.x, y: this.player.position.y, z: this.player.position.z },
+        flagHealth: this.flag.health,
         hotbar: this.inventory.hotbar,
         backpack: this.inventory.backpack,
         armor: this.inventory.armor,
@@ -1590,6 +1624,9 @@ export class Game {
       }
       if (save.playerPos) {
         this.player.position.set(save.playerPos.x, save.playerPos.y, save.playerPos.z);
+      }
+      if (save.flagHealth !== undefined) {
+        this.flag.health = Math.max(0, Math.min(this.flag.maxHealth, save.flagHealth));
       }
       if (save.hotbar) {
         for (let i = 0; i < save.hotbar.length; i++) this.inventory.hotbar[i] = save.hotbar[i];

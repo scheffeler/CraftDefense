@@ -18,6 +18,13 @@ export const FORTRESS_CENTER_X = 32;
 export const FORTRESS_CENTER_Z = 32;
 export const WALL_HEIGHT = 6;
 
+// Survival mode: the flag the player defends sits at the world centre, inside a
+// flat open clearing the player builds their own fortress around.
+export const FLAG_X = FORTRESS_CENTER_X;
+export const FLAG_Z = FORTRESS_CENTER_Z;
+export const FLAG_MAX_HEALTH = 100;
+export const CLEARING_RADIUS = 11;
+
 // Enemy spawn gate positions (world Z)
 export const SPAWN_GATE_NORTH_Z = 2;
 export const SPAWN_GATE_SOUTH_Z = 61;

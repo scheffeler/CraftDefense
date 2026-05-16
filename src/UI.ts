@@ -131,6 +131,9 @@ export class UI {
   private blockTooltip!: HTMLElement;
   private elWaveInfo!: HTMLElement;
   private elObjective!: HTMLElement;
+  private elFlagBar!: HTMLElement;
+  private elFlagFill!: HTMLElement;
+  private elFlagText!: HTMLElement;
   private dayClockCanvas!: HTMLCanvasElement;
   private minimapCanvas!: HTMLCanvasElement;
   private minimapTerrain: ImageData | null = null;
@@ -253,6 +256,18 @@ export class UI {
   setObjective(text: string): void {
     this.elObjective.textContent = text;
     this.elObjective.style.opacity = text ? "1" : "0";
+  }
+
+  /** Survival mode: update the flag health bar fill and label. */
+  updateFlagHealth(current: number, max: number): void {
+    const pct = max > 0 ? Math.max(0, Math.min(1, current / max)) * 100 : 0;
+    this.elFlagFill.style.width = `${pct}%`;
+    this.elFlagText.textContent = `⚑ FLAG  ${Math.max(0, Math.ceil(current))}/${max}`;
+  }
+
+  /** Show or hide the flag health bar (survival mode only). */
+  showFlagBar(show: boolean): void {
+    this.elFlagBar.style.display = show ? "block" : "none";
   }
 
   showPointerLockPrompt(show: boolean): void {
@@ -432,6 +447,14 @@ export class UI {
     this.elWaveInfo = div("fps-wave-info");
     this.elWaveInfo.innerHTML = "Wave 0/10<br>0 enemies";
     this.container.appendChild(this.elWaveInfo);
+
+    this.elFlagBar = div("fps-flag-bar");
+    this.elFlagFill = div("fps-flag-fill");
+    this.elFlagText = div("fps-flag-text");
+    this.elFlagBar.appendChild(this.elFlagFill);
+    this.elFlagBar.appendChild(this.elFlagText);
+    this.elFlagBar.style.display = "none";
+    this.container.appendChild(this.elFlagBar);
 
     this.buildHearts();
     this.buildHungerBar();
@@ -1340,6 +1363,28 @@ const FPS_CSS = `
   padding: 4px 10px;
   pointer-events: none; z-index: 15;
   white-space: nowrap;
+}
+
+/* Flag health bar — survival mode, below the objective banner */
+.fps-flag-bar {
+  position: absolute;
+  top: 34px; left: 50%; transform: translateX(-50%);
+  width: 220px; height: 16px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid #000;
+  pointer-events: none; z-index: 15;
+}
+.fps-flag-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 100%;
+  background: linear-gradient(#e04444, #a02020);
+  transition: width 0.2s;
+}
+.fps-flag-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: bold; color: #fff;
+  text-shadow: 1px 1px 0 #000;
 }
 
 /* Day/night clock — top right below wave info */

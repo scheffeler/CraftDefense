@@ -17,6 +17,7 @@ const TIER_SPEED: Record<ToolTier, number> = {
 
 export class BlockInteraction {
   private readonly raycaster = new THREE.Raycaster();
+  private readonly _screenCenter = new THREE.Vector2(0, 0);
   private readonly targetHighlight: THREE.LineSegments;
   private readonly breakOverlay: THREE.Mesh;
   private readonly crackTextures: THREE.CanvasTexture[];
@@ -108,8 +109,19 @@ export class BlockInteraction {
     }
   }
 
-  startBreaking(): void { this.isBreaking = true; this.breakTimer = 0; }
-  stopBreaking():  void { this.isBreaking = false; this.breakTimer = 0; this.lastCrackStage = -1; }
+  /**
+   * Drives the hold-to-break state. Idempotent: the break timer is reset only on a
+   * not-breaking -> breaking transition, so callers may invoke this every frame.
+   */
+  setBreaking(active: boolean): void {
+    if (active === this.isBreaking) return;
+    this.isBreaking = active;
+    this.breakTimer = 0;
+    if (!active) {
+      this.lastCrackStage = -1;
+      this.breakOverlay.visible = false;
+    }
+  }
 
   getBreakProgress(): number {
     return this.breakHardness > 0 ? Math.min(1, this.breakTimer / this.breakHardness) : 0;
@@ -195,44 +207,51 @@ export class BlockInteraction {
   }
 
   private updateTarget(): void {
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    this.raycaster.far = REACH;
+    this.raycaster.setFromCamera(this._screenCenter, this.camera);
+    const { origin, direction: dir } = this.raycaster.ray;
 
-    const hits = this.raycaster.intersectObjects(this.world.getChunkMeshes());
-    if (hits.length === 0 || !hits[0].face) {
-      this.clearTarget();
-      return;
+    // Voxel-grid DDA (Amanatides & Woo): march the ray cell by cell through the
+    // block grid. This is independent of the render mesh, its winding and the
+    // BVH, so it reliably picks the first solid voxel the player looks at.
+    let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
+    const stepX = dir.x >= 0 ? 1 : -1;
+    const stepY = dir.y >= 0 ? 1 : -1;
+    const stepZ = dir.z >= 0 ? 1 : -1;
+    const tDeltaX = dir.x !== 0 ? Math.abs(1 / dir.x) : Infinity;
+    const tDeltaY = dir.y !== 0 ? Math.abs(1 / dir.y) : Infinity;
+    const tDeltaZ = dir.z !== 0 ? Math.abs(1 / dir.z) : Infinity;
+    // Parametric distance from the ray origin to the first grid boundary per axis.
+    let tMaxX = dir.x !== 0 ? (stepX > 0 ? x + 1 - origin.x : origin.x - x) * tDeltaX : Infinity;
+    let tMaxY = dir.y !== 0 ? (stepY > 0 ? y + 1 - origin.y : origin.y - y) * tDeltaY : Infinity;
+    let tMaxZ = dir.z !== 0 ? (stepZ > 0 ? z + 1 - origin.z : origin.z - z) * tDeltaZ : Infinity;
+
+    let px = x, py = y, pz = z;   // last empty cell before the hit (placement spot)
+    let hitId: BlockId = "air";
+    for (let t = 0; t <= REACH; ) {
+      const id = this.world.getBlock(x, y, z);
+      if (id !== "air" && id !== "water") { hitId = id; break; }
+      px = x; py = y; pz = z;
+      if (tMaxX <= tMaxY && tMaxX <= tMaxZ)      { x += stepX; t = tMaxX; tMaxX += tDeltaX; }
+      else if (tMaxY <= tMaxZ)                   { y += stepY; t = tMaxY; tMaxY += tDeltaY; }
+      else                                       { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
     }
 
-    const hit = hits[0];
-    const n   = hit.face!.normal;
-    const p   = hit.point;
-
-    const bx = Math.floor(p.x - n.x * 0.001);
-    const by = Math.floor(p.y - n.y * 0.001);
-    const bz = Math.floor(p.z - n.z * 0.001);
-
-    const id = this.world.getBlock(bx, by, bz);
-    if (id === "air") { this.clearTarget(); return; }
+    if (hitId === "air") { this.clearTarget(); return; }
 
     if (
       !this.targetBlock ||
-      this.targetBlock.wx !== bx ||
-      this.targetBlock.wy !== by ||
-      this.targetBlock.wz !== bz
+      this.targetBlock.wx !== x ||
+      this.targetBlock.wy !== y ||
+      this.targetBlock.wz !== z
     ) {
       this.breakTimer = 0;
-      this.computeBreakHardness(id);
+      this.computeBreakHardness(hitId);
     }
 
-    this.targetBlock   = { wx: bx, wy: by, wz: bz };
-    this.adjacentBlock = {
-      wx: Math.floor(p.x + n.x * 0.001),
-      wy: Math.floor(p.y + n.y * 0.001),
-      wz: Math.floor(p.z + n.z * 0.001),
-    };
+    this.targetBlock   = { wx: x, wy: y, wz: z };
+    this.adjacentBlock = { wx: px, wy: py, wz: pz };
 
-    this.targetHighlight.position.set(bx + 0.5, by + 0.5, bz + 0.5);
+    this.targetHighlight.position.set(x + 0.5, y + 0.5, z + 0.5);
     this.targetHighlight.visible = true;
   }
 

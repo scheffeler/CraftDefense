@@ -1,18 +1,18 @@
 import type { VoxelWorld } from "./Map";
-import { WORLD_WIDTH, WORLD_DEPTH, GROUND_OFFSET } from "./config/map";
+import {
+  WORLD_WIDTH, WORLD_DEPTH, GROUND_OFFSET,
+  FORTRESS_CENTER_X, FORTRESS_CENTER_Z, CLEARING_RADIUS,
+} from "./config/map";
 
 // ---------------------------------------------------------------------------
-// Fortress geometry constants
-// Wall columns: x=18..19 (west), x=44..45 (east), z=18..19 (north), z=44..45 (south)
-// Interior:     x=20..43, z=20..43
+// Layout constants
+// A flat open clearing sits at the world centre; structures keep out of the
+// central box so the player has room to build.
 // ---------------------------------------------------------------------------
 const G = GROUND_OFFSET;               // surface Y alias (blocks sit at Y=G)
-const WX1 = 18, WX2 = 45;              // west/east outermost wall columns
-const WZ1 = 18, WZ2 = 45;              // north/south outermost wall columns
-const WALL_H = 6;                       // wall height above surface
-const GATE_X1 = 30, GATE_X2 = 33;      // gate x span (~centered on x=32)
-const GATE_CENTER_X = 32;              // x center of gate/spawn marker
-const GATE_H = 3;                       // gate opening height
+const WX1 = 18, WX2 = 45;              // central keep-out box for structures
+const WZ1 = 18, WZ2 = 45;
+const GATE_CENTER_X = 32;              // x center of enemy spawn markers
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,6 +25,12 @@ function hash(x: number, z: number): number {
 
 function inFortressBounds(x: number, z: number): boolean {
   return x >= WX1 && x <= WX2 && z >= WZ1 && z <= WZ2;
+}
+
+/** True for cells inside the flat open clearing the player defends and builds in. */
+function inClearing(x: number, z: number): boolean {
+  const dx = x - FORTRESS_CENTER_X, dz = z - FORTRESS_CENTER_Z;
+  return dx * dx + dz * dz <= CLEARING_RADIUS * CLEARING_RADIUS;
 }
 
 type Biome = "forest" | "desert" | "taiga";
@@ -55,8 +61,7 @@ export const DUNGEON_CHEST_POSITIONS: Array<[number, number, number]> = [
 export function generateWorld(world: VoxelWorld): void {
   generateTerrain(world);
   generateCaves(world);
-  generateFortress(world);
-  generateInterior(world);
+  generateStarterShelter(world);
   generateTrees(world);
   generateCacti(world);
   generateVillages(world);
@@ -101,8 +106,9 @@ function generateTerrain(world: VoxelWorld): void {
         }
       }
 
-      if (inFortressBounds(x, z)) {
-        world.setBlock(x, G, z, "cobblestone");
+      if (inClearing(x, z)) {
+        // Flat grassy clearing — the player's build/defense area.
+        world.setBlock(x, G, z, "grass");
         continue;
       }
 
@@ -157,71 +163,28 @@ function smoothNoise(x: number, z: number): number {
   return (n1 + n2 + n3) / 1.6;
 }
 
-function generateFortress(world: VoxelWorld): void {
-  buildWalls(world);
-  buildCornerTowers(world);
-}
-
-function buildWalls(world: VoxelWorld): void {
-  for (let x = WX1; x <= WX2; x++) {
-    for (let z = WZ1; z <= WZ2; z++) {
-      const onWest  = x <= WX1 + 1;
-      const onEast  = x >= WX2 - 1;
-      const onNorth = z <= WZ1 + 1;
-      const onSouth = z >= WZ2 - 1;
-      if (!(onWest || onEast || onNorth || onSouth)) continue;
-
-      const gateX = x >= GATE_X1 && x <= GATE_X2;
-      const northGate = onNorth && gateX;
-      const southGate = onSouth && gateX;
-
-      for (let y = G + 1; y <= G + WALL_H; y++) {
-        if ((northGate || southGate) && y <= G + GATE_H) continue;
-        world.setBlock(x, y, z, y % 3 === 0 ? "stone" : "cobblestone");
-      }
-
-      // Battlement merlons on top (alternating positions)
-      if ((x + z) % 2 === 0) world.setBlock(x, G + WALL_H + 1, z, "cobblestone");
+/**
+ * Starter shelter at the clearing centre: a small cobblestone platform with a
+ * crafting table, furnace and chest. The flag the player defends is a mesh
+ * entity placed by Game.ts and occupies the platform centre.
+ */
+function generateStarterShelter(world: VoxelWorld): void {
+  const cx = FORTRESS_CENTER_X, cz = FORTRESS_CENTER_Z;
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      world.setBlock(cx + dx, G, cz + dz, "cobblestone");
     }
   }
-
-  // Torches along inner face of north/south walls every 6 blocks
-  for (let x = WX1 + 3; x <= WX2 - 3; x += 6) {
-    if (x < GATE_X1 - 1 || x > GATE_X2 + 1) {
-      world.setBlock(x, G + 3, WZ1 + 2, "torch"); // north wall inner face
-      world.setBlock(x, G + 3, WZ2 - 2, "torch"); // south wall inner face
-    }
-  }
-  // Torches along inner face of east/west walls
-  for (let z = WZ1 + 3; z <= WZ2 - 3; z += 6) {
-    world.setBlock(WX1 + 2, G + 3, z, "torch"); // west wall inner face
-    world.setBlock(WX2 - 2, G + 3, z, "torch"); // east wall inner face
-  }
-}
-
-function buildCornerTowers(world: VoxelWorld): void {
-  const corners: [number, number][] = [
-    [WX1,     WZ1    ],
-    [WX2 - 2, WZ1    ],
-    [WX1,     WZ2 - 2],
-    [WX2 - 2, WZ2 - 2],
-  ];
-  for (const [cx, cz] of corners) {
-    for (let dx = 0; dx < 3; dx++) {
-      for (let dz = 0; dz < 3; dz++) {
-        for (let y = G + 1; y <= G + WALL_H + 2; y++) {
-          world.setBlock(cx + dx, y, cz + dz, "cobblestone");
-        }
-      }
-    }
-    world.setBlock(cx + 1, G + WALL_H + 3, cz + 1, "torch");
-  }
+  world.setBlock(cx - 2, G + 1, cz - 2, "crafting_table");
+  world.setBlock(cx + 2, G + 1, cz - 2, "furnace");
+  world.setBlock(cx - 2, G + 1, cz + 2, "chest");
+  world.setBlock(cx + 2, G + 1, cz + 2, "torch");
 }
 
 function generateTrees(world: VoxelWorld): void {
   for (let x = 2; x < WORLD_WIDTH - 2; x++) {
     for (let z = 2; z < WORLD_DEPTH - 2; z++) {
-      if (x >= WX1 - 6 && x <= WX2 + 6 && z >= WZ1 - 6 && z <= WZ2 + 6) continue;
+      if (inClearing(x, z)) continue;   // keep the build clearing open
       if (z <= 7 || z >= WORLD_DEPTH - 8) continue;
 
       const biome = getBiome(x, z);
@@ -334,82 +297,6 @@ function generateCacti(world: VoxelWorld): void {
 }
 
 // Ore outcroppings now handled by terrain generation (ore embedded in hills)
-
-function generateInterior(world: VoxelWorld): void {
-  // Stone-paved floor path from north gate to south gate
-  for (let z = WZ1 + 2; z <= WZ2 - 2; z++) {
-    for (let x = GATE_X1; x <= GATE_X2; x++) {
-      world.setBlock(x, G, z, "cobblestone");
-    }
-  }
-
-  // Cobblestone border around interior perimeter
-  for (let x = WX1 + 2; x <= WX2 - 2; x++) {
-    world.setBlock(x, G, WZ1 + 2, "cobblestone");
-    world.setBlock(x, G, WZ2 - 2, "cobblestone");
-  }
-  for (let z = WZ1 + 2; z <= WZ2 - 2; z++) {
-    world.setBlock(WX1 + 2, G, z, "cobblestone");
-    world.setBlock(WX2 - 2, G, z, "cobblestone");
-  }
-
-  // Central well
-  const cx = 32, cz = 32;
-  for (let angle = 0; angle < 8; angle++) {
-    const a = angle / 8 * Math.PI * 2;
-    const wx = Math.round(cx + Math.cos(a) * 2);
-    const wz = Math.round(cz + Math.sin(a) * 2);
-    world.setBlock(wx, G + 1, wz, "cobblestone");
-    world.setBlock(wx, G + 2, wz, "cobblestone");
-  }
-  world.setBlock(cx, G, cz, "cobblestone");
-  world.setBlock(cx, G + 3, cz - 2, "torch");
-  world.setBlock(cx, G + 3, cz + 2, "torch");
-
-  // East shack (crafting area)
-  for (let dx = 0; dx < 3; dx++) {
-    world.setBlock(38 + dx, G + 1, 28, "planks");
-    world.setBlock(38 + dx, G + 1, 31, "planks");
-    world.setBlock(38 + dx, G + 2, 28, "planks");
-    world.setBlock(38 + dx, G + 2, 31, "planks");
-    world.setBlock(38 + dx, G + 3, 28, "wood");
-    world.setBlock(38 + dx, G + 3, 31, "wood");
-  }
-  world.setBlock(38, G + 1, 29, "planks");
-  world.setBlock(38, G + 1, 30, "planks");
-  world.setBlock(38, G + 2, 29, "planks");
-  world.setBlock(38, G + 2, 30, "planks");
-  for (let dx = 0; dx < 3; dx++) {
-    for (let dz = 0; dz < 4; dz++) {
-      world.setBlock(38 + dx, G + 4, 28 + dz, "planks");
-    }
-  }
-  world.setBlock(39, G + 1, 29, "crafting_table");
-  world.setBlock(39, G + 1, 30, "furnace");
-  world.setBlock(38, G + 1, 30, "chest");
-  world.setBlock(40, G + 3, 30, "torch");
-
-  // West shack (barracks)
-  for (let dx = 0; dx < 3; dx++) {
-    world.setBlock(22 + dx, G + 1, 28, "planks");
-    world.setBlock(22 + dx, G + 1, 31, "planks");
-    world.setBlock(22 + dx, G + 2, 28, "planks");
-    world.setBlock(22 + dx, G + 2, 31, "planks");
-    world.setBlock(22 + dx, G + 3, 28, "wood");
-    world.setBlock(22 + dx, G + 3, 31, "wood");
-  }
-  world.setBlock(24, G + 1, 29, "planks");
-  world.setBlock(24, G + 1, 30, "planks");
-  world.setBlock(24, G + 2, 29, "planks");
-  world.setBlock(24, G + 2, 30, "planks");
-  for (let dx = 0; dx < 3; dx++) {
-    for (let dz = 0; dz < 4; dz++) {
-      world.setBlock(22 + dx, G + 4, 28 + dz, "planks");
-    }
-  }
-  world.setBlock(24, G + 3, 30, "torch");
-  world.setBlock(22, G + 1, 30, "chest");
-}
 
 function generateSpawnMarkers(world: VoxelWorld): void {
   for (let y = G + 1; y <= G + 5; y++) {

@@ -40,7 +40,7 @@ function isWater(world: VoxelWorld, wx: number, wy: number, wz: number): boolean
  * Checks if the AABB at `pos` (feet position) overlaps any solid voxel.
  * Returns true if there is overlap.
  */
-function overlapsWorld(world: VoxelWorld, pos: THREE.Vector3): boolean {
+export function overlapsWorld(world: VoxelWorld, pos: THREE.Vector3): boolean {
   const aabb = playerAABB(pos);
   const x0 = Math.floor(aabb.min.x), x1 = Math.floor(aabb.max.x - 0.001);
   const y0 = Math.floor(aabb.min.y), y1 = Math.floor(aabb.max.y - 0.001);
@@ -53,6 +53,35 @@ function overlapsWorld(world: VoxelWorld, pos: THREE.Vector3): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Finds a spawn position whose player AABB does not overlap any solid voxel.
+ * Starts at the preferred (cx, cy, cz), then searches outward in expanding
+ * square rings on the X/Z plane, trying a few heights at each cell. Guarantees
+ * the player never spawns embedded in geometry (e.g. the fortress well ring).
+ */
+export function findSafeSpawn(
+  world: VoxelWorld,
+  cx: number,
+  cy: number,
+  cz: number,
+): THREE.Vector3 {
+  const probe = new THREE.Vector3();
+  for (let r = 0; r <= 10; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        // Only the outer ring at this radius (inner cells already tried).
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        for (let dy = 0; dy <= 4; dy++) {
+          probe.set(cx + dx, cy + dy, cz + dz);
+          if (!overlapsWorld(world, probe)) return probe.clone();
+        }
+      }
+    }
+  }
+  // Fallback: drop the player in well above the surface and let gravity settle.
+  return new THREE.Vector3(cx, cy + 6, cz);
 }
 
 /**

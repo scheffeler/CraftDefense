@@ -322,6 +322,27 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "bread", count: 1 },
   },
 
+  // --- Flint and Steel ---
+  {
+    id: "flint_and_steel",
+    pattern: [
+      [r("iron_ingot")],
+      [r("flint")     ],
+    ],
+    result: { itemId: "flint_and_steel", count: 1 },
+  },
+
+  // --- TNT (5 gunpowder + 4 sand, alternating) ---
+  {
+    id: "tnt",
+    pattern: [
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+    ],
+    result: { itemId: "tnt", count: 1 },
+  },
+
   // --- Bed (3 planks + 3 wool) ---
   {
     id: "bed",
