@@ -249,42 +249,68 @@ export class SceneManager {
     const def = ITEMS[itemId];
     if (!def) return;
 
-    const itemMesh = this.buildItemMesh(def.id, def.category, def.color);
+    const itemMesh = def.weaponType === "gun"
+      ? (def.id === "pistol" ? this.buildPistolMesh() : this.buildGunMesh(def.color))
+      : this.buildItemMesh(def.category, def.color);
     if (itemMesh) this.armGroup.add(itemMesh);
   }
 
-  private buildItemMesh(itemId: string, category: string, color: number): THREE.Object3D | null {
-    if (itemId === "pistol") {
-      const g = new THREE.Group();
-      const metalMat = new THREE.MeshLambertMaterial({ color: 0x445566 });
-      const gripMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a22 });
-      const slideMat = new THREE.MeshLambertMaterial({ color: 0x556677 });
+  /** Compact pistol viewmodel (upright, side-held style). */
+  private buildPistolMesh(): THREE.Object3D {
+    const g = new THREE.Group();
+    const metalMat = new THREE.MeshLambertMaterial({ color: 0x445566 });
+    const gripMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a22 });
+    const slideMat = new THREE.MeshLambertMaterial({ color: 0x556677 });
 
-      // Grip (handle) — vertical below slide
-      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.07), gripMat);
-      grip.position.set(-0.01, 0.05, 0.01);
-      grip.rotation.x = 0.18;
-      g.add(grip);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.07), gripMat);
+    grip.position.set(-0.01, 0.05, 0.01);
+    grip.rotation.x = 0.18;
+    g.add(grip);
 
-      // Slide/body — main block
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.04), slideMat);
-      body.position.set(-0.01, 0.24, -0.01);
-      g.add(body);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.04), slideMat);
+    body.position.set(-0.01, 0.24, -0.01);
+    g.add(body);
 
-      // Barrel — thinner, extends above body
-      const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.03), metalMat);
-      barrel.position.set(-0.01, 0.39, -0.01);
-      g.add(barrel);
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.03), metalMat);
+    barrel.position.set(-0.01, 0.39, -0.01);
+    g.add(barrel);
 
-      // Trigger guard
-      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.04), gripMat);
-      guard.position.set(-0.01, 0.14, -0.01);
-      g.add(guard);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.04), gripMat);
+    guard.position.set(-0.01, 0.14, -0.01);
+    g.add(guard);
 
-      g.rotation.z = 0.3;
-      return g;
-    }
+    g.rotation.z = 0.3;
+    return g;
+  }
 
+  /** Builds a first-person gun viewmodel (long barrel pointing forward — used by sniper & future guns). */
+  private buildGunMesh(color: number): THREE.Object3D {
+    const g = new THREE.Group();
+    const bodyMat = new THREE.MeshLambertMaterial({ color });
+    const darkMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.5), bodyMat);
+    barrel.position.set(0.06, 0.26, -0.16);
+    g.add(barrel);
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.22), bodyMat);
+    body.position.set(0.06, 0.24, 0.04);
+    g.add(body);
+
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.18, 0.07), darkMat);
+    grip.position.set(0.06, 0.12, 0.08);
+    grip.rotation.x = 0.25;
+    g.add(grip);
+
+    const scope = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.18), darkMat);
+    scope.position.set(0.06, 0.30, -0.05);
+    g.add(scope);
+
+    g.position.set(0.04, 0.08, 0.0);
+    return g;
+  }
+
+  private buildItemMesh(category: string, color: number): THREE.Object3D | null {
     if (category === "block") {
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), mat);

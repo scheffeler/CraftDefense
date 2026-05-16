@@ -326,3 +326,48 @@ canvas { display: block; position: absolute; inset: 0; }
   80%  { opacity: 0.8; }
   100% { opacity: 0; transform: translateX(-50%) translateY(-48px); }
 }
+
+/* ── Sniper Scope Overlay ────────────────────────────────── */
+.fps-scope-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+  background: radial-gradient(
+    circle at center,
+    transparent 18%,
+    rgba(0,0,0,0.97) 18.5%
+  );
+}
+
+.fps-scope-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 200, 50, 0.6),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.5);
+  margin: auto;
+  width: 36%;
+  height: 36%;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Crosshair lines inside scope */
+.fps-scope-overlay::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36%;
+  height: 36%;
+  background:
+    linear-gradient(rgba(0,200,50,0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,50,0.5) 1px, transparent 1px);
+  background-size: 100% 50%, 50% 100%;
+  background-position: center center;
+  border-radius: 50%;
+  clip-path: circle(50%);
+}

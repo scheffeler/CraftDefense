@@ -138,6 +138,7 @@ export class UI {
   private lockPrompt!: HTMLElement;
   private continueBtn!: HTMLElement;
   private ammoDisplay!: HTMLElement;
+  private scopeOverlay!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
   private deathOverlay!: HTMLElement;
@@ -384,6 +385,11 @@ export class UI {
     setTimeout(() => el.remove(), 600);
   }
 
+  showScopeOverlay(show: boolean): void {
+    this.scopeOverlay.style.display = show ? "block" : "none";
+    this.crosshair.style.display    = show ? "none"  : "block";
+  }
+
   flashThunder(): void {
     const el = document.createElement("div");
     el.className = "thunder-flash";
@@ -426,6 +432,10 @@ export class UI {
     this.crosshair = div("fps-crosshair");
     this.crosshair.innerHTML = `<span class="fps-ch-h"></span><span class="fps-ch-v"></span>`;
     this.container.appendChild(this.crosshair);
+
+    this.scopeOverlay = div("fps-scope-overlay");
+    this.scopeOverlay.style.display = "none";
+    this.container.appendChild(this.scopeOverlay);
 
     this.elObjective = div("fps-objective");
     this.container.appendChild(this.elObjective);

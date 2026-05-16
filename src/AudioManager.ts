@@ -10,7 +10,7 @@ type SoundName =
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
   | "splash" | "thunder" | "creeper_hiss"
-  | "pistol_shot";
+  | "pistol_shot" | "sniper_fire" | "scope_in";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -414,11 +414,10 @@ export class AudioManager {
 
       case "pistol_shot": {
         // Sharp gunshot: low bang + high crack + metallic click
-        noiseBurst(0.5, 60, 0.05);           // low body thud
-        noiseBurst(0.25, 3000, 0.015);        // high crack
-        tone(80, 0.08, "sawtooth", 0.7);      // bass boom
-        tone(2400, 0.012, "square", 0.3);     // snap
-        // Quick metallic tick (shell casing)
+        noiseBurst(0.5, 60, 0.05);
+        noiseBurst(0.25, 3000, 0.015);
+        tone(80, 0.08, "sawtooth", 0.7);
+        tone(2400, 0.012, "square", 0.3);
         const tickTime = ctx.currentTime + 0.06;
         const tickOsc = ctx.createOscillator();
         const tickGain = ctx.createGain();
@@ -427,6 +426,43 @@ export class AudioManager {
         tickGain.gain.exponentialRampToValueAtTime(0.001, tickTime + 0.025);
         tickOsc.connect(tickGain); tickGain.connect(dest);
         tickOsc.start(tickTime); tickOsc.stop(tickTime + 0.03);
+        break;
+      }
+
+      case "sniper_fire": {
+        // Loud sharp crack: low-freq boom + high transient
+        const crackDur = 0.5;
+        const cbuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * crackDur), ctx.sampleRate);
+        const cd = cbuf.getChannelData(0);
+        for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1);
+        const cfilt = ctx.createBiquadFilter();
+        cfilt.type = "lowpass"; cfilt.frequency.value = 800;
+        const csrc = ctx.createBufferSource();
+        csrc.buffer = cbuf;
+        const crackGain = ctx.createGain();
+        crackGain.gain.setValueAtTime(vol * 1.4, ctx.currentTime);
+        crackGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + crackDur);
+        csrc.connect(cfilt); cfilt.connect(crackGain); crackGain.connect(dest);
+        csrc.start();
+        const clickOsc = ctx.createOscillator();
+        clickOsc.frequency.value = 120;
+        const clickGain = ctx.createGain();
+        clickGain.gain.setValueAtTime(vol * 0.8, ctx.currentTime);
+        clickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        clickOsc.connect(clickGain); clickGain.connect(dest);
+        clickOsc.start(); clickOsc.stop(ctx.currentTime + 0.08);
+        break;
+      }
+
+      case "scope_in": {
+        const sClickOsc = ctx.createOscillator();
+        sClickOsc.type = "square";
+        sClickOsc.frequency.value = 800;
+        const sClickGain = ctx.createGain();
+        sClickGain.gain.setValueAtTime(vol * 0.2, ctx.currentTime);
+        sClickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+        sClickOsc.connect(sClickGain); sClickGain.connect(dest);
+        sClickOsc.start(); sClickOsc.stop(ctx.currentTime + 0.04);
         break;
       }
     }

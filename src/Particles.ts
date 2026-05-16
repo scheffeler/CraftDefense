@@ -90,6 +90,20 @@ export class ParticleSystem {
     }
   }
 
+  /** Small impact sparks at bullet hit point. */
+  spawnBulletImpact(x: number, y: number, z: number): void {
+    for (let i = 0; i < 6; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.05, 0.05),
+        new THREE.MeshBasicMaterial({ color: 0xffcc44 }),
+      );
+      mesh.position.set(x, y, z);
+      const theta = Math.random() * Math.PI * 2;
+      const spd   = 2 + Math.random() * 3;
+      this.spawnParticle(mesh, Math.cos(theta) * spd, 1 + Math.random() * 2, Math.sin(theta) * spd, 0.25 + Math.random() * 0.2);
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

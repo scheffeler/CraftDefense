@@ -394,6 +394,25 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+  // --- Sniper Ammo (flint + iron ingot = 8 rounds) ---
+  {
+    id: "sniper_ammo",
+    pattern: [
+      [r("flint"), r("iron_ingot")],
+    ],
+    result: { itemId: "sniper_ammo", count: 8 },
+  },
+
+  // --- Sniper Rifle (iron ingots in barrel + body + grip) ---
+  {
+    id: "sniper_rifle",
+    pattern: [
+      [null,            r("iron_ingot"), r("iron_ingot")],
+      [r("iron_ingot"), r("iron_ingot"), r("iron_ingot")],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "sniper_rifle", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

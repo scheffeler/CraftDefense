@@ -15,7 +15,7 @@ import { AudioManager } from "./AudioManager";
 import { ParticleSystem } from "./Particles";
 import { BLOCK_BEHAVIORS } from "./config/blocks";
 import { BLOCK_DEFS } from "./Map";
-import { ITEMS } from "./config/items";
+import { ITEMS, type ItemDef } from "./config/items";
 import { getSpawnPositions, DUNGEON_CHEST_POSITIONS } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
@@ -95,11 +95,12 @@ export class Game {
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
 
-  // Gun fire cooldowns
-  private pistolCooldown = 0;
-
   // Achievement tracking
   private readonly _achievements = new Set<string>();
+
+  // Gun state
+  private gunCooldown    = 0;
+  private isSniperScoped = false;
 
   // Item entity drops — floating 3D items in the world
   private readonly itemEntities: Array<{
@@ -216,7 +217,7 @@ export class Game {
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"pistol",        count:1 }, { itemId:"bullet", count:24 }, { itemId:"gunpowder", count:6 }, { itemId:"iron_ingot", count:4 },
+      [{ itemId:"sniper_rifle", count:1 }, { itemId:"sniper_ammo", count:16 }, { itemId:"pistol", count:1 }, { itemId:"bullet", count:16 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
@@ -293,6 +294,10 @@ export class Game {
     // Hotbar slot selection
     this.input.onSlotChange = (slot) => {
       this.inventory.activeSlot = slot;
+      if (this.isSniperScoped) {
+        this.isSniperScoped = false;
+        this.ui.showScopeOverlay(false);
+      }
       this.refreshHotbar();
     };
 
@@ -326,12 +331,13 @@ export class Game {
       this.ui.showRecipeBook(nowOpen);
     };
 
-    // Left click — melee attack or gun fire (mining handled by isLeftMouseDown in update)
+    // Left click — melee attack / gun fire (mining is handled by isLeftMouseDown in update)
     this.input.onLeftClick = () => {
       if (this.ui.isInventoryOpen()) return;
-      const activeStack = this.inventory.getActiveItem();
-      if (activeStack?.itemId === "pistol") {
-        this.tryPistolShot();
+      const stack   = this.inventory.getActiveItem();
+      const itemDef = stack ? ITEMS[stack.itemId] : null;
+      if (itemDef?.weaponType === "gun") {
+        this.tryGunFire(itemDef);
         return;
       }
       if (!this.blockInteraction.getTargetBlock()) this.tryMeleeAttack();
@@ -427,7 +433,12 @@ export class Game {
         return;
       }
 
-      if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
+      if (itemDef?.id === "sniper_rifle") {
+        this.isSniperScoped = !this.isSniperScoped;
+        this.ui.showScopeOverlay(this.isSniperScoped);
+        this.audio.play("scope_in", 0.4);
+        return;
+      } else if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
       } else if (itemDef?.category === "food" && itemDef.foodPoints && this.player.hunger < 20) {
@@ -967,9 +978,6 @@ export class Game {
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
-    // Decrement gun cooldowns
-    this.pistolCooldown = Math.max(0, this.pistolCooldown - dt);
-
     // Player movement + bow charge accumulation
     const input = this.input.getMovementInput();
     this.player.update(dt, input);
@@ -1083,8 +1091,12 @@ export class Game {
       this.ui.showContinueButton(true);
     }
 
-    // Sprint FOV
-    this.scene.setFOV(input.sprint && isMovingH ? 85 : 75, dt);
+    // Sprint / scope FOV
+    const targetFOV = this.isSniperScoped ? 20 : (input.sprint && isMovingH ? 85 : 75);
+    this.scene.setFOV(targetFOV, dt);
+
+    // Gun cooldown
+    this.gunCooldown = Math.max(0, this.gunCooldown - dt);
     this.scene.updateShake(dt);
 
     // Sync armor value each frame
@@ -1484,62 +1496,81 @@ export class Game {
     }
   }
 
-  private tryPistolShot(): void {
+  private tryGunFire(def: ItemDef): void {
     if (this.phase !== "playing" && this.mode !== "freeplay") return;
-    if (this.pistolCooldown > 0) return;
+    if (this.gunCooldown > 0) return;
 
-    const stack   = this.inventory.getActiveItem();
-    const itemDef = stack ? ITEMS[stack.itemId] : null;
-    if (!itemDef || itemDef.id !== "pistol") return;
-
-    const ammoId = itemDef.ammoId ?? "bullet";
-    if (!this.inventory.hasItem(ammoId, 1)) {
-      this.audio.play("ui_click", 0.3);
-      this.pistolCooldown = 0.5;
+    const ammoId = def.ammoType;
+    if (ammoId && !this.inventory.hasItem(ammoId, 1)) {
+      this.ui.showBlockTooltip("No ammo!");
+      setTimeout(() => this.ui.showBlockTooltip(null), 1200);
       return;
     }
 
-    this.pistolCooldown = itemDef.fireRate ?? 0.35;
+    this.gunCooldown = def.gunCooldown ?? 1;
+    const range      = def.gunRange ?? 30;
+    const hitRadius  = def.id === "sniper_rifle" ? 1.2 : 0.85;
+    const damage     = def.damage ?? 10;
+    const isSniper   = def.id === "sniper_rifle";
 
-    // Hitscan: find closest enemy on the look ray
-    const origin  = this.player.getCameraPosition();
-    const dir     = this.player.getLookDirection();
-    const maxRange = itemDef.range ?? 60;
-    const hitRadius = 0.85;
+    const from = this.player.getCameraPosition();
+    const dir  = this.player.getLookDirection();
 
+    let closestT  = range;
     let closestId = -1;
-    let closestT  = maxRange;
 
     for (const state of this.enemies.getAliveEnemies()) {
       const pos = this.enemies.getEnemyPosition(state.id);
       if (!pos) continue;
-      const delta = pos.clone().sub(origin);
-      const t = delta.dot(dir);
-      if (t <= 0 || t > maxRange) continue;
-      const lateral = delta.clone().sub(dir.clone().multiplyScalar(t)).length();
-      if (lateral < hitRadius && t < closestT) {
+      const toEnemy = pos.clone().sub(from);
+      const t       = toEnemy.dot(dir);
+      if (t < 0 || t > range) continue;
+      const closest = from.clone().addScaledVector(dir, t);
+      if (closest.distanceTo(pos) < hitRadius && t < closestT) {
         closestT  = t;
         closestId = state.id;
       }
     }
 
-    const damage = (itemDef.damage ?? 12) + this.getEnchantDamageBonus(stack);
-
-    if (closestId >= 0) {
+    const hitPos = closestId >= 0 ? this.enemies.getEnemyPosition(closestId) : null;
+    if (closestId >= 0 && hitPos) {
       this.enemies.damage(closestId, damage);
-      const pos = this.enemies.getEnemyPosition(closestId);
-      if (pos) {
-        this.audio.play("hit", 0.45);
-        this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
-        this.particles.spawnBlockBreak(pos.x, pos.y + 1, pos.z, 0xff4444);
-      }
+      this.showDamageNumber(damage, hitPos.x, hitPos.y + 1.8, hitPos.z);
+      this.particles.spawnBulletImpact(hitPos.x, hitPos.y + 1, hitPos.z);
+      this.audio.play("hit", isSniper ? 0.25 : 0.45);
     }
 
-    this.inventory.removeItem(ammoId, 1);
-    this.audio.play("pistol_shot", 0.85);
-    this.scene.shake(0.05, 0.18);
+    if (ammoId) {
+      this.inventory.removeItem(ammoId, 1);
+      this.refreshHotbar();
+    }
+
     this.scene.swingArm();
-    this.refreshHotbar();
+    this.scene.shake(isSniper ? 0.18 : 0.05, isSniper ? 0.25 : 0.18);
+    this.audio.play(isSniper ? "sniper_fire" : "pistol_shot", isSniper ? 0.9 : 0.85);
+
+    if (isSniper) {
+      const endPos = hitPos
+        ? hitPos.clone().add(new THREE.Vector3(0, 1, 0))
+        : from.clone().addScaledVector(dir, range);
+      this.spawnTracerLine(from, endPos);
+    }
+  }
+
+  private spawnTracerLine(from: THREE.Vector3, to: THREE.Vector3): void {
+    const points = [from.clone(), to.clone()];
+    const geo  = new THREE.BufferGeometry().setFromPoints(points);
+    const mat  = new THREE.LineBasicMaterial({ color: 0xffff88, transparent: true, opacity: 0.7 });
+    const line = new THREE.Line(geo, mat);
+    this.scene.scene.add(line);
+    let t = 0;
+    const fade = () => {
+      t += 0.016;
+      mat.opacity = Math.max(0, 0.7 - t * 4);
+      if (mat.opacity > 0) requestAnimationFrame(fade);
+      else { this.scene.scene.remove(line); geo.dispose(); mat.dispose(); }
+    };
+    requestAnimationFrame(fade);
   }
 
   private unlockAchievement(id: string, title: string, desc: string): void {
@@ -1616,8 +1647,8 @@ export class Game {
 
     // Ammo counter for guns
     const itemDef = active ? ITEMS[active.itemId] : null;
-    if (itemDef?.ammoId) {
-      const ammoCount = this.inventory.countItem(itemDef.ammoId);
+    if (itemDef?.ammoType) {
+      const ammoCount = this.inventory.countItem(itemDef.ammoType);
       this.ui.updateAmmoDisplay(ammoCount);
     } else {
       this.ui.updateAmmoDisplay(null);

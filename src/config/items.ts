@@ -5,6 +5,8 @@ export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "mat
 export type ToolTier     = "wood" | "stone" | "iron" | "diamond";
 export type ArmorSlot    = "head" | "chest" | "legs" | "feet";
 
+export type WeaponType = "melee" | "ranged" | "gun";
+
 export interface ItemDef {
   id:         string;
   name:       string;
@@ -17,6 +19,11 @@ export interface ItemDef {
   damage?:       number;
   speedMult?:    number;       // mining speed multiplier
   durability?:   number;
+  // Gun-specific
+  weaponType?:  WeaponType;
+  ammoType?:    string;        // itemId of required ammo
+  gunRange?:    number;        // hitscan range in world units
+  gunCooldown?: number;        // seconds between shots
   // Food
   foodPoints?:   number;
   // Armor
@@ -24,10 +31,6 @@ export interface ItemDef {
   armorSlot?:    ArmorSlot;
   // Placeable block
   placesBlock?:  BlockId;
-  // Ranged gun weapon
-  ammoId?:       string;
-  fireRate?:     number;   // seconds between shots
-  range?:        number;   // max hitscan range in blocks
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -125,7 +128,7 @@ export const ITEMS: Record<string, ItemDef> = {
   pistol: {
     id:"pistol", name:"Pistol", category:"weapon", stackSize:1,
     color:0x445566, damage:12, durability:250,
-    ammoId:"bullet", fireRate:0.35, range:60,
+    weaponType:"gun", ammoType:"bullet", gunCooldown:0.35, gunRange:60,
   },
 
   // --- Iron armor ---
@@ -133,4 +136,12 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_chestplate: { id:"iron_chestplate", name:"Iron Chestplate", category:"armor", stackSize:1, color:0xbbbbbb, armorValue:5, armorSlot:"chest" },
   iron_leggings:   { id:"iron_leggings",   name:"Iron Leggings",   category:"armor", stackSize:1, color:0xbbbbbb, armorValue:4, armorSlot:"legs"  },
   iron_boots:      { id:"iron_boots",      name:"Iron Boots",      category:"armor", stackSize:1, color:0xbbbbbb, armorValue:2, armorSlot:"feet"  },
+
+  // --- Guns & ammo ---
+  sniper_ammo:  { id:"sniper_ammo",  name:"Sniper Ammo",  category:"material", stackSize:64, color:0xcccc88 },
+  sniper_rifle: {
+    id:"sniper_rifle", name:"Sniper Rifle", category:"weapon", stackSize:1, color:0x445566,
+    damage:28, durability:60,
+    weaponType:"gun", ammoType:"sniper_ammo", gunRange:60, gunCooldown:2.2,
+  },
 };
