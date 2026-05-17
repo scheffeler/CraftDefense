@@ -1,5 +1,35 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-17 — Sniper Scope Overlay (Run 14)
+
+### What was done
+- **Sniper scope visual overlay** — when the player right-clicks with the sniper rifle, a full-screen CSS scope overlay renders on top of the game canvas:
+  - Radial-gradient dark vignette: `rgba(0,0,0,0.98)` outside a 28 vmin radius circle, giving a clean black ocular surround with only a central 56 vmin circle visible
+  - `.scope-ring`: 56 vmin × 56 vmin border circle (1.5px semi-transparent green), with inset box-shadow for lens depth
+  - `.scope-ch-hl` / `.scope-ch-hr`: horizontal crosshair half-lines, 22 vmin wide with 16px center gap
+  - `.scope-ch-vt` / `.scope-ch-vb`: vertical crosshair half-lines, 22 vmin tall with 16px center gap
+  - `.scope-dot`: 3 px center dot
+  - Two `.scope-mildot` range markers at 8 vmin and 14 vmin below center
+  - Two `.scope-tick` horizontal ticks at matching positions
+  - All elements use `rgba(138,170,138,…)` — muted military green for realism
+- FOV already set to 20 on scope-in (existing Game.ts code) — overlay appears on same `showScopeOverlay(true)` call
+- All styling in `src/UI.ts` `buildCSS()` / `build()` — no new files added
+
+### Notes for next run
+- `npm install` required at session start (node_modules not committed)
+- `npx tsc -p tsconfig.emit.json` exits 0 cleanly (TS5107 is pre-existing deprecation noise)
+- Playwright: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (executablePath override)
+- Dev server: `npm run dev` → port 5175
+- Screenshot script: `node scripts/screenshot-scope.mjs`
+
+### Ideas for next run
+- **Best Endless Wave scoreboard**: track + display highest endless wave in gameover/victory screen
+- **Skeleton flee behavior**: below 30% HP, skeleton runs away briefly then reverses
+- **Spider web shot**: spider fires web projectile that slows player 2s
+- **Troll stomping visual polish**: screen-space shockwave ring (CSS/canvas overlay expanding circle)
+- **Ammo refill station**: craftable block converting iron_ingots → ammo at 1/sec when player nearby
+- **Weapon hotbar ammo display**: show bullet count directly on hotbar slot overlay
+
 ## 2026-05-17 — Troll Stomp Attack (Run 12)
 
 ### What was done

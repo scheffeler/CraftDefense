@@ -464,6 +464,18 @@ export class UI {
     this.container.appendChild(this.crosshair);
 
     this.scopeOverlay = div("fps-scope-overlay");
+    // Pure CSS elements so sizing uses the same vmin units as the radial-gradient.
+    this.scopeOverlay.innerHTML = `
+      <div class="scope-ring"></div>
+      <div class="scope-ch-hl"></div>
+      <div class="scope-ch-hr"></div>
+      <div class="scope-ch-vt"></div>
+      <div class="scope-ch-vb"></div>
+      <div class="scope-dot"></div>
+      <div class="scope-mildot" style="top:calc(50% + 8vmin)"></div>
+      <div class="scope-mildot" style="top:calc(50% + 14vmin)"></div>
+      <div class="scope-tick" style="top:calc(50% + 8vmin)"></div>
+      <div class="scope-tick" style="top:calc(50% + 14vmin)"></div>`;
     this.scopeOverlay.style.display = "none";
     this.container.appendChild(this.scopeOverlay);
 
@@ -1423,6 +1435,56 @@ const FPS_CSS = `
   position: absolute;
   width: 2px; height: 14px;
   background: #fff;
+}
+
+/* Sniper scope overlay — full-screen dark vignette with circular clear window */
+.fps-scope-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none; z-index: 25;
+  background: radial-gradient(circle at 50% 50%, rgba(0,12,0,0.12) 27.5vmin, rgba(0,0,0,0.98) 28.0vmin);
+}
+/* Scope lens ring — exactly matches the CSS vignette circle */
+.scope-ring {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 56vmin; height: 56vmin; border-radius: 50%;
+  border: 1.5px solid rgba(74,102,74,0.9);
+  box-shadow: inset 0 0 0 3px rgba(20,35,20,0.75), 0 0 0 1px rgba(74,102,74,0.4);
+}
+/* Horizontal crosshair halves — gap in center */
+.scope-ch-hl, .scope-ch-hr {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  height: 1px; background: rgba(138,170,138,0.9);
+  width: calc(22vmin - 8px);
+}
+.scope-ch-hl { right: calc(50% + 8px); }
+.scope-ch-hr { left:  calc(50% + 8px); }
+/* Vertical crosshair halves */
+.scope-ch-vt, .scope-ch-vb {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 1px; background: rgba(138,170,138,0.9);
+  height: calc(22vmin - 8px);
+}
+.scope-ch-vt { bottom: calc(50% + 8px); }
+.scope-ch-vb { top:    calc(50% + 8px); }
+/* Center dot */
+.scope-dot {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 3px; border-radius: 50%;
+  background: rgba(138,170,138,1.0);
+}
+/* Mil-dot reticle marks below center */
+.scope-mildot {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(138,170,138,0.85);
+}
+/* Horizontal ticks beside mil-dots */
+.scope-tick {
+  position: absolute; left: 50%; transform: translate(-50%, -50%);
+  width: 10px; height: 1px;
+  background: rgba(138,170,138,0.65);
 }
 
 /* Crossbow loading bar — appears below crosshair */
