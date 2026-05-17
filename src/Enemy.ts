@@ -28,9 +28,12 @@ interface SkeletonArrow {
   active: boolean;
 }
 
-const SKELETON_ARROW_POOL = 30;
-const SKELETON_SHOOT_RANGE = 7.5;
+const SKELETON_ARROW_POOL    = 30;
+const SKELETON_SHOOT_RANGE   = 7.5;
 const SKELETON_SHOOT_INTERVAL = 2.2;
+const SKELETON_STRAFE_SPEED  = 1.8;  // lateral units/sec while aiming
+const SKELETON_STRAFE_FLIP   = 1.6;  // seconds between direction flips
+const KNOCKBACK_STAGGER      = 0.35; // seconds enemies are staggered after knockback
 
 export class EnemyManager {
   private readonly enemies   = new Map<number, EnemyState>();
@@ -226,13 +229,19 @@ export class EnemyManager {
     }
   }
 
-  damage(id: number, amount: number, slowFactor = 1.0, slowDuration = 0): void {
+  damage(id: number, amount: number, slowFactor = 1.0, slowDuration = 0, knockback = false): void {
     const state = this.enemies.get(id);
     if (!state || !state.alive || state.dying) return;
 
     const prevPct = state.health / state.config.maxHealth;
     state.health = Math.max(0, state.health - amount);
     this.flashHit(id);
+
+    // Brief stagger on melee hit — interrupts skeleton strafe direction
+    if (knockback) {
+      state.knockbackTimer = KNOCKBACK_STAGGER;
+      if (state.config.type === "skeleton") state.strafeTimer = 0; // forces immediate strafe flip
+    }
 
     if (slowFactor < 1.0 && slowDuration > 0) {
       state.speed = Math.min(state.speed, state.config.speed * slowFactor);
@@ -302,6 +311,12 @@ export class EnemyManager {
     id: number, state: EnemyState, group: THREE.Group, dt: number,
   ): void {
     const pos = group.position;
+
+    // Knockback stagger — enemy pauses movement briefly after taking a hit
+    if ((state.knockbackTimer ?? 0) > 0) {
+      state.knockbackTimer = (state.knockbackTimer ?? 0) - dt;
+      return;
+    }
 
     // Reached fortress center?
     const dx = pos.x - FORTRESS_CENTER_X;
@@ -417,11 +432,22 @@ export class EnemyManager {
           state.shootCooldown = SKELETON_SHOOT_INTERVAL;
           this.fireSkeletonArrow(pos, state.config.damage);
         }
-        // Move slower when in shooting range
-        const moveSpeed = state.speed * 0.3;
-        pos.x += flow.dx * moveSpeed * dt;
-        pos.z += flow.dz * moveSpeed * dt;
-        state.movePhase += dt * moveSpeed * 4;
+
+        // Strafe sideways while aiming
+        state.strafeTimer = (state.strafeTimer ?? 0) - dt;
+        if (state.strafeTimer <= 0) {
+          state.strafeDir = (Math.random() < 0.5 ? 1 : -1) as 1 | -1;
+          state.strafeTimer = SKELETON_STRAFE_FLIP + Math.random() * 0.8;
+        }
+        const dir   = state.strafeDir ?? 1;
+        const dLen  = Math.sqrt(dx * dx + dz * dz) || 1;
+        // Perpendicular to player direction
+        const perpX = (-dz / dLen) * dir;
+        const perpZ = (dx / dLen) * dir;
+        pos.x += perpX * SKELETON_STRAFE_SPEED * dt;
+        pos.z += perpZ * SKELETON_STRAFE_SPEED * dt;
+
+        state.movePhase += dt * SKELETON_STRAFE_SPEED * 4;
         this.animateLegs(id, state.movePhase);
         return;
       }

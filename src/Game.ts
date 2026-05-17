@@ -1563,7 +1563,7 @@ export class Game {
     for (const state of this.enemies.getAliveEnemies()) {
       const pos = this.enemies.getEnemyPosition(state.id);
       if (pos && pos.distanceTo(result.center) <= result.radius) {
-        this.enemies.damage(state.id, damage);
+        this.enemies.damage(state.id, damage, 1, 0, true); // knockback on melee
         this.audio.play("hit", 0.4);
         this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
         hitSomething = true;
