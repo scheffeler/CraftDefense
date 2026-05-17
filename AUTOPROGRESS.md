@@ -273,3 +273,39 @@
 - **New biome content**: nether portal (end game), lava biome, new ore types
 - **Wave difficulty scaling**: wave 10+ introduces boss variants, elite mobs
 - **Day/night tie-in**: new hostile mobs that only appear at night in freeplay
+
+## 2026-05-17 — Skeleton Strafe AI + Melee Knockback (Run 11)
+
+### What was done
+- **Skeleton strafe AI**: when within shooting range (7.5 blocks), skeletons now
+  strafe perpendicular to the player direction while aiming. Direction flips
+  every 1.6–2.4 seconds randomly, making them harder to hit with hitscan weapons.
+  Stagger resets the strafe timer immediately for a stumble effect.
+- **Melee knockback stagger**: sword/axe swings now apply a 0.35s movement pause
+  to any enemy hit (`knockback=true` param on `enemies.damage()`). Staggered
+  enemies skip their movement update frame entirely — stops them walking through
+  the player's swing and makes sword combat feel much more satisfying.
+- New `EnemyState` optional fields: `strafeDir`, `strafeTimer`, `knockbackTimer`
+- Constants: `SKELETON_STRAFE_SPEED=1.8`, `SKELETON_STRAFE_FLIP=1.6`, `KNOCKBACK_STAGGER=0.35`
+- Note: a redundant pistol commit was attempted and discarded (all 5 guns already existed)
+
+### Notes for next run
+- All 5 guns + boss + elite mobs + endless mode complete (runs 1–10)
+- Skeleton strafe + melee knockback added this run (Run 11)
+- `npm install` required at session start (node_modules not committed)
+- `npx tsc -p tsconfig.emit.json` exits 0 cleanly
+- Playwright: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (executablePath override)
+- Dev server: `npm run dev` → port 5175
+
+### Ideas for next run
+- **Troll stomp attack**: when troll closes to melee range, it briefly stops and
+  does an AoE stomp that damages the player if nearby (animation + shockwave ring)
+- **Best Endless Wave scoreboard**: track + display high score on victory/gameover screen
+- **Skeleton flee**: when health drops below 30%, skeleton runs away briefly before
+  reversing direction (adds tactical depth — player must chase low-HP skeletons)
+- **Spider web shot**: spider occasionally fires a web projectile that slows player
+  movement for 2s (add WebSlowEffect to Player)
+- **Gun ADS (aim-down-sights)**: right-click zooms in for sniper without scope ring
+  (small FOV shift + steadied crosshair for pistol/shotgun)
+- **Ammo refill station**: craftable block that slowly converts iron_ingots → ammo
+  (iron_ingot per 8 bullets; passive refill 1 round/sec when player is near)
