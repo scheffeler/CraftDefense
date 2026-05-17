@@ -1,5 +1,30 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-17 — Elite Mob Variants (Run 9)
+
+### What was done
+- **Elite mob variants** — from wave 5+, enemies have a scaling chance (8% at wave 5 up to 40% at wave 9+) to spawn as orange-glowing elites:
+  - `spawnElite(type, x, z)` added to `EnemyManager` — 2× HP, 1.5× damage, 3× XP, 1.3× scale, orange emissive glow, gold health bar
+  - `clearSlowTint()` updated to restore elite orange glow after slow effect wears off
+  - `elite?: boolean` field added to `EnemyState` in `types.ts`
+- **Elite kill rewards**: guaranteed 100% drop chance, 2× item count, "★ ELITE KILL!" floating text, "Elite Hunter" achievement unlock on first
+- Elite death → orange-tinted particles; boss (uruk_captain) explicitly excluded from elite chance
+
+### Notes for next run
+- All 5 guns complete (pistol, sniper, shotgun, crossbow, raygun) + boss fight + muzzle flash (runs 1–8)
+- Run 9 added elite mob variants
+- Use `./node_modules/.bin/tsc -p tsconfig.emit.json` to check TypeScript (not global tsc)
+- Playwright executablePath: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
+- Vite available via `npx --yes vite --port XXXX`
+
+### Ideas for next run
+- **Enemy AI improvements**: skeleton archers strafe sideways when shot at; melee enemies block occasionally
+- **Nether portal**: obsidian frame → nether dimension (lava biome, blaze mobs, nether brick blocks)
+- **Reload animation**: gun viewmodel shakes/dips when reloading (per-weapon timing)
+- **Wave 10+ survival**: after boss defeated, option to continue with endless waves, increasing difficulty
+- **Sound polish**: reverb variation for indoor vs outdoor gunshots; boss roar on spawn
+- **Ammo refill station**: craftable block that slowly refills gun ammo (costs iron ingots)
+
 ## 2026-05-17 — Muzzle Flash + Boss Achievement (Run 8)
 
 ### What was done

@@ -90,6 +90,8 @@ export interface EnemyState {
   flashTimer?: number;
   // Skeleton-specific
   shootCooldown?: number;
+  // Elite variant
+  elite?: boolean;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

@@ -540,18 +540,31 @@ export class Game {
     // Enemy events
     this.enemies.onEnemyDied = (state) => {
       const pos = this.enemies.getEnemyPosition(state.id);
+      const isElite = state.elite === true;
+
       if (pos) {
-        this.particles.spawnEnemyDeath(pos.x, pos.y, pos.z, state.config.color);
+        // Elite deaths leave extra particles and a golden flash
+        const deathColor = isElite ? 0xff8800 : state.config.color;
+        this.particles.spawnEnemyDeath(pos.x, pos.y, pos.z, deathColor);
         if (state.config.xpReward) {
-          this.particles.spawnXPOrbs(pos.x, pos.y, pos.z, Math.min(state.config.xpReward, 5));
+          this.particles.spawnXPOrbs(pos.x, pos.y, pos.z, Math.min(state.config.xpReward, 8));
         }
       }
       if (state.config.xpReward) { this.player.addXP(state.config.xpReward); this.refreshXPBar(); }
+
+      if (isElite) {
+        this.unlockAchievement("elite_kill", "Elite Hunter", "Defeated an Elite enemy");
+        this.ui.showFloatingNumber("★ ELITE KILL!", "#ff8800", window.innerWidth / 2, window.innerHeight * 0.35);
+      }
+
       this.unlockAchievement("first_kill", "Monster Hunter", `Defeated your first ${state.config.name}`);
       if (state.config.drops && pos) {
+        // Elites always drop their loot (100% chance each drop)
+        const dropMultiplier = isElite ? 2 : 1;
         for (const drop of state.config.drops) {
-          if (Math.random() < drop.chance) {
-            const count = drop.count ?? 1;
+          const roll = isElite ? 0 : Math.random(); // elites always drop
+          if (roll < drop.chance) {
+            const count = (drop.count ?? 1) * dropMultiplier;
             for (let d = 0; d < count; d++) {
               this.spawnItemEntity(
                 pos.x + (Math.random() - 0.5) * 0.4,
@@ -949,7 +962,15 @@ export class Game {
   private spawnEnemy(type: EnemyTypeName, gate: "north" | "south"): void {
     const positions = getSpawnPositions(gate);
     const [sx, sz]  = positions[Math.floor(Math.random() * positions.length)];
-    this.enemies.spawn(type, sx + 0.5, sz + 0.5);
+
+    // From wave 5+, non-boss enemies have a scaling chance to spawn as elites
+    const eliteChance = type === "uruk_captain" ? 0
+      : Math.min(0.4, (this.waves.wave - 4) * 0.08);   // 8% at wave 5, capping at 40%
+    if (this.waves.wave >= 5 && Math.random() < eliteChance) {
+      this.enemies.spawnElite(type, sx + 0.5, sz + 0.5);
+    } else {
+      this.enemies.spawn(type, sx + 0.5, sz + 0.5);
+    }
   }
 
   private resetGame(): void {

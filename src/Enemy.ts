@@ -78,6 +78,42 @@ export class EnemyManager {
   setFlowField(ff: FlowField): void { this.flowField = ff; }
   setWorld(w: VoxelWorld):     void { this.world = w; }
 
+  /** Spawn an elite variant: 2× HP, 1.5× damage, 1.3× scale, orange glow. */
+  spawnElite(type: EnemyTypeName, spawnX?: number, spawnZ?: number): number {
+    const id = this.spawn(type, spawnX, spawnZ);
+    const state = this.enemies.get(id)!;
+    state.elite = true;
+    // Double HP and bump damage
+    state.health = state.config.maxHealth * 2;
+    // Mutate a copy of config so we don't affect other spawns of same type
+    state.config = {
+      ...state.config,
+      maxHealth: state.config.maxHealth * 2,
+      damage: Math.ceil(state.config.damage * 1.5),
+      xpReward: (state.config.xpReward ?? 10) * 3,
+    };
+    // Visual: 1.3× scale + orange emissive glow
+    const group = this.meshes.get(id);
+    if (group) {
+      group.scale.multiplyScalar(1.3);
+      group.traverse(obj => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mat = (obj as THREE.Mesh).material as THREE.MeshLambertMaterial;
+          if (mat && obj.name !== "boss_eye") {
+            mat.emissive = new THREE.Color(0xff4400);
+            mat.emissiveIntensity = 0.35;
+          }
+        }
+      });
+    }
+    // Gold health bar for elites
+    const hb = this.healthBars.get(id);
+    if (hb) {
+      (hb.bar.material as THREE.MeshBasicMaterial).color.setHex(0xffaa00);
+    }
+    return id;
+  }
+
   spawn(type: EnemyTypeName, spawnX?: number, spawnZ?: number): number {
     const cfg = ENEMY_CONFIGS[type];
     const id  = this.idCounter++;
@@ -828,15 +864,19 @@ export class EnemyManager {
   }
 
   private clearSlowTint(id: number): void {
+    const state = this.enemies.get(id);
     const group = this.meshes.get(id);
     if (!group) return;
+    // Restore elite glow if applicable; otherwise clear entirely
+    const eliteEmissive = state?.elite ? 0xff4400 : 0x000000;
+    const eliteIntensity = state?.elite ? 0.35 : 0;
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      if (m.name === "boss_eye") return; // preserve glowing eyes
+      if (m.name === "boss_eye") return;
       const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(0x000000);
-      mat.emissiveIntensity = 0;
+      mat.emissive.setHex(eliteEmissive);
+      mat.emissiveIntensity = eliteIntensity;
     });
   }
 
