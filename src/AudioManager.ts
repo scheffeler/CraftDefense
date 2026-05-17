@@ -11,7 +11,7 @@ type SoundName =
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
   | "splash" | "thunder" | "creeper_hiss"
   | "pistol_shot" | "sniper_fire" | "scope_in"
-  | "shotgun_blast";
+  | "shotgun_blast" | "raygun_fire";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -474,6 +474,34 @@ export class AudioManager {
         noiseBurst(0.25, 80,  0.14);   // long low rumble
         tone(90,  0.10, "square", 0.6);
         tone(55,  0.18, "sawtooth", 0.4);
+        break;
+      }
+
+      case "raygun_fire": {
+        // Sci-fi zap: descending pitch sweep + electric buzz
+        const zapOsc = ctx.createOscillator();
+        const zapGain = ctx.createGain();
+        zapOsc.type = "sawtooth";
+        zapOsc.frequency.setValueAtTime(2400, ctx.currentTime);
+        zapOsc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.3);
+        zapGain.gain.setValueAtTime(vol * 0.6, ctx.currentTime);
+        zapGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        zapOsc.connect(zapGain); zapGain.connect(dest);
+        zapOsc.start(); zapOsc.stop(ctx.currentTime + 0.35);
+
+        // Harmonic buzz layer
+        const buzzOsc = ctx.createOscillator();
+        const buzzGain = ctx.createGain();
+        buzzOsc.type = "square";
+        buzzOsc.frequency.setValueAtTime(1200, ctx.currentTime);
+        buzzOsc.frequency.linearRampToValueAtTime(400, ctx.currentTime + 0.2);
+        buzzGain.gain.setValueAtTime(vol * 0.3, ctx.currentTime);
+        buzzGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        buzzOsc.connect(buzzGain); buzzGain.connect(dest);
+        buzzOsc.start(); buzzOsc.stop(ctx.currentTime + 0.2);
+
+        // Impact pop
+        noiseBurst(0.15, 3000, 0.02);
         break;
       }
     }

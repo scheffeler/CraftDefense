@@ -444,6 +444,27 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "shotgun", count: 1 },
   },
+
+  // --- Energy Cell (diamond + gold ingot = 4 cells) ---
+  {
+    id: "energy_cell",
+    pattern: [
+      [r("diamond"),    r("gold_ingot")],
+      [r("gold_ingot"), r("diamond")   ],
+    ],
+    result: { itemId: "energy_cell", count: 4 },
+  },
+
+  // --- Raygun (diamond barrel + gold body + iron grip) ---
+  {
+    id: "raygun",
+    pattern: [
+      [null,            r("diamond"),    r("diamond")   ],
+      [r("gold_ingot"), r("gold_ingot"), r("diamond")   ],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "raygun", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

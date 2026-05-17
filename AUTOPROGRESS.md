@@ -96,3 +96,37 @@
 - **Crossbow reload sound**: distinct mechanical click/crank audio
 - **Ammo HUD**: show arrow count when crossbow is active (similar to gun ammo display)
 - **Reload animation**: camera bob / item shake when loading starts
+
+## 2026-05-17 — Raygun (Run 5)
+
+### What was done
+- Added **Raygun** — the final exotic weapon with chain-lightning hitscan:
+  - Fires at primary target, then jumps to up to 2 more nearby enemies (within 7 blocks)
+  - Decreasing damage per chain: 20 → 12 → 7
+  - 2.0s cooldown, 50-block range, uses `energy_cell` ammo (stackable ×32)
+  - Cyan tracer beam (`spawnTracerLine` color param added) connects each chain link
+  - `spawnBulletImpact` fires at every hit enemy
+  - Sci-fi zap sound (`raygun_fire`): descending pitch sweep + harmonic buzz + impact pop
+- Added `energy_cell` item + crafting recipe (2 diamond + 2 gold ingot = 4 cells)
+- Added raygun crafting recipe (diamond barrel + gold body + iron grip, 3×3)
+- Troll enemies now have 20% chance to drop 1 energy cell
+- Dungeon chest #3 now contains raygun + 6 energy cells alongside all other guns
+- Extended `spawnTracerLine` with optional `color` parameter (cyan for raygun, yellow for sniper)
+- Added `fireRaygunChain()` private method in Game.ts for the multi-target chain logic
+
+### Full weapon roster (all 5 guns complete!)
+- Swords (wood/stone/iron/diamond) ✓
+- Bow (charge + arrow) ✓
+- Pistol (fast hitscan, bullet ammo) ✓
+- Sniper Rifle (high damage, scope zoom) ✓
+- Shotgun (6-pellet spread, short range) ✓
+- Crossbow (load + fire mechanic, bolt projectile) ✓
+- **Raygun (chain lightning, energy cells)** ✓ — added this run
+
+### Ideas for next run
+- **Polish weapons**: ammo HUD for all guns, crossbow reload sound, viewmodel animations
+- **Weapon viewmodels**: distinct first-person mesh for each gun (pistol, sniper, shotgun)
+- **Enemy AI improvements**: ranged enemies dodge, trolls charge/stomp, spider webs
+- **New biome content**: nether portal (end game), lava biome, new ore types
+- **Wave difficulty scaling**: wave 10+ introduces boss variants, elite mobs
+- **Day/night tie-in**: new hostile mobs that only appear at night in freeplay

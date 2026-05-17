@@ -96,9 +96,10 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     scale: 1.6,
     xpReward: 40,
     drops: [
-      { itemId: "iron_ingot", chance: 0.9, count: 4 },
-      { itemId: "iron_block", chance: 0.3, count: 1 },
-      { itemId: "apple",      chance: 0.5, count: 2 },
+      { itemId: "iron_ingot",  chance: 0.9, count: 4 },
+      { itemId: "iron_block",  chance: 0.3, count: 1 },
+      { itemId: "apple",       chance: 0.5, count: 2 },
+      { itemId: "energy_cell", chance: 0.2, count: 1 },
     ],
   },
   goblin_miner: {

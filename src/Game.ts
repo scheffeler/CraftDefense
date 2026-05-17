@@ -219,7 +219,8 @@ export class Game {
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"crossbow",     count:1 }, { itemId:"arrow_item", count:24 }, { itemId:"sniper_rifle", count:1 }, { itemId:"sniper_ammo", count:16 },
        { itemId:"pistol", count:1 }, { itemId:"bullet", count:16 }, { itemId:"shotgun", count:1 }, { itemId:"shotgun_shell", count:12 },
-       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+       { itemId:"raygun", count:1 }, { itemId:"energy_cell", count:6 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
@@ -1539,12 +1540,16 @@ export class Game {
     const damage     = def.damage ?? 10;
     const isSniper   = def.id === "sniper_rifle";
     const isShotgun  = def.id === "shotgun";
+    const isRaygun   = def.id === "raygun";
 
     const from = this.player.getCameraPosition();
     const dir  = this.player.getLookDirection();
 
     if (isShotgun) {
       this.fireShotgunPellets(from, dir, range, damage);
+    } else if (isRaygun) {
+      this.fireRaygunChain(from, dir, range, damage);
+      this.audio.play("hit", 0.3);
     } else {
       const hitRadius = isSniper ? 1.2 : 0.85;
       let closestT  = range;
@@ -1586,12 +1591,12 @@ export class Game {
 
     this.scene.swingArm();
     this.scene.shake(
-      isSniper ? 0.18 : isShotgun ? 0.16 : 0.05,
-      isSniper ? 0.25 : isShotgun ? 0.22 : 0.18,
+      isSniper ? 0.18 : isShotgun ? 0.16 : isRaygun ? 0.06 : 0.05,
+      isSniper ? 0.25 : isShotgun ? 0.22 : isRaygun ? 0.20 : 0.18,
     );
     this.audio.play(
-      isSniper ? "sniper_fire" : isShotgun ? "shotgun_blast" : "pistol_shot",
-      isSniper ? 0.9 : isShotgun ? 1.0 : 0.85,
+      isSniper ? "sniper_fire" : isShotgun ? "shotgun_blast" : isRaygun ? "raygun_fire" : "pistol_shot",
+      isSniper ? 0.9 : isShotgun ? 1.0 : isRaygun ? 0.95 : 0.85,
     );
   }
 
@@ -1648,10 +1653,10 @@ export class Game {
     if (anyHit) this.audio.play("hit", 0.55);
   }
 
-  private spawnTracerLine(from: THREE.Vector3, to: THREE.Vector3): void {
+  private spawnTracerLine(from: THREE.Vector3, to: THREE.Vector3, color = 0xffff88): void {
     const points = [from.clone(), to.clone()];
     const geo  = new THREE.BufferGeometry().setFromPoints(points);
-    const mat  = new THREE.LineBasicMaterial({ color: 0xffff88, transparent: true, opacity: 0.7 });
+    const mat  = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 });
     const line = new THREE.Line(geo, mat);
     this.scene.scene.add(line);
     let t = 0;
@@ -1662,6 +1667,59 @@ export class Game {
       else { this.scene.scene.remove(line); geo.dispose(); mat.dispose(); }
     };
     requestAnimationFrame(fade);
+  }
+
+  /** Chain lightning for raygun — up to 3 targets, decreasing damage per jump. */
+  private fireRaygunChain(from: THREE.Vector3, dir: THREE.Vector3, range: number, damage: number): void {
+    // Primary hit — closest enemy to ray
+    let primaryId = -1;
+    let primaryT  = range;
+    for (const state of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(state.id);
+      if (!pos) continue;
+      const toEnemy = pos.clone().sub(from);
+      const t = toEnemy.dot(dir);
+      if (t < 0 || t > range) continue;
+      const closest = from.clone().addScaledVector(dir, t);
+      if (closest.distanceTo(pos) < 1.0 && t < primaryT) {
+        primaryT  = t;
+        primaryId = state.id;
+      }
+    }
+
+    const chainRadius = 7;   // jump range between enemies
+    const hitIds      = new Set<number>();
+    const damages     = [damage, Math.round(damage * 0.6), Math.round(damage * 0.35)];
+
+    let prevPos = from;
+    let currentId = primaryId;
+
+    for (let i = 0; i < 3; i++) {
+      if (currentId === -1) break;
+      const pos = this.enemies.getEnemyPosition(currentId);
+      if (!pos) break;
+
+      hitIds.add(currentId);
+      const dmg = damages[i];
+      this.enemies.damage(currentId, dmg);
+      this.showDamageNumber(dmg, pos.x, pos.y + 1.8, pos.z);
+      this.particles.spawnBulletImpact(pos.x, pos.y + 1, pos.z);
+      this.spawnTracerLine(prevPos, pos.clone().add(new THREE.Vector3(0, 1, 0)), 0x00ccff);
+
+      prevPos = pos.clone().add(new THREE.Vector3(0, 1, 0));
+
+      // Find next chain target — closest unhit enemy within chainRadius
+      let nextId = -1;
+      let nextDist = chainRadius;
+      for (const state of this.enemies.getAliveEnemies()) {
+        if (hitIds.has(state.id)) continue;
+        const npos = this.enemies.getEnemyPosition(state.id);
+        if (!npos) continue;
+        const d = pos.distanceTo(npos);
+        if (d < nextDist) { nextDist = d; nextId = state.id; }
+      }
+      currentId = nextId;
+    }
   }
 
   private unlockAchievement(id: string, title: string, desc: string): void {

@@ -155,4 +155,12 @@ export const ITEMS: Record<string, ItemDef> = {
     color:0x8b4513, damage:24, durability:150,
     weaponType:"gun", ammoType:"shotgun_shell", gunRange:15, gunCooldown:1.2,
   },
+
+  // --- Raygun (chain-lightning hitscan — hits up to 3 enemies per shot) ---
+  energy_cell: { id:"energy_cell", name:"Energy Cell", category:"material", stackSize:32, color:0x00ddff },
+  raygun: {
+    id:"raygun", name:"Raygun", category:"weapon", stackSize:1,
+    color:0x00ccff, damage:20, durability:999,
+    weaponType:"gun", ammoType:"energy_cell", gunRange:50, gunCooldown:2.0,
+  },
 };
