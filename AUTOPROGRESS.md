@@ -1,5 +1,37 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-17 — Muzzle Flash + Boss Achievement (Run 8)
+
+### What was done
+- **Muzzle flash particles** at gun barrel tip when any gun fires:
+  - `spawnMuzzleFlash(x, y, z, dir)` added to `Particles.ts`
+  - 8 white/yellow/gold particles burst forward along the look direction
+  - Very short lifetime (60–120ms) — pure flash, no lingering smoke
+  - Called in `tryGunFire()` for pistol, sniper, shotgun, raygun (crossbow uses projectile, not hitscan)
+  - Muzzle position: `camera_pos + look * 0.7`
+- **Boss defeat achievement**: defeating the Uruk-hai Captain now unlocks
+  "The Battle of Helm's Deep" achievement toast notification
+
+### Notes for next run
+- Previous runs already completed ALL 5 guns (pistol, sniper, shotgun, crossbow, raygun)
+- Boss fight added in Run 7; muzzle flash + achievement added this run
+- `npm install` is required at session start (node_modules only has `.vite/` cache)
+- TypeScript 5.9.3 (project-local) compiles cleanly; global `npx tsc` uses TS6 which breaks
+  → always use `./node_modules/.bin/tsc -p tsconfig.emit.json` to verify
+- Browser for Playwright: `/opt/pw-browsers/chromium_headless_shell-1194/` (version 1194, not 1223)
+  → symlink: `ln -sf /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell /opt/pw-browsers/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell`
+  → run scripts with: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/screenshot.mjs`
+
+### Ideas for next run
+- **Enemy AI improvements**: ranged enemies strafe sideways when shot at, melee enemies occasionally block
+- **Elite mob variants**: from wave 7+, some enemies get 2× HP, red tint, drop better loot
+- **Nether portal**: obsidian frame → enters nether dimension (alternate worldgen, lava, blaze mobs)
+- **Reload animation**: viewmodel shakes down then back up when gun fires (distinct per gun type)
+- **Shotgun spread indicator**: crosshair shows cone ring while shotgun equipped
+- **Sound reverb**: different reverb tail underground vs outdoors (gunshots echo in dungeons)
+- **Wave 10+ bonus**: after boss defeated, continue button → enter survival mode with endless waves
+- **Visual**: torch particles (embers floating up), lava glow, weather lightning illuminates enemies
+
 ## 2026-05-17 — Boss Wave: Uruk-hai Captain (Run 7)
 
 ### What was done
