@@ -608,6 +608,7 @@ export class Game {
       this.ui.hideBossHealthBar();
       this.audio.play("victory", 0.6);
       this.scene.shake(0.12, 0.5);
+      this.unlockAchievement("boss_slain", "The Battle of Helm's Deep", "Defeated the Uruk-hai Captain!");
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
@@ -1602,6 +1603,10 @@ export class Game {
       this.inventory.removeItem(ammoId, 1);
       this.refreshHotbar();
     }
+
+    // Muzzle flash: small bright burst just in front of the gun barrel
+    const muzzlePos = from.clone().addScaledVector(dir, 0.7);
+    this.particles.spawnMuzzleFlash(muzzlePos.x, muzzlePos.y, muzzlePos.z, dir);
 
     this.scene.swingArm();
     this.scene.shake(

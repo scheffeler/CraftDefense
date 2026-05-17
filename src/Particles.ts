@@ -90,6 +90,26 @@ export class ParticleSystem {
     }
   }
 
+  /** Bright muzzle flash burst at gun barrel tip. */
+  spawnMuzzleFlash(x: number, y: number, z: number, dir: THREE.Vector3): void {
+    const colors = [0xffffff, 0xffff88, 0xffcc44];
+    for (let i = 0; i < 8; i++) {
+      const color = colors[i % colors.length];
+      const size  = 0.03 + Math.random() * 0.05;
+      const mesh  = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(x, y, z);
+      // Mostly forward along dir, with small lateral spread
+      const spd = 1.5 + Math.random() * 2.0;
+      const sx = dir.x * spd + (Math.random() - 0.5) * 0.6;
+      const sy = dir.y * spd + (Math.random() - 0.5) * 0.6;
+      const sz = dir.z * spd + (Math.random() - 0.5) * 0.6;
+      this.spawnParticle(mesh, sx, sy, sz, 0.06 + Math.random() * 0.06);
+    }
+  }
+
   /** Small impact sparks at bullet hit point. */
   spawnBulletImpact(x: number, y: number, z: number): void {
     for (let i = 0; i < 6; i++) {
