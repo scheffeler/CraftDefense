@@ -149,6 +149,8 @@ export class Game {
     this.inventory = new Inventory();
     this.inventory.addItem("stone_sword", 1);
     this.inventory.addItem("stone_pickaxe", 1);
+    this.inventory.addItem("pistol", 1);
+    this.inventory.addItem("bullet", 24);
     this.inventory.addItem("wood_axe", 1);
     this.inventory.addItem("wood_hoe", 1);
     this.inventory.addItem("cobblestone", 32);
@@ -204,6 +206,8 @@ export class Game {
       { itemId: "iron_sword",    count: 1 },
       { itemId: "crossbow",      count: 1 },
       { itemId: "arrow_item",    count: 32 },
+      { itemId: "apple",         count: 6 },
+      { itemId: "bullet",        count: 16 },
       { itemId: "cobblestone",   count: 32 },
       { itemId: "gunpowder",     count: 4 },
       null, null, null, null,

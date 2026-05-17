@@ -295,7 +295,6 @@ export class SceneManager {
     const woodMat  = new THREE.MeshLambertMaterial({ color: 0x7a3b10 });
     const darkMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
 
-    // Wide double-barrel body running front-to-back along local Z
     const barrelL = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 0.34), metalMat);
     barrelL.position.set(-0.03, 0.27, -0.08);
     g.add(barrelL);
@@ -304,23 +303,19 @@ export class SceneManager {
     barrelR.position.set(0.03, 0.27, -0.08);
     g.add(barrelR);
 
-    // Receiver block connecting the two barrels
     const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.14), darkMat);
     receiver.position.set(0.0, 0.26, 0.10);
     g.add(receiver);
 
-    // Pump fore-end (wooden slide under barrels)
     const pump = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.05, 0.10), woodMat);
     pump.position.set(0.0, 0.22, -0.05);
     g.add(pump);
 
-    // Stock (wooden grip/stock)
     const stock = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 0.12), woodMat);
     stock.position.set(0.0, 0.21, 0.19);
     stock.rotation.x = -0.15;
     g.add(stock);
 
-    // Guard / trigger area
     const guard = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.07), darkMat);
     guard.position.set(0.0, 0.19, 0.09);
     g.add(guard);
@@ -329,7 +324,7 @@ export class SceneManager {
     return g;
   }
 
-  /** Builds a first-person gun viewmodel (long barrel pointing forward — used by sniper & future guns). */
+  /** Long-barrel gun viewmodel — sniper and generic firearms. */
   private buildGunMesh(color: number): THREE.Object3D {
     const g = new THREE.Group();
     const bodyMat = new THREE.MeshLambertMaterial({ color });

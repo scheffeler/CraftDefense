@@ -124,14 +124,12 @@ export const ITEMS: Record<string, ItemDef> = {
   // --- Gunpowder (dropped by creepers) ---
   gunpowder: { id:"gunpowder", name:"Gunpowder", category:"material", stackSize:64, color:0x444444 },
 
-  // --- Bullets (ammo for pistol) ---
+  // --- Pistol + ammo ---
   bullet: { id:"bullet", name:"Bullet", category:"material", stackSize:64, color:0xcccccc },
-
-  // --- Pistol ---
   pistol: {
     id:"pistol", name:"Pistol", category:"weapon", stackSize:1,
-    color:0x445566, damage:12, durability:250,
-    weaponType:"gun", ammoType:"bullet", gunCooldown:0.35, gunRange:60,
+    color:0x445566, damage:15, durability:400,
+    weaponType:"gun", ammoType:"bullet", gunCooldown:0.45, gunRange:60,
   },
 
   // --- Iron armor ---

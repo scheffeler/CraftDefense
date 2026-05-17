@@ -395,6 +395,14 @@ export class AudioManager {
         break;
       }
 
+      case "pistol_shot": {
+        // Sharp crack: very short high-frequency noise burst + low body thud
+        noiseBurst(0.04, 3500, 0.008);
+        noiseBurst(0.12, 120, 0.05);
+        tone(180, 0.06, "sawtooth", 0.8);
+        break;
+      }
+
       case "creeper_hiss": {
         // Rising white-noise hiss (s s s s)
         const hissDur = 1.6;

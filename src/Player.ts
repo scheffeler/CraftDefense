@@ -16,6 +16,7 @@ const BOW_CHARGE_TIME      = 1.5;  // seconds to reach full charge
 const CROSSBOW_LOAD_TIME   = 1.2;  // seconds to load crossbow
 const MELEE_RADIUS         = 2.5;
 const MELEE_REACH          = 2.0;
+const PISTOL_COOLDOWN      = 0.45; // ~2.2 shots/sec for generic guns
 
 export class Player {
   position: THREE.Vector3;    // feet position
@@ -33,6 +34,7 @@ export class Player {
   attackCooldown = 0;
   bowCharge      = 0;
   isBowCharging  = false;
+  gunCooldown    = 0;
 
   // Crossbow state: two-phase (load then fire)
   isCrossbowLoading  = false;
@@ -56,6 +58,7 @@ export class Player {
 
   update(dt: number, input: MovementInput): void {
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.gunCooldown    = Math.max(0, this.gunCooldown - dt);
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
     }
@@ -79,6 +82,13 @@ export class Player {
       .addScaledVector(look, MELEE_REACH)
       .add(new THREE.Vector3(0, -0.3, 0));
     return { center, radius: MELEE_RADIUS };
+  }
+
+  /** Hitscan fire — returns shot params if off cooldown, null otherwise. */
+  tryGunFire(): { from: THREE.Vector3; direction: THREE.Vector3 } | null {
+    if (this.gunCooldown > 0) return null;
+    this.gunCooldown = PISTOL_COOLDOWN;
+    return { from: this.getCameraPosition(), direction: this.getLookDirection() };
   }
 
   startBowCharge(): void {
