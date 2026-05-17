@@ -66,3 +66,33 @@
 - **Crossbow**: right-click charges (holds charge), fires a bolt projectile (physical arc), bolt = flint + stick
 - **Raygun**: chain-lightning hitscan (jumps to 3 nearby enemies), uses energy_cell, cyan glow, no cooldown but limited energy
 - **Shotgun polish**: spread indicator on crosshair, pump recoil animation, muzzle flash
+
+## 2026-05-17 — Crossbow (Run 4)
+
+### What was done
+- Added **Crossbow** weapon with Minecraft-style two-phase mechanic:
+  - First right-click: starts 1.2s loading animation (progress bar appears below crosshair)
+  - Second right-click (when loaded, bar turns green): fires a **bolt** instantly
+  - Switching hotbar slot cancels loading (bolt not lost, just state reset)
+  - Bolt stats: 12 damage, 48 m/s (2× faster than bow), very low arc (gravity 6 vs bow's 20)
+  - Bolt visual: thicker shaft (CylinderGeometry r=0.06) + conical metal tip group
+- Added crossbow crafting recipe (3×3 workbench): sticks + iron_ingots cross pattern
+- Added **crossbow loading HUD bar**: yellow while loading → green when ready, CSS below crosshair
+- Added distinct `crossbow` SVG icon (horizontal stock + vertical limbs + bolt)
+- Added crossbow icon shape to `makeItemIcon` and route in `getItemIcon`
+- Crossbow + 24 arrows now in dungeon chest #3 (alongside guns)
+- Fixed barracks chest to include crossbow + 32 arrows for easy discovery
+- Added crossbow to recipe book UI with two-phase usage hint
+- Pre-existing TS5107 deprecation resolved: `tsc --noEmit` now exits 0
+- Added `scripts/screenshot-crossbow.mjs` Playwright test harness
+
+### Architecture note
+- `PlayerBolt` pool is separate from `PlayerArrow` pool (10 bolts vs 20 arrows)
+- `THREE.Group` (shaft + tip) stored as `mesh` field via type cast — clean without extra interface
+
+### Ideas for next run
+- **Raygun**: the final weapon — chain hitscan to 3 nearby enemies, energy_cell ammo, cyan emissive bolt
+- **Gun viewmodels for crossbow**: animate the loading bolt pull-back motion in first-person
+- **Crossbow reload sound**: distinct mechanical click/crank audio
+- **Ammo HUD**: show arrow count when crossbow is active (similar to gun ammo display)
+- **Reload animation**: camera bob / item shake when loading starts
