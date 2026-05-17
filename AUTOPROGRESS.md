@@ -1,5 +1,31 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-17 — Merge conflict resolution + pistol polish (Run 6)
+
+### What was done
+- Resolved merge conflicts between auto-iterate branches (two simultaneous runs had diverged)
+- My pistol commit used `pistol_ammo` ammo type; HEAD used `bullet` — unified to `bullet`
+- Removed redundant `tryPistolShot()` (superseded by HEAD's generalized `tryGunFire(def)`)
+- Merged SceneManager viewmodels: kept HEAD's `buildPistolMesh()` + `buildShotgunMesh()` + `buildGunMesh()`
+- Unified Player constants: kept `CROSSBOW_LOAD_TIME` (HEAD) and `PISTOL_COOLDOWN` (mine)
+- Player now starts with pistol (slot 2) + 24 bullets in hotbar for immediate gameplay
+- Barracks chest upgraded: crossbow + 32 arrows + 6 bullets + apple ×6
+
+### Status of all 5 guns (complete!)
+- Pistol ✓ (hitscan, 15 dmg, 0.45s cooldown, `bullet` ammo)
+- Sniper Rifle ✓ (28 dmg, scope zoom, tracer line, `sniper_ammo`)
+- Shotgun ✓ (6 pellets, spread, short range, `shotgun_shell`)
+- Crossbow ✓ (preload + release, bolt projectile, loading HUD)
+- Raygun ✓ (chain hitscan 3 targets, `energy_cell`, cyan tracers)
+
+### Ideas for next run
+- **Polish all guns**: reload animations, muzzle flash particles at barrel tip
+- **Ammo HUD**: show "GUN N" counter bottom-right for all equipped guns
+- **Enemy AI**: ranged enemies dodge sideways, melee enemies block occasionally
+- **New content**: nether portal, lava pools, new mob types (blaze, witch)
+- **Wave scaling**: boss variant spawns at wave 10, elite mobs wave 7+
+- **Sound polish**: echoing gunshots underground, environmental reverb
+
 ## 2026-05-16 — Pistol + Sniper Rifle (Guns System)
 
 ### What was done (Run 1 — Pistol)
