@@ -101,6 +101,7 @@ function getItemIcon(itemId: string): string {
 export class UI {
   // FPS callbacks
   onRestart: () => void = () => {};
+  onContinueEndless: () => void = () => {};
   onPointerLockRequest: () => void = () => {};
   onModeSelect: (mode: "helmsdeep" | "freeplay") => void = () => {};
   onContinueGame: () => void = () => {};
@@ -267,12 +268,15 @@ export class UI {
     this.itemTooltip.style.display = "block";
   }
 
-  updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean): void {
+  updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean, endless?: boolean): void {
     const dayStr = dayNum != null
       ? `<br><span style="color:${isDay ? "#ffee88" : "#aabbff"}">${isDay ? "☀" : "☽"} Day ${dayNum}</span>`
       : "";
+    const waveLabel = endless
+      ? `<span style="color:#ff8800">&#x221E; Wave ${wave}</span>`
+      : `Wave ${wave}/${total}`;
     this.elWaveInfo.innerHTML =
-      `Wave ${wave}/${total}<br>${enemyCount} enemies${dayStr}`;
+      `${waveLabel}<br>${enemyCount} enemies${dayStr}`;
   }
 
   setObjective(text: string): void {
@@ -317,10 +321,11 @@ export class UI {
   }
 
   /** Shows a big centered announcement that fades out after ~2 seconds. */
-  showWaveAnnouncement(waveNum: number): void {
+  showWaveAnnouncement(waveNum: number, endless = false): void {
     const el = document.createElement("div");
     el.className = "wave-announce";
-    el.textContent = `WAVE ${waveNum}`;
+    el.textContent = endless ? `★ ENDLESS WAVE ${waveNum}` : `WAVE ${waveNum}`;
+    if (endless) el.style.color = "#ff8800";
     this.container.appendChild(el);
     setTimeout(() => el.remove(), 2500);
   }
@@ -393,9 +398,11 @@ export class UI {
     const box = this.endOverlay.querySelector(".overlay-box")!;
     const title = box.querySelector<HTMLElement>(".overlay-title")!;
     const stats = box.querySelector<HTMLElement>(".overlay-stats")!;
+    const endlessBtn = box.querySelector<HTMLElement>("#end-endless")!;
     title.textContent = type === "victory" ? "VICTORY!" : "GAME OVER";
     title.style.color = type === "victory" ? "#ffdd00" : "#ff4444";
     stats.textContent = detail;
+    endlessBtn.style.display = type === "victory" ? "block" : "none";
     this.endOverlay.style.display = "flex";
   }
 
@@ -1262,11 +1269,18 @@ export class UI {
       <div class="overlay-box">
         <h1 class="overlay-title"></h1>
         <p class="overlay-stats"></p>
+        <button class="overlay-btn" id="end-endless" style="display:none;background:#c87800;margin-bottom:8px">
+          &#x221E; Continue: Endless Mode
+        </button>
         <button class="overlay-btn" id="end-restart">Play Again</button>
       </div>`;
     ov.querySelector("#end-restart")!.addEventListener("click", () => {
       ov.style.display = "none";
       this.onRestart();
+    });
+    ov.querySelector("#end-endless")!.addEventListener("click", () => {
+      ov.style.display = "none";
+      this.onContinueEndless();
     });
     this.endOverlay = ov;
     this.container.appendChild(ov);

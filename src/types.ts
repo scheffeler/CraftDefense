@@ -2,7 +2,7 @@
 // Shared type definitions — no Three.js imports
 // ---------------------------------------------------------------------------
 
-export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win";
+export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win" | "endless";
 
 export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton" | "uruk_captain";
 export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat

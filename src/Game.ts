@@ -674,10 +674,11 @@ export class Game {
         this.phase = "wave_clear";
         const nextWave = wave + 1;
         const secs     = this.waves.betweenWaveDuration;
+        const label    = this.waves.isEndless ? `∞ Wave ${nextWave}` : `Wave ${nextWave}`;
         this.ui.setObjective(
-          `Wave ${wave} cleared! Reinforce the walls. Wave ${nextWave} in ${secs}s.`,
+          `${this.waves.isEndless ? "★ ENDLESS" : ""} Wave ${wave} cleared! Reinforce the walls. ${label} in ${secs}s.`,
         );
-        this.ui.updateWaveInfo(wave, this.waves.totalWaves, 0);
+        this.ui.updateWaveInfo(wave, this.waves.totalWaves, 0, undefined, undefined, this.waves.isEndless);
       }
     };
 
@@ -685,11 +686,21 @@ export class Game {
       const nextWave = this.waves.wave + 1;
       if (secondsLeft > 0) {
         this.ui.setObjective(
-          `Reinforce the walls. Wave ${nextWave} in ${secondsLeft}s.`,
+          `${this.waves.isEndless ? "[ENDLESS] " : ""}Reinforce the walls. Wave ${nextWave} in ${secondsLeft}s.`,
         );
       } else {
         this.startNextWave();
       }
+    };
+
+    // Continue to endless mode after final wave
+    this.ui.onContinueEndless = () => {
+      this.phase = "endless";
+      this.waves.enableEndless();
+      this.scene.lockPointer();
+      const secs = this.waves.betweenWaveDuration;
+      this.ui.setObjective(`ENDLESS MODE: Survive as long as you can! Wave ${this.waves.wave + 1} in ${secs}s.`);
+      this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0, undefined, undefined, true);
     };
 
     // Continue saved game
@@ -951,12 +962,13 @@ export class Game {
   // ─── Wave control ──────────────────────────────────────────────────────────
 
   private startNextWave(): void {
-    this.phase = "playing";
+    this.phase = this.waves.isEndless ? "endless" : "playing";
     this.waves.startWave((type, gate) => this.spawnEnemy(type, gate));
     this.audio.play("wave_start");
-    this.ui.setObjective(`Wave ${this.waves.wave} — Defend the fortress!`);
-    this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0);
-    this.ui.showWaveAnnouncement(this.waves.wave);
+    const endlessTag = this.waves.isEndless ? "★ ENDLESS — " : "";
+    this.ui.setObjective(`${endlessTag}Wave ${this.waves.wave} — Defend the fortress!`);
+    this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0, undefined, undefined, this.waves.isEndless);
+    this.ui.showWaveAnnouncement(this.waves.wave, this.waves.isEndless);
   }
 
   private spawnEnemy(type: EnemyTypeName, gate: "north" | "south"): void {
@@ -1099,11 +1111,15 @@ export class Game {
         } else {
           this.waves.update(dt);
         }
-      } else if (this.phase === "playing") {
+      } else if (this.phase === "playing" || this.phase === "endless") {
         this.waves.update(dt);
         this.updateCombat(dt);
         const count = this.enemies.getAliveEnemies().length;
-        this.ui.setObjective(`Defend the fortress! ${count} enemies remaining.`);
+        const prefix = this.phase === "endless" ? "★ ENDLESS — " : "";
+        this.ui.setObjective(`${prefix}Defend the fortress! ${count} enemies remaining.`);
+        if (this.phase === "endless") {
+          this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, count, undefined, undefined, true);
+        }
       }
     } else if (this.mode === "freeplay") {
       // Night mob spawning
@@ -1533,7 +1549,7 @@ export class Game {
   }
 
   private tryMeleeAttack(): void {
-    if (this.phase !== "playing" && this.mode !== "freeplay") return;
+    if (this.phase !== "playing" && this.phase !== "endless" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
     const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack);
@@ -1561,7 +1577,7 @@ export class Game {
   }
 
   private tryGunFire(def: ItemDef): void {
-    if (this.phase !== "playing" && this.mode !== "freeplay") return;
+    if (this.phase !== "playing" && this.phase !== "endless" && this.mode !== "freeplay") return;
     if (this.gunCooldown > 0) return;
 
     const ammoId = def.ammoType;

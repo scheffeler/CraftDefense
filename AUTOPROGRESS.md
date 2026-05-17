@@ -1,5 +1,38 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-17 — Endless Survival Mode (Run 10)
+
+### What was done
+- **Post-boss Endless Survival Mode** — after defeating the Uruk-hai Captain boss at wave 10:
+  - Victory screen shows a new **"∞ Continue: Endless Mode"** button (orange) alongside "Play Again"
+  - Clicking it transitions to `phase = "endless"` with infinite procedurally generated waves
+  - `WaveManager.enableEndless()` unlocks `startWave()` beyond the 10 scripted configs
+  - `generateEndlessConfig(waveNum)` procedurally builds each endless wave:
+    - Scale factor increases 15% per wave beyond 10 (enemy count, spawn rate)
+    - Troll count increases every 3 waves (capped at 6)
+    - Creepers appear from wave ~14 onwards
+    - Every 5 endless waves (15, 20, 25...) a returning boss mini-wave is included
+  - Wave counter badge shows **"∞ Wave N"** in orange instead of "Wave N/10"
+  - Wave announcement shows **"★ ENDLESS WAVE N"** in orange  
+  - Objective bar shows **"★ ENDLESS — "** prefix during endless play
+  - All combat mechanics (guns, melee, crossbow) correctly allowed during "endless" phase
+- **Types**: Added `"endless"` to `GamePhase` union
+
+### Notes for next run
+- All 5 guns complete + boss fight + elite mobs + endless mode (runs 1–10)
+- `npm install` required at session start (node_modules missing)
+- Playwright: `/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`
+- `npx tsc -p tsconfig.emit.json` exits 0 (TypeScript 6 + moduleResolution: Node fixed)
+
+### Ideas for next run
+- **Enemy AI improvements**: skeletons strafe sideways, melee enemies block occasionally
+- **Nether portal**: obsidian frame → nether dimension (lava biome, blaze mobs, nether brick)
+- **Crossbow reload animation**: viewmodel bolt pull-back motion, mechanical click sound
+- **Sound polish**: reverb tail for indoor vs outdoor gunshots, boss roar on spawn
+- **Ammo refill station**: craftable block that slowly refills ammo (costs iron)
+- **Endless rewards**: bonus loot drops during endless waves, scaling gold reward per wave
+- **Scoreboard**: display "Best Endless Wave" record in the victory/defeat screen
+
 ## 2026-05-17 — Elite Mob Variants (Run 9)
 
 ### What was done
