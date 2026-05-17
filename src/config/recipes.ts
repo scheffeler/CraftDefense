@@ -255,6 +255,17 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "bow", count: 1 },
   },
 
+  // --- Crossbow (iron_ingot + sticks + iron_ingot tripwire) ---
+  {
+    id: "crossbow",
+    pattern: [
+      [r("stick"),      r("iron_ingot"), r("stick")     ],
+      [r("iron_ingot"), null,            r("iron_ingot")],
+      [null,            r("stick"),      null           ],
+    ],
+    result: { itemId: "crossbow", count: 1 },
+  },
+
   // --- Arrows ---
   {
     id: "arrows",

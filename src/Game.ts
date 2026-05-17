@@ -202,8 +202,8 @@ export class Game {
     const barracksChest = `22,${7},30`;
     this.chestStorage.set(barracksChest, [
       { itemId: "iron_sword",    count: 1 },
-      { itemId: "apple",         count: 6 },
-      { itemId: "arrow_item",    count: 12 },
+      { itemId: "crossbow",      count: 1 },
+      { itemId: "arrow_item",    count: 32 },
       { itemId: "cobblestone",   count: 32 },
       { itemId: "gunpowder",     count: 4 },
       null, null, null, null,
@@ -217,8 +217,8 @@ export class Game {
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"sniper_rifle", count:1 }, { itemId:"sniper_ammo", count:16 }, { itemId:"pistol", count:1 }, { itemId:"bullet", count:16 },
-       { itemId:"shotgun", count:1 }, { itemId:"shotgun_shell", count:12 },
+      [{ itemId:"crossbow",     count:1 }, { itemId:"arrow_item", count:24 }, { itemId:"sniper_rifle", count:1 }, { itemId:"sniper_ammo", count:16 },
+       { itemId:"pistol", count:1 }, { itemId:"bullet", count:16 }, { itemId:"shotgun", count:1 }, { itemId:"shotgun_shell", count:12 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
@@ -299,6 +299,7 @@ export class Game {
         this.isSniperScoped = false;
         this.ui.showScopeOverlay(false);
       }
+      this.player.cancelCrossbow();
       this.refreshHotbar();
     };
 
@@ -439,6 +440,24 @@ export class Game {
         this.ui.showScopeOverlay(this.isSniperScoped);
         this.audio.play("scope_in", 0.4);
         return;
+      }
+
+      if (itemDef?.id === "crossbow" && this.inventory.hasItem("arrow_item", 1)) {
+        if (this.player.isCrossbowLoaded) {
+          // Second right-click: fire instantly
+          const shot = this.player.fireCrossbow();
+          if (shot) {
+            const damage = itemDef.damage ?? 12;
+            this.projectiles.fireFromPlayerCrossbow(shot.from, shot.direction, damage);
+            this.inventory.removeItem("arrow_item", 1);
+            this.audio.play("arrow_release");
+            this.refreshHotbar();
+          }
+        } else {
+          // First right-click: start loading
+          this.player.startCrossbowLoad();
+          this.audio.play("bow_charge", 0.5);
+        }
       } else if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
@@ -979,9 +998,16 @@ export class Game {
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
-    // Player movement + bow charge accumulation
+    // Player movement + bow/crossbow charge accumulation
     const input = this.input.getMovementInput();
     this.player.update(dt, input);
+
+    // Update crossbow loading HUD
+    this.ui.updateCrossbowProgress(
+      this.player.crossbowLoadProgress,
+      this.player.isCrossbowLoading,
+      this.player.isCrossbowLoaded,
+    );
 
     // Water entry/exit effects
     const nowInWater = this.player.inWater;

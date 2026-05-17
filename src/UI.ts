@@ -7,7 +7,7 @@ import { ITEMS } from "./config/items";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "crossbow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -30,6 +30,12 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
                <rect x="10" y="4" width="12" height="2" fill="#8b6914"/>
                <rect x="10" y="26" width="12" height="2" fill="#8b6914"/>
                <rect x="10" y="15" width="12" height="2" fill="#c8a060"/>`;
+      break;
+    case "crossbow":
+      // Horizontal stock body + vertical prod arms + bolt
+      path = `<rect x="4" y="14" width="20" height="5" fill="${color}"/>
+               <rect x="18" y="8" width="4" height="16" fill="#8b6914"/>
+               <rect x="6" y="15" width="14" height="2" fill="#aaaaaa"/>`;
       break;
     case "food":
       path = `<rect x="8" y="8" width="16" height="16" fill="${color}"/>
@@ -84,6 +90,7 @@ function getItemIcon(itemId: string): string {
   else if (def.toolCategory === "shovel") shape = "shovel";
   else if (def.id.endsWith("_hoe")) shape = "hoe";
   else if (def.id === "bow") shape = "bow";
+  else if (def.id === "crossbow") shape = "crossbow";
   else if (def.category === "food") shape = "food";
   else if (def.category === "armor") shape = "armor";
   else if (def.category === "block") shape = "block";
@@ -122,6 +129,8 @@ export class UI {
   onStartGame: (_difficulty: "easy" | "normal" | "hard") => void = () => {};
 
   private crosshair!: HTMLElement;
+  private crossbowLoadBar!: HTMLElement;
+  private crossbowLoadFill!: HTMLElement;
   private hotbarSlots: HTMLElement[] = [];
   private heartEls: HTMLElement[] = [];
   private hungerEls: HTMLElement[] = [];
@@ -201,6 +210,17 @@ export class UI {
       else if (hp === 1) el.style.backgroundImage = `url("${HEART_HALF}")`;
       else               el.style.backgroundImage = `url("${HEART_EMPTY}")`;
     }
+  }
+
+  /** Show/hide crossbow loading bar. progress=0..1; isLoaded=true when ready to fire. */
+  updateCrossbowProgress(progress: number, isLoading: boolean, isLoaded: boolean): void {
+    if (!isLoading && !isLoaded) {
+      this.crossbowLoadBar.style.display = "none";
+      return;
+    }
+    this.crossbowLoadBar.style.display = "block";
+    this.crossbowLoadFill.style.width = `${Math.round(progress * 100)}%`;
+    this.crossbowLoadFill.style.background = isLoaded ? "#55ff55" : "#ffcc00";
   }
 
   updateXP(current: number, max: number, level?: number): void {
@@ -436,6 +456,13 @@ export class UI {
     this.scopeOverlay = div("fps-scope-overlay");
     this.scopeOverlay.style.display = "none";
     this.container.appendChild(this.scopeOverlay);
+
+    // Crossbow loading progress bar (shown below crosshair while loading/loaded)
+    this.crossbowLoadBar = div("fps-crossbow-bar");
+    this.crossbowLoadFill = div("fps-crossbow-fill");
+    this.crossbowLoadBar.appendChild(this.crossbowLoadFill);
+    this.crossbowLoadBar.style.display = "none";
+    this.container.appendChild(this.crossbowLoadBar);
 
     this.elObjective = div("fps-objective");
     this.container.appendChild(this.elObjective);
@@ -1124,6 +1151,7 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "Crossbow", ingredients: "3 Iron Ingots + 2 Sticks (3×3 grid) — right-click to load, right-click to fire", key: "crossbow" },
     ];
 
     const list = div("fps-rb-list");
@@ -1352,6 +1380,23 @@ const FPS_CSS = `
   position: absolute;
   width: 2px; height: 14px;
   background: #fff;
+}
+
+/* Crossbow loading bar — appears below crosshair */
+.fps-crossbow-bar {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, 18px);
+  width: 80px; height: 6px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 3px;
+  z-index: 21; pointer-events: none;
+}
+.fps-crossbow-fill {
+  height: 100%; border-radius: 3px;
+  background: #ffcc00;
+  transition: width 0.05s linear;
 }
 
 /* Objective banner — flat, no blur, pixel shadow */

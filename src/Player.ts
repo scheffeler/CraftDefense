@@ -11,10 +11,11 @@ const WATER_SPEED     = 0.5;   // fraction of normal speed in water
 const SWIM_ACCEL      = 18;    // upward accel when holding jump in water
 const SWIM_MAX_UP     = 3.5;   // max upward swim velocity
 const EYE_HEIGHT      = 1.62;
-const MELEE_COOLDOWN  = 0.5;
-const BOW_CHARGE_TIME = 1.5;  // seconds to reach full charge
-const MELEE_RADIUS    = 2.5;
-const MELEE_REACH     = 2.0;
+const MELEE_COOLDOWN       = 0.5;
+const BOW_CHARGE_TIME      = 1.5;  // seconds to reach full charge
+const CROSSBOW_LOAD_TIME   = 1.2;  // seconds to load crossbow
+const MELEE_RADIUS         = 2.5;
+const MELEE_REACH          = 2.0;
 
 export class Player {
   position: THREE.Vector3;    // feet position
@@ -32,6 +33,11 @@ export class Player {
   attackCooldown = 0;
   bowCharge      = 0;
   isBowCharging  = false;
+
+  // Crossbow state: two-phase (load then fire)
+  isCrossbowLoading  = false;
+  isCrossbowLoaded   = false;
+  crossbowLoadProgress = 0;  // 0..1
 
   onDeath: () => void = () => {};
 
@@ -52,6 +58,13 @@ export class Player {
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
+    }
+    if (this.isCrossbowLoading) {
+      this.crossbowLoadProgress = Math.min(1, this.crossbowLoadProgress + dt / CROSSBOW_LOAD_TIME);
+      if (this.crossbowLoadProgress >= 1) {
+        this.isCrossbowLoading = false;
+        this.isCrossbowLoaded  = true;
+      }
     }
     this.applyMovement(dt, input);
     this.camera.position.copy(this.getCameraPosition());
@@ -90,6 +103,29 @@ export class Player {
       from: this.getCameraPosition(),
       direction: this.getLookDirection(),
     };
+  }
+
+  /** Start loading the crossbow (first right-click). No-op if already loaded/loading. */
+  startCrossbowLoad(): void {
+    if (this.isCrossbowLoaded || this.isCrossbowLoading) return;
+    this.isCrossbowLoading   = true;
+    this.crossbowLoadProgress = 0;
+  }
+
+  /** Fire the loaded crossbow. Returns shot params or null if not loaded. */
+  fireCrossbow(): { from: THREE.Vector3; direction: THREE.Vector3 } | null {
+    if (!this.isCrossbowLoaded) return null;
+    this.isCrossbowLoaded   = false;
+    this.isCrossbowLoading  = false;
+    this.crossbowLoadProgress = 0;
+    return { from: this.getCameraPosition(), direction: this.getLookDirection() };
+  }
+
+  /** Unload crossbow when switching away (bolt is lost). */
+  cancelCrossbow(): void {
+    this.isCrossbowLoaded    = false;
+    this.isCrossbowLoading   = false;
+    this.crossbowLoadProgress = 0;
   }
 
   getCameraPosition(): THREE.Vector3 {

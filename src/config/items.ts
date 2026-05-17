@@ -118,6 +118,9 @@ export const ITEMS: Record<string, ItemDef> = {
   // --- Bow ---
   bow: { id:"bow", name:"Bow", category:"weapon", stackSize:1, color:0x8b6914, damage:8, durability:384 },
 
+  // --- Crossbow ---
+  crossbow: { id:"crossbow", name:"Crossbow", category:"weapon", stackSize:1, color:0x5c3a1a, damage:12, durability:465 },
+
   // --- Gunpowder (dropped by creepers) ---
   gunpowder: { id:"gunpowder", name:"Gunpowder", category:"material", stackSize:64, color:0x444444 },
 
