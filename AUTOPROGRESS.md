@@ -404,3 +404,35 @@
 - **Spider web shot**: spider projectile that slows player 2s
 - **Best Endless Wave**: track + display on victory screen
 - **Skeleton flee**: below 30% HP, turns and runs briefly
+
+## 2026-05-17 — Spider Web Shot (Run 15)
+
+### What was done
+- **Spider web-shot mechanic**: Spiders periodically (every ~4.5s + random jitter) spit a sticky web projectile at the player when within 12 blocks
+  - `SpiderWeb` pool of 12 grey-white semi-transparent sphere meshes in Enemy.ts
+  - Slow projectile (7 m/s) with gentle upward arc for visibility; rotates mid-air
+  - On hit: `onSpiderWebHit()` callback → player slowed to 35% speed for 3 seconds
+  - `Player.webSlowTimer` field decrements in `update()`, applied in `applyMovement()`
+  - Spider's `webCooldown` field added to `EnemyState` in `types.ts`
+  - Green edge vignette overlay + "WEBBED" text label fade over 3.2s via CSS animations
+  - `Enemy.reset()` clears in-flight webs between waves
+- Confirmed: all 5 guns, boss, elites, skeleton strafe, stomp, muzzle flash all still compile and run
+- Branch: `auto-iterate` — pushed to origin
+
+### Current full feature set
+- All 5 guns: pistol, sniper, shotgun, crossbow, raygun
+- Boss fight (Uruk-hai Captain, wave 10) + boss rage mode  
+- Endless survival mode after boss defeat
+- Elite mob variants (orange glow, 2× HP, better drops)
+- Skeleton strafe AI, melee knockback stagger
+- Troll stomp attack, creeper explosions, spider web slows
+- Sniper scope ADS overlay with crosshair + mil-dots
+- Muzzle flash, tracer lines, shockwave particles
+
+### Ideas for next run
+- **Skeleton flee**: when below 30% HP, skeleton turns and runs briefly  
+- **Best Endless Wave**: track and display high-score wave number on victory/death screen
+- **Ammo hotbar indicator**: show ammo count as small number overlay on hotbar slot
+- **Web strand visuals**: when player is webbed, show sticky white strands at screen edges
+- **Goblin miner mining animation**: sparks + chunk flying out when breaking walls
+- **XP system UI**: show XP bar fill progress toward next level below health
