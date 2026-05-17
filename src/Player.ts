@@ -35,6 +35,7 @@ export class Player {
   bowCharge      = 0;
   isBowCharging  = false;
   gunCooldown    = 0;
+  webSlowTimer   = 0;  // > 0: player is webbed and slowed
 
   // Crossbow state: two-phase (load then fire)
   isCrossbowLoading  = false;
@@ -59,6 +60,7 @@ export class Player {
   update(dt: number, input: MovementInput): void {
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.gunCooldown    = Math.max(0, this.gunCooldown - dt);
+    this.webSlowTimer   = Math.max(0, this.webSlowTimer - dt);
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
     }
@@ -179,6 +181,7 @@ export class Player {
     let speed = WALK_SPEED;
     if (input.sprint) speed *= SPRINT_MULT;
     if (this.inWater) speed *= WATER_SPEED;
+    if (this.webSlowTimer > 0) speed *= 0.35;  // webbed: slowed to 35% speed
 
     // Build horizontal move vector relative to camera yaw
     const move = new THREE.Vector3();

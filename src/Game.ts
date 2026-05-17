@@ -613,6 +613,12 @@ export class Game {
       this.audio.play("player_hurt", 0.5);
     };
 
+    this.enemies.onSpiderWebHit = () => {
+      this.player.webSlowTimer = 3.0;  // 3 seconds of slow
+      this.ui.showWebbedIndicator();
+      this.audio.play("swing", 0.3);   // sticky thwack sound (reuse swing)
+    };
+
     this.enemies.onTrollStomp = (x, y, z, radius, damage) => {
       this.audio.play("troll_stomp", 0.95);
       this.particles.spawnStompShockwave(x, y, z);

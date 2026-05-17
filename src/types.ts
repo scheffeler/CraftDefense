@@ -92,6 +92,8 @@ export interface EnemyState {
   shootCooldown?: number;
   strafeDir?: 1 | -1;       // +1 or -1 lateral strafe direction
   strafeTimer?: number;     // seconds until next strafe direction flip
+  // Spider-specific
+  webCooldown?: number;     // seconds until next web shot
   // Knockback / stagger (all melee enemy types)
   knockbackTimer?: number;  // > 0: briefly staggered, can't attack
   // Elite variant

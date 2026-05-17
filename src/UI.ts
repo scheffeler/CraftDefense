@@ -415,6 +415,19 @@ export class UI {
     setTimeout(() => el.remove(), 600);
   }
 
+  showWebbedIndicator(): void {
+    // Remove any existing webbed indicators
+    this.container.querySelectorAll(".webbed-indicator,.webbed-vignette").forEach(e => e.remove());
+    const vignette = document.createElement("div");
+    vignette.className = "webbed-vignette";
+    this.container.appendChild(vignette);
+    const label = document.createElement("div");
+    label.className = "webbed-indicator";
+    label.textContent = "WEBBED";
+    this.container.appendChild(label);
+    setTimeout(() => { vignette.remove(); label.remove(); }, 3200);
+  }
+
   showScopeOverlay(show: boolean): void {
     this.scopeOverlay.style.display = show ? "block" : "none";
     this.crosshair.style.display    = show ? "none"  : "block";
@@ -2036,6 +2049,34 @@ const FPS_CSS = `
   z-index: 60;
   background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.75) 100%);
   animation: damageFlash 0.6s ease-out forwards;
+}
+.webbed-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 58;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(80,160,60,0.55) 100%);
+  animation: webbedPulse 3.2s ease-out forwards;
+}
+.webbed-indicator {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 65;
+  color: #cceecc;
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-family: monospace;
+  text-shadow: 0 0 8px #44aa44, 0 2px 4px #000;
+  letter-spacing: 0.2em;
+  animation: webbedPulse 3.2s ease-out forwards;
+}
+@keyframes webbedPulse {
+  0%   { opacity: 1; }
+  70%  { opacity: 0.8; }
+  100% { opacity: 0; }
 }
 @keyframes damageFlash {
   0%   { opacity: 1; }

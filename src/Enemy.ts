@@ -28,12 +28,25 @@ interface SkeletonArrow {
   active: boolean;
 }
 
+interface SpiderWeb {
+  mesh: THREE.Mesh;
+  vel: THREE.Vector3;
+  life: number;
+  active: boolean;
+}
+
 const SKELETON_ARROW_POOL    = 30;
 const SKELETON_SHOOT_RANGE   = 7.5;
 const SKELETON_SHOOT_INTERVAL = 2.2;
 const SKELETON_STRAFE_SPEED  = 1.8;  // lateral units/sec while aiming
 const SKELETON_STRAFE_FLIP   = 1.6;  // seconds between direction flips
 const KNOCKBACK_STAGGER      = 0.35; // seconds enemies are staggered after knockback
+
+const SPIDER_WEB_POOL     = 12;
+const SPIDER_WEB_RANGE    = 12.0; // max distance to spit web
+const SPIDER_WEB_INTERVAL = 4.5;  // seconds between web shots
+const SPIDER_WEB_SPEED    = 7.0;  // projectile speed (slower than arrows for readability)
+const SPIDER_WEB_HIT_DIST = 0.8;
 
 // Troll / uruk_captain stomp attack
 const STOMP_RANGE       = 2.8;  // blocks from player to trigger stomp
@@ -47,6 +60,7 @@ export class EnemyManager {
   private readonly meshes    = new Map<number, THREE.Group>();
   private readonly healthBars = new Map<number, { bar: THREE.Mesh; bg: THREE.Mesh }>();
   private readonly skeletonArrows: SkeletonArrow[] = [];
+  private readonly spiderWebs: SpiderWeb[] = [];
   private idCounter = 0;
 
   private flowField: FlowField | null = null;
@@ -58,6 +72,7 @@ export class EnemyManager {
   onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
   onCreeperPrime: () => void = () => {};
   onSkeletonArrowHit: (damage: number) => void = () => {};
+  onSpiderWebHit: () => void = () => {};
   onBossHealthChanged: (name: string, pct: number) => void = () => {};
   onBossDied: () => void = () => {};
   onTrollStomp: (x: number, y: number, z: number, radius: number, damage: number) => void = () => {};
@@ -83,6 +98,16 @@ export class EnemyManager {
       mesh.visible = false;
       scene.add(mesh);
       this.skeletonArrows.push({ mesh, vel: new THREE.Vector3(), damage: 0, life: 0, active: false });
+    }
+
+    // Spider web projectile pool — grey-white sticky globs
+    const webGeo = new THREE.SphereGeometry(0.15, 5, 4);
+    const webMat = new THREE.MeshLambertMaterial({ color: 0xddddcc, transparent: true, opacity: 0.85 });
+    for (let i = 0; i < SPIDER_WEB_POOL; i++) {
+      const mesh = new THREE.Mesh(webGeo, webMat);
+      mesh.visible = false;
+      scene.add(mesh);
+      this.spiderWebs.push({ mesh, vel: new THREE.Vector3(), life: 0, active: false });
     }
   }
 
@@ -235,6 +260,30 @@ export class EnemyManager {
         arrow.mesh.visible = false;
       }
     }
+
+    // Update spider webs
+    for (const web of this.spiderWebs) {
+      if (!web.active) continue;
+      web.life -= dt;
+      if (web.life <= 0) {
+        web.active = false;
+        web.mesh.visible = false;
+        continue;
+      }
+      web.mesh.position.addScaledVector(web.vel, dt);
+      // Simple rotation for visual flair
+      web.mesh.rotation.x += dt * 3;
+      web.mesh.rotation.z += dt * 2;
+      // Check hit against player
+      const dx = web.mesh.position.x - this._playerX;
+      const dy = web.mesh.position.y - this._playerY;
+      const dz = web.mesh.position.z - this._playerZ;
+      if (dx * dx + dy * dy + dz * dz < SPIDER_WEB_HIT_DIST * SPIDER_WEB_HIT_DIST) {
+        this.onSpiderWebHit();
+        web.active = false;
+        web.mesh.visible = false;
+      }
+    }
   }
 
   damage(id: number, amount: number, slowFactor = 1.0, slowDuration = 0, knockback = false): void {
@@ -304,6 +353,8 @@ export class EnemyManager {
     for (const id of [...this.enemies.keys()]) this.despawn(id);
     this.enemies.clear();
     this.idCounter = 0;
+    // Clear in-flight webs
+    for (const w of this.spiderWebs) { w.active = false; w.mesh.visible = false; }
   }
 
   getEnemyProgress(id: number): number {
@@ -461,6 +512,19 @@ export class EnemyManager {
       }
     }
 
+    // Spider web shot — periodically spit a web blob at the player
+    if (state.config.type === "spider") {
+      const sdx = this._playerX - pos.x;
+      const sdz = this._playerZ - pos.z;
+      const distToPlayer = Math.sqrt(sdx * sdx + sdz * sdz);
+
+      state.webCooldown = (state.webCooldown ?? SPIDER_WEB_INTERVAL) - dt;
+      if (state.webCooldown <= 0 && distToPlayer < SPIDER_WEB_RANGE) {
+        state.webCooldown = SPIDER_WEB_INTERVAL + Math.random() * 1.5;
+        this.fireSpiderWeb(pos);
+      }
+    }
+
     // Troll / boss stomp attack
     if (state.config.type === "troll" || state.config.type === "uruk_captain") {
       state.stompCooldown = Math.max(0, (state.stompCooldown ?? STOMP_COOLDOWN) - dt);
@@ -531,6 +595,26 @@ export class EnemyManager {
       dx / spd3d * speed,
       (dy + horiz * 0.15) / spd3d * speed, // slight upward arc
       dz / spd3d * speed,
+    );
+  }
+
+  private fireSpiderWeb(from: THREE.Vector3): void {
+    const web = this.spiderWebs.find(w => !w.active);
+    if (!web) return;
+
+    const tx = this._playerX, ty = this._playerY + 0.8, tz = this._playerZ;
+    const dx = tx - from.x, dy = ty - from.y, dz = tz - from.z;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+
+    web.active = true;
+    web.life = 3.5;
+    web.mesh.position.set(from.x, from.y + 0.4, from.z);
+    web.mesh.visible = true;
+    // Slight upward arc to make it readable
+    web.vel.set(
+      dx / len * SPIDER_WEB_SPEED,
+      (dy / len + 0.2) * SPIDER_WEB_SPEED,
+      dz / len * SPIDER_WEB_SPEED,
     );
   }
 
