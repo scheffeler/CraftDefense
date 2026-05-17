@@ -96,6 +96,10 @@ export interface EnemyState {
   knockbackTimer?: number;  // > 0: briefly staggered, can't attack
   // Elite variant
   elite?: boolean;
+  // Troll / uruk_captain stomp attack
+  stompCooldown?: number;    // seconds until next stomp is available
+  stompCharging?: boolean;   // true during wind-up before stomp fires
+  stompChargeTimer?: number; // counts up to STOMP_CHARGE_TIME
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

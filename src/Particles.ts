@@ -124,6 +124,40 @@ export class ParticleSystem {
     }
   }
 
+  /** Expanding ring of stone/dust particles when a troll stomps. */
+  spawnStompShockwave(x: number, y: number, z: number): void {
+    const count = 20;
+    for (let i = 0; i < count; i++) {
+      const theta = (i / count) * Math.PI * 2;
+      const size  = 0.07 + Math.random() * 0.09;
+      const color = (i % 3 === 0) ? 0x887766 : (i % 3 === 1) ? 0x665544 : 0x999988;
+      const mesh  = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size * 0.5, size),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(x, y + 0.15, z);
+      const spd  = 3.5 + Math.random() * 2.5;
+      const rise = 0.8 + Math.random() * 1.5;
+      this.spawnParticle(mesh,
+        Math.cos(theta) * spd,
+        rise,
+        Math.sin(theta) * spd,
+        0.45 + Math.random() * 0.35,
+      );
+    }
+    // Central burst (dust cloud rising up)
+    for (let i = 0; i < 8; i++) {
+      const size = 0.1 + Math.random() * 0.12;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshBasicMaterial({ color: 0xaaa090, transparent: true, opacity: 0.7 }),
+      );
+      mesh.position.set(x + (Math.random() - 0.5) * 0.5, y + 0.2, z + (Math.random() - 0.5) * 0.5);
+      const spd = 0.3 + Math.random() * 0.6;
+      this.spawnParticle(mesh, (Math.random() - 0.5) * spd, 2 + Math.random() * 2, (Math.random() - 0.5) * spd, 0.6 + Math.random() * 0.4);
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

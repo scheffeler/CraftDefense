@@ -11,7 +11,8 @@ type SoundName =
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
   | "splash" | "thunder" | "creeper_hiss"
   | "pistol_shot" | "sniper_fire" | "scope_in"
-  | "shotgun_blast" | "raygun_fire";
+  | "shotgun_blast" | "raygun_fire"
+  | "troll_stomp";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -510,6 +511,16 @@ export class AudioManager {
 
         // Impact pop
         noiseBurst(0.15, 3000, 0.02);
+        break;
+      }
+
+      case "troll_stomp": {
+        // Deep ground-shake: sub-bass thud + mid crunch
+        noiseBurst(0.06, 60, 0.12);
+        noiseBurst(0.12, 200, 0.08);
+        tone(40, 0.35, "sawtooth", vol * 0.9);
+        tone(80, 0.22, "square",   vol * 0.6);
+        noiseBurst(0.08, 800, 0.05);
         break;
       }
     }

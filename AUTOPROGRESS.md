@@ -1,6 +1,39 @@
 # CraftDefense Auto-Progress Log
 
-## 2026-05-17 — Endless Survival Mode (Run 10)
+## 2026-05-17 — Troll Stomp Attack (Run 12)
+
+### What was done
+- **Troll / boss stomp attack** — when a Troll or Uruk-hai Captain closes to within 2.8 blocks of the player:
+  - 0.7s wind-up animation: troll crouches (scale Y compresses 18%, scale X/Z expands 10%) while standing still
+  - When charge completes, fires `onTrollStomp` callback (3.5-block AoE, 8 damage)
+  - Damage falls off with distance: `ceil(8 * (0.5 + 0.5 * (1 - dist/radius)))` — full 8 at center, 4 at edge
+  - 5.0s cooldown between stomps
+  - Elite scale (1.3×) preserved during stomp animation (uses `state.config.scale * (elite ? 1.3 : 1.0)` as base)
+- **Stomp sound**: deep bass thud — sub-bass noise burst (60 Hz) + mid crunch (200 Hz) + sawtooth at 40 Hz + rumble
+- **Stomp shockwave particles**: 20 outward-flying stone/dust chunks (ring) + 8 central dust cloud rising
+- **Screen shake**: 0.14 magnitude / 0.45s when stomp fires
+- **Damage vignette + floating damage number** when player is hit by stomp
+- New `stompCooldown`, `stompCharging`, `stompChargeTimer` fields in `EnemyState`
+- New `onTrollStomp` callback on `EnemyManager` (wired in Game.ts)
+- New `spawnStompShockwave(x, y, z)` method in `ParticleSystem`
+- New `"troll_stomp"` sound in `AudioManager`
+
+### Notes for next run
+- All 5 guns + boss + elite mobs + endless mode + skeleton strafe + stomp attack complete
+- `npm install` required at session start (node_modules not committed)
+- `npx tsc -p tsconfig.emit.json` exits 0 cleanly
+- Playwright: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (executablePath override)
+- Dev server: `npm run dev` → port 5175
+
+### Ideas for next run
+- **Best Endless Wave scoreboard**: track + display highest endless wave in gameover/victory screen
+- **Skeleton flee behavior**: below 30% HP, skeleton runs away briefly then reverses
+- **Spider web shot**: spider fires web projectile that slows player 2s
+- **Troll stomping visual polish**: screen-space shockwave ring (CSS/canvas overlay expanding circle)
+- **Ammo refill station**: craftable block converting iron_ingots → ammo at 1/sec when player nearby
+- **Gun ADS (aim-down-sights)**: right-click zooms in for sniper/pistol (small FOV shift)
+
+## 2026-05-17 — Skeleton Strafe AI + Melee Knockback (Run 11)
 
 ### What was done
 - **Post-boss Endless Survival Mode** — after defeating the Uruk-hai Captain boss at wave 10:

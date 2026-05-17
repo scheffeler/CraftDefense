@@ -35,6 +35,13 @@ const SKELETON_STRAFE_SPEED  = 1.8;  // lateral units/sec while aiming
 const SKELETON_STRAFE_FLIP   = 1.6;  // seconds between direction flips
 const KNOCKBACK_STAGGER      = 0.35; // seconds enemies are staggered after knockback
 
+// Troll / uruk_captain stomp attack
+const STOMP_RANGE       = 2.8;  // blocks from player to trigger stomp
+const STOMP_CHARGE_TIME = 0.7;  // seconds of wind-up before stomp fires
+const STOMP_COOLDOWN    = 5.0;  // seconds between stomps
+const STOMP_RADIUS      = 3.5;  // AoE blast radius
+const STOMP_DAMAGE      = 8;    // damage on direct hit (within radius)
+
 export class EnemyManager {
   private readonly enemies   = new Map<number, EnemyState>();
   private readonly meshes    = new Map<number, THREE.Group>();
@@ -53,6 +60,7 @@ export class EnemyManager {
   onSkeletonArrowHit: (damage: number) => void = () => {};
   onBossHealthChanged: (name: string, pct: number) => void = () => {};
   onBossDied: () => void = () => {};
+  onTrollStomp: (x: number, y: number, z: number, radius: number, damage: number) => void = () => {};
 
   private _playerX = 32;
   private _playerZ = 32;
@@ -450,6 +458,42 @@ export class EnemyManager {
         state.movePhase += dt * SKELETON_STRAFE_SPEED * 4;
         this.animateLegs(id, state.movePhase);
         return;
+      }
+    }
+
+    // Troll / boss stomp attack
+    if (state.config.type === "troll" || state.config.type === "uruk_captain") {
+      state.stompCooldown = Math.max(0, (state.stompCooldown ?? STOMP_COOLDOWN) - dt);
+
+      const stompDx   = this._playerX - pos.x;
+      const stompDz   = this._playerZ - pos.z;
+      const stompDist = Math.sqrt(stompDx * stompDx + stompDz * stompDz);
+      // Base scale accounting for elite 1.3× multiplier
+      const baseS = state.config.scale * (state.elite ? 1.3 : 1.0);
+
+      if (state.stompCharging) {
+        state.stompChargeTimer = (state.stompChargeTimer ?? 0) + dt;
+        // Wind-up: widen and compress vertically (crouch before leap)
+        const t = Math.min(1, (state.stompChargeTimer ?? 0) / STOMP_CHARGE_TIME);
+        group.scale.set(baseS * (1.0 + t * 0.1), baseS * (1.0 - t * 0.18), baseS * (1.0 + t * 0.1));
+
+        if ((state.stompChargeTimer ?? 0) >= STOMP_CHARGE_TIME) {
+          // Fire stomp!
+          state.stompCharging = false;
+          state.stompCooldown = STOMP_COOLDOWN;
+          state.stompChargeTimer = 0;
+          group.scale.setScalar(baseS);
+          this.onTrollStomp(pos.x, pos.y, pos.z, STOMP_RADIUS, STOMP_DAMAGE);
+        }
+        return; // stand still during wind-up
+      }
+
+      if (stompDist <= STOMP_RANGE && state.stompCooldown <= 0) {
+        state.stompCharging = true;
+        state.stompChargeTimer = 0;
+        group.scale.setScalar(baseS);
+        // Face the player before stomping
+        group.rotation.y = Math.atan2(stompDx, stompDz);
       }
     }
 

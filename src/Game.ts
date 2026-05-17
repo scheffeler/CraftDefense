@@ -613,6 +613,23 @@ export class Game {
       this.audio.play("player_hurt", 0.5);
     };
 
+    this.enemies.onTrollStomp = (x, y, z, radius, damage) => {
+      this.audio.play("troll_stomp", 0.95);
+      this.particles.spawnStompShockwave(x, y, z);
+      this.scene.shake(0.14, 0.45);
+      const pp   = this.player.position;
+      const dist = Math.sqrt((pp.x - x) ** 2 + (pp.z - z) ** 2);
+      if (dist <= radius) {
+        const falloff     = Math.max(0, 1 - dist / radius);
+        const actualDmg   = Math.ceil(damage * (0.5 + 0.5 * falloff));
+        this.player.damage(actualDmg);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+        this.audio.play("player_hurt", 0.6);
+        this.showDamageNumber(actualDmg, pp.x, pp.y + 2, pp.z);
+      }
+    };
+
     this.enemies.onBossHealthChanged = (name, pct) => {
       this.ui.showBossHealthBar(name, pct);
     };
