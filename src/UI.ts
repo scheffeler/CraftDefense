@@ -147,6 +147,9 @@ export class UI {
   private lockPrompt!: HTMLElement;
   private continueBtn!: HTMLElement;
   private ammoDisplay!: HTMLElement;
+  private bossBarWrap!: HTMLElement;
+  private bossBarFill!: HTMLElement;
+  private bossBarName!: HTMLElement;
   private scopeOverlay!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
@@ -728,6 +731,18 @@ export class UI {
     this.ammoDisplay = div("fps-ammo-display");
     this.ammoDisplay.style.display = "none";
     this.container.appendChild(this.ammoDisplay);
+
+    // Boss health bar (shown during boss fight)
+    this.bossBarWrap = div("fps-boss-bar-wrap");
+    this.bossBarWrap.style.display = "none";
+    this.bossBarName = div("fps-boss-bar-name");
+    this.bossBarName.textContent = "";
+    const bossBarBg = div("fps-boss-bar-bg");
+    this.bossBarFill = div("fps-boss-bar-fill");
+    bossBarBg.appendChild(this.bossBarFill);
+    this.bossBarWrap.appendChild(this.bossBarName);
+    this.bossBarWrap.appendChild(bossBarBg);
+    this.container.appendChild(this.bossBarWrap);
   }
 
   updateAmmoDisplay(count: number | null): void {
@@ -737,6 +752,20 @@ export class UI {
       this.ammoDisplay.textContent = `⚙ ${count}`;
       this.ammoDisplay.style.display = "block";
     }
+  }
+
+  showBossHealthBar(name: string, pct: number): void {
+    this.bossBarWrap.style.display = "block";
+    this.bossBarName.textContent = `⚔ ${name}`;
+    this.bossBarFill.style.width = `${Math.max(0, Math.min(1, pct) * 100).toFixed(1)}%`;
+    // Turn red when raging (below 50%)
+    this.bossBarFill.style.background = pct <= 0.5
+      ? "linear-gradient(90deg, #cc0000, #ff3300)"
+      : "linear-gradient(90deg, #880000, #cc2200)";
+  }
+
+  hideBossHealthBar(): void {
+    this.bossBarWrap.style.display = "none";
   }
 
   private buildInventoryOverlay(): void {
@@ -1978,4 +2007,31 @@ const FPS_CSS = `
 .fps-rb-name { font-size: 9px; color: #fff; margin-bottom: 2px; }
 .fps-rb-ing  { font-size: 7px; color: #aaa; }
 .fps-rb-hint { font-size: 7px; color: #666; text-align: center; margin-top: 8px; }
+
+/* Boss health bar */
+.fps-boss-bar-wrap {
+  position: absolute;
+  top: 16px; left: 50%; transform: translateX(-50%);
+  width: 360px; pointer-events: none; z-index: 20;
+  text-align: center;
+}
+.fps-boss-bar-name {
+  font-family: monospace; font-size: 14px; font-weight: bold;
+  color: #ff4422; text-shadow: 0 0 6px #ff0000, 2px 2px 0 #000;
+  margin-bottom: 4px; letter-spacing: 2px;
+}
+.fps-boss-bar-bg {
+  width: 100%; height: 16px;
+  background: rgba(0,0,0,0.7);
+  border: 2px solid #880000;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 0 8px #ff000055;
+}
+.fps-boss-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #880000, #cc2200);
+  transition: width 0.15s ease-out;
+}
 `;

@@ -1,5 +1,32 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-17 — Boss Wave: Uruk-hai Captain (Run 7)
+
+### What was done
+- Added **Uruk-hai Captain** boss enemy for wave 10's climactic fight:
+  - 1200 HP, scale 2.0 (twice player height), speed 1.6, 8 base damage
+  - `canBreakWalls: true` — charges through fortifications
+  - **Rage mode** at 50% HP: speed jumps to 2.56, full-body red emissive glow
+  - Rich drops: 4 diamond, 6 iron_block, sniper_rifle (60%), 24 sniper_ammo, 6 energy_cell
+  - 200 XP, 200 gold reward
+- **Boss health bar UI** — large red bar at top-center of screen during boss fight:
+  - Shows boss name (`⚔ Uruk-hai Captain`) and health percentage
+  - Bar turns bright red/orange gradient when boss enters rage mode (≤50% HP)
+  - Disappears when boss dies, triggers victory sound + screen shake
+- **Distinctive boss mesh**: armored humanoid with helmet, visor, glowing red eyes,
+  gold-trimmed shoulder pauldrons, greatsword with gold crossguard
+- Wave 10 updated: 1 boss + 3 trolls + full siege force (was 4 trolls)
+- Added `BOSS_RAGE_THRESHOLD` constant, `onBossHealthChanged` / `onBossDied` callbacks on EnemyManager
+- Eye meshes named "boss_eye" to preserve their emissive glow through slow/rage tint changes
+
+### Ideas for next run
+- **Enemy AI improvements**: ranged enemies dodge sideways when shot, melee enemies with block chance
+- **Nether content**: nether portal block + nether biome with lava, blaze mobs, nether brick
+- **Visual polish**: muzzle flash particles at gun barrel tip, reload animation viewmodel shake
+- **Wave system**: skeletons appear from wave 7+, add "elite" variants (double HP/damage)
+- **Sound design**: boss roar on spawn, stomping footstep sounds for trolls and boss
+- **Achievement**: unlock for defeating the boss — "The Battle of Helm's Deep"
+
 ## 2026-05-17 — Merge conflict resolution + pistol polish (Run 6)
 
 ### What was done

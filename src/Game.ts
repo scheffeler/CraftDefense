@@ -600,6 +600,16 @@ export class Game {
       this.audio.play("player_hurt", 0.5);
     };
 
+    this.enemies.onBossHealthChanged = (name, pct) => {
+      this.ui.showBossHealthBar(name, pct);
+    };
+
+    this.enemies.onBossDied = () => {
+      this.ui.hideBossHealthBar();
+      this.audio.play("victory", 0.6);
+      this.scene.shake(0.12, 0.5);
+    };
+
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
       this.audio.play("explosion", 0.9);
       this.scene.shake(0.18, 0.6);

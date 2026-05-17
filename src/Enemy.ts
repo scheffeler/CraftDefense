@@ -15,8 +15,10 @@ const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
 // All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
 const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
   "goblin", "orc", "troll", "goblin_miner",
-  "zombie", "spider", "golem", "creeper", "skeleton",
+  "zombie", "spider", "golem", "creeper", "skeleton", "uruk_captain",
 ]);
+
+const BOSS_RAGE_THRESHOLD = 0.5; // fraction of HP at which boss enters rage
 
 interface SkeletonArrow {
   mesh: THREE.Mesh;
@@ -46,6 +48,8 @@ export class EnemyManager {
   onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
   onCreeperPrime: () => void = () => {};
   onSkeletonArrowHit: (damage: number) => void = () => {};
+  onBossHealthChanged: (name: string, pct: number) => void = () => {};
+  onBossDied: () => void = () => {};
 
   private _playerX = 32;
   private _playerZ = 32;
@@ -190,6 +194,7 @@ export class EnemyManager {
     const state = this.enemies.get(id);
     if (!state || !state.alive || state.dying) return;
 
+    const prevPct = state.health / state.config.maxHealth;
     state.health = Math.max(0, state.health - amount);
     this.flashHit(id);
 
@@ -201,9 +206,21 @@ export class EnemyManager {
 
     this.updateHealthBar(id, state, this.meshes.get(id)?.position ?? new THREE.Vector3());
 
+    // Boss-specific handling
+    if (state.config.type === "uruk_captain") {
+      const newPct = state.health / state.config.maxHealth;
+      this.onBossHealthChanged(state.config.name, newPct);
+      // Rage mode triggers when crossing 50% health threshold
+      if (prevPct > BOSS_RAGE_THRESHOLD && newPct <= BOSS_RAGE_THRESHOLD && state.slowTimer <= 0) {
+        state.speed = state.config.speed * 1.6;
+        this.applyRageTint(id);
+      }
+    }
+
     if (state.health <= 0) {
       state.dying = true;
-      state.dyingTimer = 0.4;
+      state.dyingTimer = 0.5;
+      if (state.config.type === "uruk_captain") this.onBossDied();
       this.onEnemyDied(state);
     }
   }
@@ -423,6 +440,8 @@ export class EnemyManager {
       this.buildCreeperMesh(group);
     } else if (type === "skeleton") {
       this.buildSkeletonMesh(group);
+    } else if (type === "uruk_captain") {
+      this.buildUrukCaptainMesh(group);
     } else {
       this.buildHumanoidMesh(group, type);
     }
@@ -652,6 +671,77 @@ export class EnemyManager {
     }
   }
 
+  private buildUrukCaptainMesh(group: THREE.Group): void {
+    const armorMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a2e });
+    const skinMat   = new THREE.MeshLambertMaterial({ color: 0x2a2a3e });
+    const darkMat   = new THREE.MeshLambertMaterial({ color: 0x0a0a18 });
+    const eyeMat    = new THREE.MeshLambertMaterial({ color: 0xff2200, emissive: 0xff0000, emissiveIntensity: 1.2 });
+    const bladeMat  = new THREE.MeshLambertMaterial({ color: 0x888899 });
+    const goldMat   = new THREE.MeshLambertMaterial({ color: 0xddaa00, emissive: 0x664400, emissiveIntensity: 0.3 });
+
+    // Body
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.32), armorMat);
+    body.position.y = 0.72; body.castShadow = true;
+    group.add(body);
+
+    // Helmet
+    const helm = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.52, 0.48), darkMat);
+    helm.position.y = 1.30; helm.castShadow = true;
+    group.add(helm);
+    // Helm visor
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.14, 0.04), darkMat);
+    visor.position.set(0, 1.32, 0.25); group.add(visor);
+    // Glowing red eyes
+    for (const ex of [-0.09, 0.09]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
+      eye.position.set(ex, 1.34, 0.26);
+      eye.name = "boss_eye";
+      group.add(eye);
+    }
+
+    // Shoulder pauldrons
+    for (const sx of [-0.46, 0.46]) {
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.38), darkMat);
+      pad.position.set(sx, 0.98, 0); group.add(pad);
+      // Gold trim
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.40), goldMat);
+      trim.position.set(sx, 0.88, 0); group.add(trim);
+    }
+
+    // Legs with greaves
+    for (const [lx, i] of [[-0.15, 0], [0.15, 1]] as [number, number][]) {
+      const legPivot = new THREE.Object3D();
+      legPivot.position.set(lx, 0.50, 0);
+      legPivot.name = `legpivot_${i}`;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.52, 0.24), armorMat);
+      leg.position.y = -0.26; leg.castShadow = true;
+      legPivot.add(leg);
+      group.add(legPivot);
+    }
+
+    // Arms
+    for (const [ax, i] of [[-0.42, 0], [0.42, 1]] as [number, number][]) {
+      const armPivot = new THREE.Object3D();
+      armPivot.position.set(ax, 0.92, 0);
+      armPivot.name = `armpivot_${i}`;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.52, 0.24), skinMat);
+      arm.position.y = -0.24;
+      armPivot.add(arm);
+      group.add(armPivot);
+    }
+
+    // Greatsword (held on right side)
+    const swordGrip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 0.06), goldMat);
+    swordGrip.position.set(0.55, 0.55, 0.10); group.add(swordGrip);
+    const crossguard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.06), goldMat);
+    crossguard.position.set(0.55, 0.72, 0.10); group.add(crossguard);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.70, 0.04), bladeMat);
+    blade.position.set(0.55, 1.12, 0.10); group.add(blade);
+    // Blade tip
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.03), bladeMat);
+    tip.position.set(0.55, 1.56, 0.10); group.add(tip);
+  }
+
   private animateLegs(id: number, phase: number): void {
     const group = this.meshes.get(id);
     if (!group) return;
@@ -743,9 +833,22 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
+      if (m.name === "boss_eye") return; // preserve glowing eyes
       const mat = m.material as THREE.MeshLambertMaterial;
       mat.emissive.setHex(0x000000);
       mat.emissiveIntensity = 0;
+    });
+  }
+
+  private applyRageTint(id: number): void {
+    const group = this.meshes.get(id);
+    if (!group) return;
+    group.traverse(c => {
+      const m = c as THREE.Mesh;
+      if (!m.isMesh || m.name === "boss_eye") return;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.emissive.setHex(0xff2200);
+      mat.emissiveIntensity = 0.4;
     });
   }
 
