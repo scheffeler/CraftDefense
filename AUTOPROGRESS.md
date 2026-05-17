@@ -342,3 +342,35 @@
   (small FOV shift + steadied crosshair for pistol/shotgun)
 - **Ammo refill station**: craftable block that slowly converts iron_ingots → ammo
   (iron_ingot per 8 bullets; passive refill 1 round/sec when player is near)
+
+## 2026-05-17 — Conflict Resolution + Cleanup (Run 13)
+
+### What was done
+- Merged my local pistol additions into the existing auto-iterate branch (which had runs 1–12)
+- The branch already had all 5 weapons, boss, elite mobs, knockback, stomp attack, etc.
+- Resolved merge conflicts across: `Game.ts`, `SceneManager.ts`, `UI.ts`, `config/items.ts`, `config/enemies.ts`
+- Key resolution decisions:
+  - Kept remote's `weaponType:"gun"` / `ammoType` / `gunCooldown` / `gunRange` field names
+  - Kept remote's `tryGunFire(def)` unified hitscan handler (discarded my `tryPistolFire()`)
+  - Kept remote's specialized gun viewmodels (`buildPistolMesh`, `buildShotgunMesh`, `buildGunMesh`)
+  - Removed my duplicate `buildAmmoDisplay()` and `updateAmmoDisplay()` from UI.ts
+  - Removed duplicate pistol and pistol_ammo recipes from `recipes.ts` (kept the remote's `bullet` + `pistol`)
+  - Removed my redundant `isGun`, `ammoId`, `fireCooldown`, `range` fields from `ItemDef`
+- Build passes cleanly: `npx tsc -p tsconfig.emit.json` has no real errors (only pre-existing TS5107 warning)
+
+### Current full feature set
+- All 5 guns: pistol, sniper, shotgun, crossbow, raygun
+- Boss fight (Uruk-hai Captain, wave 10) with health bar, rage mode
+- Endless survival mode after boss defeat
+- Elite mob variants (orange glow, 2× HP, better drops)
+- Skeleton strafe AI, melee knockback stagger
+- Troll stomp attack (wind-up, AoE, shockwave particles)
+- Muzzle flash particles, bullet impact sparks, tracer lines
+
+### Ideas for next run
+- **Sniper scope ADS**: add full scope overlay (vignette circle, crosshair lines) when right-click with sniper
+- **Weapon hotbar UI**: show bullet icon + ammo count directly in hotbar slot overlay (not just bottom-right)
+- **Sound polish**: verify `sniper_fire`, `shotgun_blast`, `raygun_fire`, `crossbow_fire` are all in AudioManager
+- **Spider web shot**: spider projectile that slows player 2s
+- **Best Endless Wave**: track + display on victory screen
+- **Skeleton flee**: below 30% HP, turns and runs briefly
