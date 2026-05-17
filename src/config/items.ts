@@ -129,7 +129,7 @@ export const ITEMS: Record<string, ItemDef> = {
   pistol: {
     id:"pistol", name:"Pistol", category:"weapon", stackSize:1,
     color:0x445566, damage:15, durability:400,
-    weaponType:"gun", ammoType:"bullet", gunCooldown:0.45, gunRange:60,
+    weaponType:"gun" as const, ammoType:"bullet", gunCooldown:0.45, gunRange:60,
   },
 
   // --- Iron armor ---

@@ -244,6 +244,7 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "diamond_boots", count: 1 },
   },
 
+
   // --- Bow ---
   {
     id: "bow",
@@ -345,25 +346,6 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "iron_hoe", count: 1 },
   },
 
-  // --- Pistol (3x3: iron bar shape + stick handle) ---
-  {
-    id: "pistol",
-    pattern: [
-      [r("iron_ingot"), r("iron_ingot"), r("iron_ingot")],
-      [null,            r("iron_ingot"), null           ],
-      [null,            r("stick"),      null           ],
-    ],
-    result: { itemId: "pistol", count: 1 },
-  },
-
-  // --- Pistol Ammo (iron ingot → 8 rounds) ---
-  {
-    id: "pistol_ammo",
-    pattern: [
-      [r("iron_ingot")],
-    ],
-    result: { itemId: "pistol_ammo", count: 8 },
-  },
 
   // --- Bread (3 wheat in a row) ---
   {

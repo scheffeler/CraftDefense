@@ -5,7 +5,7 @@ type SoundName =
   | "ui_click"
   | "wave_start" | "wave_complete" | "base_hit"
   | "explosion" | "victory"
-  | "swing" | "bow_charge" | "arrow_release"
+  | "swing" | "bow_charge" | "arrow_release" | "pistol_shot" | "pistol_empty"
   | "block_break" | "block_place" | "pickup"
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
@@ -318,6 +318,20 @@ export class AudioManager {
       case "arrow_release":
         noiseBurst(0.05, 3000, 0.02);
         tone(660, 0.04, "sawtooth", 0.5);
+        break;
+
+      case "pistol_shot":
+        // Sharp crack + low boom
+        noiseBurst(0.04, 14000, 0.015);
+        noiseBurst(0.18, 300, 0.12);
+        tone(90, 0.20, "sawtooth", 0.95);
+        tone(220, 0.06, "square", 0.45);
+        break;
+
+      case "pistol_empty":
+        // Dry click when out of ammo
+        noiseBurst(0.03, 2000, 0.01);
+        tone(800, 0.04, "square", 0.15);
         break;
 
       case "block_break":
