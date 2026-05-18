@@ -300,7 +300,28 @@ export class UI {
 
   isInventoryOpen(): boolean { return this._inventoryOpen; }
 
-  showDeathScreen(): void { this.deathOverlay.style.display = "flex"; }
+  showDeathScreen(endlessWave?: number, bestWave = 0): void {
+    const stats = this.deathOverlay.querySelector<HTMLElement>(".overlay-stats");
+    const record = this.deathOverlay.querySelector<HTMLElement>(".death-record");
+    if (stats) {
+      if (endlessWave !== undefined) {
+        const isNew = endlessWave >= bestWave;
+        stats.textContent = `Fell at endless wave ${endlessWave}`;
+        stats.style.color = isNew ? "#ffdd00" : "";
+        if (record) {
+          record.textContent = isNew
+            ? `★ NEW RECORD!  Best: Wave ${endlessWave}`
+            : `Best: Wave ${bestWave}`;
+          record.style.display = "block";
+        }
+      } else {
+        stats.textContent = "The fortress has fallen.";
+        stats.style.color = "";
+        if (record) record.style.display = "none";
+      }
+    }
+    this.deathOverlay.style.display = "flex";
+  }
   hideDeathScreen(): void { this.deathOverlay.style.display = "none"; }
 
   showSmeltNotice(input: string, output: string): void {
@@ -394,14 +415,23 @@ export class UI {
 
   // ─── End screens ──────────────────────────────────────────────────────────
 
-  showEnd(type: "victory" | "gameover", detail: string): void {
+  showEnd(type: "victory" | "gameover", detail: string, bestEndlessWave = 0): void {
     const box = this.endOverlay.querySelector(".overlay-box")!;
     const title = box.querySelector<HTMLElement>(".overlay-title")!;
     const stats = box.querySelector<HTMLElement>(".overlay-stats")!;
     const endlessBtn = box.querySelector<HTMLElement>("#end-endless")!;
+    const record = box.querySelector<HTMLElement>(".end-record");
     title.textContent = type === "victory" ? "VICTORY!" : "GAME OVER";
     title.style.color = type === "victory" ? "#ffdd00" : "#ff4444";
     stats.textContent = detail;
+    if (record) {
+      if (bestEndlessWave > 0) {
+        record.textContent = `★ Best Endless Wave: ${bestEndlessWave}`;
+        record.style.display = "block";
+      } else {
+        record.style.display = "none";
+      }
+    }
     endlessBtn.style.display = type === "victory" ? "block" : "none";
     this.endOverlay.style.display = "flex";
   }
@@ -1277,6 +1307,7 @@ export class UI {
       <div class="overlay-box">
         <h1 class="overlay-title" style="color:#ff4444">YOU DIED</h1>
         <p class="overlay-stats">The fortress has fallen.</p>
+        <p class="death-record" style="display:none;font-size:1.1em;color:#ffaa00;margin:4px 0 8px"></p>
         <button class="overlay-btn" id="death-restart">Respawn</button>
       </div>`;
     ov.querySelector("#death-restart")!.addEventListener("click", () => {
@@ -1294,6 +1325,7 @@ export class UI {
       <div class="overlay-box">
         <h1 class="overlay-title"></h1>
         <p class="overlay-stats"></p>
+        <p class="end-record" style="display:none;font-size:1.05em;color:#ffaa00;margin:4px 0 8px"></p>
         <button class="overlay-btn" id="end-endless" style="display:none;background:#c87800;margin-bottom:8px">
           &#x221E; Continue: Endless Mode
         </button>

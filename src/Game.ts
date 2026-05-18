@@ -64,6 +64,9 @@ export class Game {
   // Torch point lights keyed by "wx,wy,wz"
   private readonly torchLights = new Map<string, THREE.PointLight>();
 
+  // Best endless wave (persisted in localStorage)
+  private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
+
   // Hunger depletion timer
   private hungerTimer = 0;
   private _autoSaveTimer = 0;
@@ -680,7 +683,15 @@ export class Game {
     // Player death
     this.player.onDeath = () => {
       this.phase = "gameover";
-      this.ui.showDeathScreen();
+      let endlessWave: number | undefined;
+      if (this.waves.isEndless) {
+        endlessWave = this.waves.wave;
+        if (endlessWave > this._bestEndlessWave) {
+          this._bestEndlessWave = endlessWave;
+          localStorage.setItem("craftdefense_best_endless", String(endlessWave));
+        }
+      }
+      this.ui.showDeathScreen(endlessWave, this._bestEndlessWave);
       this.audio.play("player_death");
       if (this.scene.isPointerLocked) this.scene.unlockPointer();
     };
@@ -690,7 +701,7 @@ export class Game {
       this.audio.play("wave_complete");
       if (this.waves.isLastWave()) {
         this.phase = "win";
-        this.ui.showEnd("victory", `All ${wave} waves survived! The fortress holds!`);
+        this.ui.showEnd("victory", `All ${wave} waves survived! The fortress holds!`, this._bestEndlessWave);
         this.audio.play("victory");
         if (this.scene.isPointerLocked) this.scene.unlockPointer();
       } else {
