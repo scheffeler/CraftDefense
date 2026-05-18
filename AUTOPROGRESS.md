@@ -1,5 +1,28 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-18 — Lava Moat Defense System
+
+**What was done:**
+- Added `lava` BlockId + BlockDef (transparent orange, hardness 0)
+- `iron_bucket` item crafted from 3 iron ingots in V-shape at workbench
+- `lava_bucket` obtained by right-clicking lava with iron bucket; placing it gives back empty bucket
+- Player takes 2 HP/s when standing in lava + orange fog overlay (in-lava SceneManager effect)
+- Enemies take 2 damage/s when in/on lava blocks (continuous tick in updateCombat)
+- Orange point light (radius 12) auto-added when lava block is placed/broken
+- `spawnLavaEmbers()` particle method: orange/red sparks that rise periodically from nearby lava
+- `setInLavaEffect()`/`setWeatherIntensity()` updated in SceneManager for lava fog
+- Starter inventory includes 1 iron bucket so new players discover the mechanic
+- tsconfig moduleResolution changed from `Node` to `Bundler` (fix TS 6.0 deprecation error)
+
+**Ideas for next time:**
+- Lava spread mechanic: lava flows downward/sideways into adjacent air (like Minecraft)
+- Fire blocks: lava or flint&steel ignites flammable blocks (wood/planks/leaves)
+- Water-lava interaction: water touching lava creates obsidian (cobblestone at edge)
+- "Lava Trap" achievement: kill 3+ enemies with one lava pool placement
+- Golden tools: faster than iron but low durability (drops from gold ore smelting)
+- Cauldron block: fill with buckets of water/lava
+- Nether portal: build obsidian frame, light with flint&steel → transport to nether dimension
+
 ## 2026-05-18 — Potions System (healing, speed, strength, splash slowness, regen)
 
 **What was done:**
