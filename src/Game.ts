@@ -122,6 +122,16 @@ export class Game {
     pullTimer: number;
   }> = [];
 
+  // Thrown splash potions
+  private readonly thrownPotions: Array<{
+    mesh: THREE.Mesh;
+    velocity: THREE.Vector3;
+    effect: string;
+    magnitude: number;
+    duration: number;
+    life: number;
+  }> = [];
+
   private particles!:        ParticleSystem;
   private passiveMobs!:      PassiveMobManager;
   private weather!:          WeatherSystem;
@@ -484,6 +494,8 @@ export class Game {
       } else if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
+      } else if (itemDef?.category === "potion" && stack) {
+        this.usePotion(stack.itemId, itemDef);
       } else if (itemDef?.category === "food" && itemDef.foodPoints && this.player.hunger < 20) {
         this.inventory.removeItem(stack!.itemId, 1);
         this.player.hunger = Math.min(20, this.player.hunger + itemDef.foodPoints);
@@ -1187,6 +1199,12 @@ export class Game {
       }
     }
 
+    // Regen potion effect — 1 HP every 2 seconds
+    const regenEff = this.player.activeEffects.get("regen");
+    if (regenEff && regenEff.timer > 0 && this.player.health < this.player.maxHealth) {
+      this._regenTimer -= dt * 0.5; // heal 2x faster
+    }
+
     // Auto-save every 60 seconds while playing
     this._autoSaveTimer += dt;
     if (this._autoSaveTimer >= 60) {
@@ -1211,6 +1229,9 @@ export class Game {
 
     // Item entity drops
     this.updateItemEntities(dt);
+
+    // Thrown splash potions
+    this.updateThrownPotions(dt);
 
     // Crop growth
     this.updateCrops(dt);
@@ -1250,6 +1271,7 @@ export class Game {
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.ui.updateDayClock(this.scene.dayTime);
+    this.ui.updateActiveEffects(this.player.activeEffects);
     this.refreshHotbar();
 
     // Compass — extract yaw from camera quaternion
@@ -1579,7 +1601,7 @@ export class Game {
     if (this.phase !== "playing" && this.phase !== "endless" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
-    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack);
+    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack) + Math.round(this.player.getStrengthBonus());
 
     const result = this.player.tryMeleeAttack();
     if (!result) return;
@@ -1802,6 +1824,88 @@ export class Game {
         if (d < nextDist) { nextDist = d; nextId = state.id; }
       }
       currentId = nextId;
+    }
+  }
+
+  private usePotion(itemId: string, itemDef: import("./config/items").ItemDef): void {
+    if (!itemDef.potionEffect) return;
+    if (itemDef.potionSplash) {
+      this.throwSplashPotion(itemDef.potionEffect, itemDef.potionDuration ?? 8, itemDef.potionMagnitude ?? 0.5);
+      this.inventory.removeItem(itemId, 1);
+      this.refreshHotbar();
+      return;
+    }
+    const effect = itemDef.potionEffect;
+    const duration = itemDef.potionDuration ?? 0;
+    const magnitude = itemDef.potionMagnitude ?? 1;
+    if (effect === "heal") {
+      this.player.heal(magnitude);
+      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.particles.spawnHealEffect(
+        this.player.position.x,
+        this.player.position.y + 1,
+        this.player.position.z,
+      );
+    } else {
+      this.player.applyEffect(effect, duration, magnitude);
+    }
+    this.inventory.removeItem(itemId, 1);
+    this.audio.play("eat", 0.7);
+    this.refreshHotbar();
+    this.ui.updateActiveEffects(this.player.activeEffects);
+    this.unlockAchievement("first_potion", "Alchemist", "Drank your first potion");
+  }
+
+  private throwSplashPotion(effect: string, duration: number, magnitude: number): void {
+    const geo = new THREE.SphereGeometry(0.12, 6, 6);
+    const color = effect === "slowness" ? 0x44aaff : 0xff88ff;
+    const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85 });
+    const mesh = new THREE.Mesh(geo, mat);
+    const from = this.player.getCameraPosition();
+    mesh.position.copy(from);
+    this.scene.scene.add(mesh);
+    const dir = this.player.getLookDirection().multiplyScalar(12);
+    dir.y += 3;
+    this.thrownPotions.push({ mesh, velocity: dir, effect, magnitude, duration, life: 5 });
+    this.audio.play("arrow_release", 0.5);
+  }
+
+  private updateThrownPotions(dt: number): void {
+    const GRAVITY = 20;
+    for (let i = this.thrownPotions.length - 1; i >= 0; i--) {
+      const p = this.thrownPotions[i];
+      p.life -= dt;
+      p.velocity.y -= GRAVITY * dt;
+      p.mesh.position.addScaledVector(p.velocity, dt);
+
+      const bx = Math.floor(p.mesh.position.x);
+      const by = Math.floor(p.mesh.position.y - 0.1);
+      const bz = Math.floor(p.mesh.position.z);
+      const hitGround = by >= 0 && by < 32 &&
+        this.gameMap.world.getBlock(bx, by, bz) !== "air" &&
+        this.gameMap.world.getBlock(bx, by, bz) !== "water";
+
+      if (hitGround || p.life <= 0) {
+        this.splashPotionImpact(p.mesh.position, p.effect, p.duration, p.magnitude);
+        this.scene.scene.remove(p.mesh);
+        (p.mesh.material as THREE.Material).dispose();
+        p.mesh.geometry.dispose();
+        this.thrownPotions.splice(i, 1);
+      }
+    }
+  }
+
+  private splashPotionImpact(pos: THREE.Vector3, effect: string, duration: number, magnitude: number): void {
+    const RADIUS = 4;
+    this.particles.spawnSplashEffect(pos.x, pos.y, pos.z);
+    this.audio.play("splash", 0.7);
+    for (const state of this.enemies.getAliveEnemies()) {
+      const epos = this.enemies.getEnemyPosition(state.id);
+      if (epos && epos.distanceTo(pos) <= RADIUS) {
+        if (effect === "slowness") {
+          this.enemies.damage(state.id, 0, magnitude, duration);
+        }
+      }
     }
   }
 

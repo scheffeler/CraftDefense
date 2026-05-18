@@ -18,6 +18,11 @@ const MELEE_RADIUS         = 2.5;
 const MELEE_REACH          = 2.0;
 const PISTOL_COOLDOWN      = 0.45; // ~2.2 shots/sec for generic guns
 
+export interface ActiveEffect {
+  timer: number;
+  magnitude: number;
+}
+
 export class Player {
   position: THREE.Vector3;    // feet position
   velocity: THREE.Vector3 = new THREE.Vector3();
@@ -41,6 +46,8 @@ export class Player {
   isCrossbowLoading  = false;
   isCrossbowLoaded   = false;
   crossbowLoadProgress = 0;  // 0..1
+
+  readonly activeEffects = new Map<string, ActiveEffect>();
 
   onDeath: () => void = () => {};
 
@@ -71,8 +78,32 @@ export class Player {
         this.isCrossbowLoaded  = true;
       }
     }
+    for (const [key, eff] of this.activeEffects) {
+      eff.timer -= dt;
+      if (eff.timer <= 0) this.activeEffects.delete(key);
+    }
     this.applyMovement(dt, input);
     this.camera.position.copy(this.getCameraPosition());
+  }
+
+  applyEffect(id: string, duration: number, magnitude: number): void {
+    const existing = this.activeEffects.get(id);
+    if (existing) {
+      existing.timer = Math.max(existing.timer, duration);
+      existing.magnitude = Math.max(existing.magnitude, magnitude);
+    } else {
+      this.activeEffects.set(id, { timer: duration, magnitude });
+    }
+  }
+
+  getSpeedMult(): number {
+    const e = this.activeEffects.get("speed");
+    return e ? e.magnitude : 1.0;
+  }
+
+  getStrengthBonus(): number {
+    const e = this.activeEffects.get("strength");
+    return e ? e.magnitude : 0;
   }
 
   /** Returns melee sphere params if attack was successful, null if on cooldown. */
@@ -178,7 +209,7 @@ export class Player {
   private applyMovement(dt: number, input: MovementInput): void {
     const yaw = this.getYaw();
 
-    let speed = WALK_SPEED;
+    let speed = WALK_SPEED * this.getSpeedMult();
     if (input.sprint) speed *= SPRINT_MULT;
     if (this.inWater) speed *= WATER_SPEED;
     if (this.webSlowTimer > 0) speed *= 0.35;  // webbed: slowed to 35% speed

@@ -192,6 +192,7 @@ export class UI {
 
   private _personalGrid: (string | null)[][] = [[null, null], [null, null]];
   private _inventoryOpen = false;
+  private effectsPanel!: HTMLElement;
 
   private readonly container: HTMLElement;
 
@@ -266,6 +267,29 @@ export class UI {
       ? ` <span style="color:#aaa;font-size:7px">(${durability}/${def.durability})</span>` : "";
     this.itemTooltip.innerHTML = def.name + durStr;
     this.itemTooltip.style.display = "block";
+  }
+
+  updateActiveEffects(effects: Map<string, { timer: number; magnitude: number }>): void {
+    const EFFECT_META: Record<string, { label: string; icon: string; color: string }> = {
+      speed:    { label: "Speed",     icon: "⚡", color: "#ffdd44" },
+      strength: { label: "Strength",  icon: "⚔",  color: "#cc2222" },
+      regen:    { label: "Regen",     icon: "✚",  color: "#ff88cc" },
+    };
+    const active = [...effects.entries()].filter(([, e]) => e.timer > 0);
+    if (active.length === 0) {
+      this.effectsPanel.style.display = "none";
+      return;
+    }
+    this.effectsPanel.style.display = "flex";
+    this.effectsPanel.innerHTML = active.map(([id, eff]) => {
+      const meta = EFFECT_META[id] ?? { label: id, icon: "●", color: "#ffffff" };
+      const secs = Math.ceil(eff.timer);
+      return `<div class="fps-effect-pill" style="border-color:${meta.color}">
+        <span style="color:${meta.color}">${meta.icon}</span>
+        <span class="fps-effect-name">${meta.label}</span>
+        <span class="fps-effect-timer">${secs}s</span>
+      </div>`;
+    }).join("");
   }
 
   updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean, endless?: boolean): void {
@@ -544,6 +568,7 @@ export class UI {
     this.buildDayClock();
     this.buildMinimap();
     this.buildCompass();
+    this.buildEffectsPanel();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -775,6 +800,14 @@ export class UI {
     const DIRS = ["N","NE","E","SE","S","SW","W","NW"];
     const idx = Math.round(((yawRadians + Math.PI) / (Math.PI * 2)) * 8) & 7;
     this.compassEl.textContent = DIRS[idx];
+  }
+
+  private buildEffectsPanel(): void {
+    const panel = document.createElement("div");
+    panel.className = "fps-effects-panel";
+    panel.style.display = "none";
+    this.effectsPanel = panel;
+    this.container.appendChild(panel);
   }
 
   private buildHotbar(): void {
@@ -1265,6 +1298,12 @@ export class UI {
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
       { name: "Crossbow", ingredients: "3 Iron Ingots + 2 Sticks (3×3 grid) — right-click to load, right-click to fire", key: "crossbow" },
+      { name: "Glass Bottle", ingredients: "3 Glass (V-shape) → 3 Bottles", key: "glass_bottle" },
+      { name: "Healing Potion", ingredients: "1 Glass Bottle + 1 Apple → +8 HP", key: "healing_potion" },
+      { name: "Speed Potion", ingredients: "1 Glass Bottle + 1 Bread → Speed 30s", key: "speed_potion" },
+      { name: "Strength Potion", ingredients: "1 Glass Bottle + 1 Iron Ingot → +4 Dmg 30s", key: "strength_potion" },
+      { name: "Splash of Slowness", ingredients: "1 Glass Bottle + 1 Gunpowder → Throw to slow", key: "splash_slowness" },
+      { name: "Regen Potion", ingredients: "1 Glass Bottle + 1 Wheat → Heal over 20s", key: "regen_potion" },
     ];
 
     const list = div("fps-rb-list");
@@ -2213,4 +2252,29 @@ const FPS_CSS = `
   background: linear-gradient(90deg, #880000, #cc2200);
   transition: width 0.15s ease-out;
 }
+
+/* Active potion effects panel */
+.fps-effects-panel {
+  position: absolute;
+  bottom: 80px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 30;
+}
+.fps-effect-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid #666;
+  padding: 3px 7px;
+  border-radius: 3px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+.fps-effect-name { color: #ddd; }
+.fps-effect-timer { color: #aaa; font-size: 7px; margin-left: 2px; }
 `;

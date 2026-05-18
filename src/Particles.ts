@@ -101,7 +101,6 @@ export class ParticleSystem {
         new THREE.MeshBasicMaterial({ color }),
       );
       mesh.position.set(x, y, z);
-      // Mostly forward along dir, with small lateral spread
       const spd = 1.5 + Math.random() * 2.0;
       const sx = dir.x * spd + (Math.random() - 0.5) * 0.6;
       const sy = dir.y * spd + (Math.random() - 0.5) * 0.6;
@@ -145,7 +144,6 @@ export class ParticleSystem {
         0.45 + Math.random() * 0.35,
       );
     }
-    // Central burst (dust cloud rising up)
     for (let i = 0; i < 8; i++) {
       const size = 0.1 + Math.random() * 0.12;
       const mesh = new THREE.Mesh(
@@ -155,6 +153,34 @@ export class ParticleSystem {
       mesh.position.set(x + (Math.random() - 0.5) * 0.5, y + 0.2, z + (Math.random() - 0.5) * 0.5);
       const spd = 0.3 + Math.random() * 0.6;
       this.spawnParticle(mesh, (Math.random() - 0.5) * spd, 2 + Math.random() * 2, (Math.random() - 0.5) * spd, 0.6 + Math.random() * 0.4);
+    }
+  }
+
+  spawnHealEffect(x: number, y: number, z: number): void {
+    for (let i = 0; i < 10; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.06, 4, 4),
+        new THREE.MeshBasicMaterial({ color: 0xff4488 }),
+      );
+      mesh.position.set(x + (Math.random() - 0.5) * 0.5, y, z + (Math.random() - 0.5) * 0.5);
+      const theta = Math.random() * Math.PI * 2;
+      this.spawnParticle(mesh, Math.cos(theta) * 0.8, 2.5 + Math.random() * 1.5, Math.sin(theta) * 0.8, 0.6 + Math.random() * 0.4);
+    }
+  }
+
+  spawnSplashEffect(x: number, y: number, z: number): void {
+    const colors = [0x44aaff, 0x88ccff, 0xaaddff];
+    for (let i = 0; i < 18; i++) {
+      const color = colors[i % colors.length];
+      const mesh  = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05 + Math.random() * 0.06, 4, 4),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(x, y, z);
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.random() * Math.PI * 0.5;
+      const spd   = 2 + Math.random() * 3;
+      this.spawnParticle(mesh, Math.sin(phi) * Math.cos(theta) * spd, Math.cos(phi) * spd + 1, Math.sin(phi) * Math.sin(theta) * spd, 0.4 + Math.random() * 0.3);
     }
   }
 

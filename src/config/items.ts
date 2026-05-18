@@ -1,7 +1,7 @@
 import type { BlockId } from "../types";
 import type { ToolCategory } from "./blocks";
 
-export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material";
+export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material" | "potion";
 export type ToolTier     = "wood" | "stone" | "iron" | "diamond";
 export type ArmorSlot    = "head" | "chest" | "legs" | "feet";
 
@@ -31,6 +31,11 @@ export interface ItemDef {
   armorSlot?:    ArmorSlot;
   // Placeable block
   placesBlock?:  BlockId;
+  // Potion
+  potionEffect?:    string;   // "heal" | "speed" | "strength" | "slowness"
+  potionDuration?:  number;   // seconds (0 = instant)
+  potionMagnitude?: number;   // effect strength
+  potionSplash?:    boolean;  // true = throwable splash potion
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -163,4 +168,17 @@ export const ITEMS: Record<string, ItemDef> = {
     color:0x00ccff, damage:20, durability:999,
     weaponType:"gun", ammoType:"energy_cell", gunRange:50, gunCooldown:2.0,
   },
+
+  // --- Potions & ingredients ---
+  glass_bottle:    { id:"glass_bottle",    name:"Glass Bottle",         category:"material", stackSize:64, color:0x88ccee },
+  healing_potion:  { id:"healing_potion",  name:"Potion of Healing",    category:"potion",   stackSize:16, color:0xff6688,
+    potionEffect:"heal",     potionDuration:0,  potionMagnitude:8  },
+  speed_potion:    { id:"speed_potion",    name:"Potion of Speed",      category:"potion",   stackSize:16, color:0xffdd44,
+    potionEffect:"speed",    potionDuration:30, potionMagnitude:1.5 },
+  strength_potion: { id:"strength_potion", name:"Potion of Strength",   category:"potion",   stackSize:16, color:0xcc2222,
+    potionEffect:"strength", potionDuration:30, potionMagnitude:4  },
+  splash_slowness: { id:"splash_slowness", name:"Splash of Slowness",   category:"potion",   stackSize:16, color:0x44aaff,
+    potionEffect:"slowness", potionDuration:8,  potionMagnitude:0.4, potionSplash:true },
+  regen_potion:    { id:"regen_potion",    name:"Potion of Regeneration",category:"potion",  stackSize:16, color:0xff88cc,
+    potionEffect:"regen",    potionDuration:20, potionMagnitude:1  },
 };
