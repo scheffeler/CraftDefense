@@ -45,6 +45,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
   bookshelf:        { id: "bookshelf",        name: "Bookshelf",        color: 0xc8a060, topColor: 0x7a3a14, hardness: 1.5,  placeable: true,  transparent: false },
   enchanting_table: { id: "enchanting_table", name: "Enchanting Table", color: 0x1a0a2a, topColor: 0xaa0022, hardness: 5.0,  placeable: true,  transparent: false },
   bed:              { id: "bed",              name: "Bed",              color: 0xcc3333, topColor: 0xaa2222, hardness: 0.2,  placeable: true,  transparent: false },
+  tnt:              { id: "tnt",              name: "TNT",              color: 0xcc2222, topColor: 0xaa8855, hardness: 0.0,  placeable: true,  transparent: false },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];
@@ -104,6 +105,7 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "bedrock":      return 12;
     case "gold_ore":     return 14;
     case "diamond_ore":  return 15;
+    case "tnt":          return (isTop || isBot) ? 17 : 16;
     default:             return 13;
   }
 }
@@ -126,7 +128,7 @@ export class VoxelWorld {
 
   private static makeBlockTexture(): THREE.Texture {
     // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    const ATLAS_TILES = 20;
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -305,6 +307,41 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // 16: TNT side — red background, white border stripes, dark label with "TNT"
+    fill(16 * S, "#cc2222");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(16 * S, 0, S, 2);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(16 * S, 14, S, 2);
+    ctx.fillStyle = "#1a1a1a"; ctx.fillRect(16 * S + 1, 4, 14, 8);
+    // Red "TNT" pixel text inside the dark band
+    ctx.fillStyle = "#cc2222";
+    // T
+    ctx.fillRect(16*S+2,  6, 3, 1); ctx.fillRect(16*S+3,  7, 1, 3);
+    // N
+    ctx.fillRect(16*S+7,  6, 1, 4); ctx.fillRect(16*S+7,  7, 2, 1); ctx.fillRect(16*S+9,  6, 1, 4);
+    // T
+    ctx.fillRect(16*S+11, 6, 3, 1); ctx.fillRect(16*S+12, 7, 1, 3);
+    border(16 * S);
+
+    // 17: TNT top — tan base with starburst (gunpowder pattern)
+    fill(17 * S, "#c8a060");
+    { const r = rng(2017);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel(17*S+x, y, `rgb(${(200+v)|0},${(160+v*0.8)|0},${(96+v*0.5)|0})`);
+      }
+    }
+    // Starburst lines from center
+    ctx.fillStyle = "rgba(80,50,10,0.6)";
+    ctx.fillRect(17*S,   7, S, 2);   // horizontal
+    ctx.fillRect(17*S+7, 0, 2, S);   // vertical
+    for (let i = 1; i <= 5; i++) {   // diagonals
+      ctx.fillRect(17*S + 7 + i, 7 - i, 1, 1); ctx.fillRect(17*S + 7 - i, 7 - i, 1, 1);
+      ctx.fillRect(17*S + 7 + i, 7 + i, 1, 1); ctx.fillRect(17*S + 7 - i, 7 + i, 1, 1);
+    }
+    // Dark center dot (fuse hole)
+    ctx.fillStyle = "#1a1a1a"; ctx.fillRect(17*S+7, 7, 2, 2);
+    border(17 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -390,7 +427,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / 20, u1 = (texIdx + 1) / 20;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {

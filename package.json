@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsc -p tsconfig.emit.json && node scripts/dev.mjs",
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc -p tsconfig.emit.json --noEmit",
     "build": "tsc -p tsconfig.emit.json && node scripts/build.mjs",
     "preview": "node scripts/preview.mjs",
     "screenshot": "node scripts/screenshot.mjs"

@@ -89,6 +89,9 @@ export class Game {
   }>();
   private openFurnaceKey: string | null = null;
 
+  // TNT fuse tracking: key = "wx,wy,wz", value = { fuseTimer, sparkTimer }
+  private readonly litTNT = new Map<string, { fuseTimer: number; sparkTimer: number }>();
+
   // Enchanting table
   private _enchantItem: import("./Inventory").ItemStack | null = null;
 
@@ -201,6 +204,8 @@ export class Game {
       { itemId: "apple",         count: 6 },
       { itemId: "arrow_item",    count: 12 },
       { itemId: "cobblestone",   count: 32 },
+      { itemId: "gunpowder",     count: 8 },
+      { itemId: "tnt",           count: 2 },
       null, null, null, null, null,
       null, null, null, null, null, null, null, null, null,
       null, null, null, null, null, null, null, null, null,
@@ -400,6 +405,17 @@ export class Game {
         return;
       }
 
+      // Check if looking at TNT — light the fuse
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "tnt") {
+        const key = `${tb.wx},${tb.wy},${tb.wz}`;
+        if (!this.litTNT.has(key)) {
+          this.litTNT.set(key, { fuseTimer: 4.0, sparkTimer: 0 });
+          this.audio.play("creeper_hiss", 0.7);
+          this.ui.showAchievement("🧨 Bombs Away!", "Light a TNT block");
+        }
+        return;
+      }
+
       // Check if looking at a furnace — open furnace UI
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "furnace") {
         const key = `${tb.wx},${tb.wy},${tb.wz}`;
@@ -476,6 +492,7 @@ export class Game {
         }
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
+      if (id === "tnt")   this.litTNT.delete(`${wx},${wy},${wz}`);
       if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
 
       // Achievements
@@ -556,32 +573,7 @@ export class Game {
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
-      this.audio.play("explosion", 0.9);
-      this.scene.shake(0.18, 0.6);
-      this.particles.spawnExplosion(x, y + 0.5, z);
-      // Damage player if in range
-      const pp = this.player.position;
-      const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
-      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
-        this.player.damage(6);
-        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-        this.ui.showDamageVignette();
-      }
-      // Break nearby blocks
-      if (this.gameMap) {
-        for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
-          for (let by = Math.floor(y); by <= Math.ceil(y + radius); by++) {
-            for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
-              const ddx = bx - x, ddy = by - y, ddz = bz - z;
-              if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
-              const block = this.gameMap.world.getBlock(bx, by, bz);
-              if (block === "air" || block === "bedrock") continue;
-              if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
-            }
-          }
-        }
-        this.gameMap.world.rebuildDirtyChunks();
-      }
+      this.triggerExplosion(x, y, z, radius, 6);
       this.waves.onEnemyEliminated();
     };
 
@@ -954,6 +946,9 @@ export class Game {
 
     // Tick all furnace states even when pointer unlocked
     this.updateFurnaces(dt);
+
+    // Lit TNT fuses tick regardless of pointer lock
+    this.updateLitTNT(dt);
 
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
@@ -1615,5 +1610,92 @@ export class Game {
 
   deleteSave(): void {
     localStorage.removeItem("craftdefense_save");
+  }
+
+  /** Shared explosion logic used by TNT and creeper. */
+  private triggerExplosion(x: number, y: number, z: number, radius: number, playerDamage: number): void {
+    this.audio.play("explosion", 0.9);
+    this.scene.shake(0.18, 0.6);
+    this.particles.spawnExplosion(x, y + 0.5, z);
+
+    // Damage player if in range
+    const pp = this.player.position;
+    const dpx = pp.x - x, dpy = (pp.y + 0.9) - y, dpz = pp.z - z;
+    const playerDist = Math.sqrt(dpx*dpx + dpy*dpy + dpz*dpz);
+    if (playerDist <= radius + 1) {
+      const dmg = Math.max(1, Math.round(playerDamage * (1 - playerDist / (radius + 2))));
+      this.player.damage(dmg);
+      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.ui.showDamageVignette();
+    }
+
+    // Damage enemies in blast radius
+    for (const state of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(state.id);
+      if (!pos) continue;
+      const dex = pos.x - x, dey = pos.y - y, dez = pos.z - z;
+      const eDist = Math.sqrt(dex*dex + dey*dey + dez*dez);
+      if (eDist <= radius + 1) {
+        const eDmg = Math.max(1, Math.round(playerDamage * 1.5 * (1 - eDist / (radius + 2))));
+        this.enemies.damage(state.id, eDmg);
+      }
+    }
+
+    // Break nearby blocks
+    if (this.gameMap) {
+      for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+        for (let by = Math.floor(y - radius); by <= Math.ceil(y + radius); by++) {
+          for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+            const ddx = bx - x, ddy = by - y, ddz = bz - z;
+            if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
+            const block = this.gameMap.world.getBlock(bx, by, bz);
+            if (block === "air" || block === "bedrock") continue;
+            // Chain-detonate any lit TNT caught in the blast
+            const tntKey = `${bx},${by},${bz}`;
+            if (block === "tnt" && !this.litTNT.has(tntKey)) {
+              this.litTNT.set(tntKey, { fuseTimer: 0.5, sparkTimer: 0 });
+            }
+            if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
+          }
+        }
+      }
+      this.gameMap.world.rebuildDirtyChunks();
+    }
+  }
+
+  /** Update lit TNT fuses; call once per frame from the main update loop. */
+  updateLitTNT(dt: number): void {
+    if (this.litTNT.size === 0) return;
+    const toDetonate: string[] = [];
+    for (const [key, state] of this.litTNT) {
+      // If the block was removed (mined/broken), cancel the fuse
+      const [wx, wy, wz] = key.split(",").map(Number);
+      if (this.gameMap.world.getBlock(wx, wy, wz) !== "tnt") {
+        this.litTNT.delete(key);
+        continue;
+      }
+
+      state.fuseTimer -= dt;
+
+      // Spawn spark particles periodically
+      state.sparkTimer -= dt;
+      if (state.sparkTimer <= 0) {
+        state.sparkTimer = 0.15;
+        this.particles.spawnBlockBreak(wx, wy + 1, wz, 0xff6600);
+      }
+
+      if (state.fuseTimer <= 0) {
+        toDetonate.push(key);
+      }
+    }
+
+    for (const key of toDetonate) {
+      this.litTNT.delete(key);
+      const [wx, wy, wz] = key.split(",").map(Number);
+      // Remove the TNT block before exploding
+      this.gameMap.world.setBlock(wx, wy, wz, "air");
+      this.gameMap.world.rebuildDirtyChunks();
+      this.triggerExplosion(wx + 0.5, wy + 0.5, wz + 0.5, 4, 10);
+    }
   }
 }

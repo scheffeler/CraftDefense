@@ -108,6 +108,10 @@ export const ITEMS: Record<string, ItemDef> = {
   diamond_leggings:   { id:"diamond_leggings",   name:"Diamond Leggings",   category:"armor", stackSize:1, color:0x55ffff, armorValue:6,  armorSlot:"legs"  },
   diamond_boots:      { id:"diamond_boots",      name:"Diamond Boots",      category:"armor", stackSize:1, color:0x55ffff, armorValue:3,  armorSlot:"feet"  },
 
+  // --- Gunpowder + TNT ---
+  gunpowder: { id:"gunpowder", name:"Gunpowder", category:"material", stackSize:64, color:0x666655 },
+  tnt:       { id:"tnt",       name:"TNT",       category:"block",    stackSize:64, color:0xcc2222, placesBlock:"tnt" },
+
   // --- Bow ---
   bow: { id:"bow", name:"Bow", category:"weapon", stackSize:1, color:0x8b6914, damage:8, durability:384 },
 
