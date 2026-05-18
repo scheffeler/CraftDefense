@@ -35,4 +35,6 @@ export const BLOCK_BEHAVIORS: Partial<Record<BlockId, BlockBehavior>> = {
   wheat_2:        { toolCategory: "hand",    requiresTool: false, drops: []               },
   wheat_3:        { toolCategory: "hand",    requiresTool: false, drops: []               },
   tnt:            { toolCategory: "hand",    requiresTool: false, drops: ["tnt"]          },
+  // Lava can only be collected with an iron bucket (handled in Game.ts right-click)
+  lava:           { toolCategory: "hand",    requiresTool: false, drops: []               },
 };

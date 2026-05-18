@@ -17,7 +17,7 @@ export type BlockId =
   | "bedrock" | "gravel" | "gold_ore" | "diamond_ore"
   | "snow" | "cactus"
   | "bookshelf" | "enchanting_table"
-  | "bed" | "tnt";
+  | "bed" | "tnt" | "lava";
 
 export interface BlockDef {
   id: BlockId;

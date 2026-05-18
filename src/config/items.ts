@@ -181,4 +181,8 @@ export const ITEMS: Record<string, ItemDef> = {
     potionEffect:"slowness", potionDuration:8,  potionMagnitude:0.4, potionSplash:true },
   regen_potion:    { id:"regen_potion",    name:"Potion of Regeneration",category:"potion",  stackSize:16, color:0xff88cc,
     potionEffect:"regen",    potionDuration:20, potionMagnitude:1  },
+
+  // --- Buckets ---
+  iron_bucket: { id:"iron_bucket", name:"Iron Bucket",    category:"material", stackSize:16, color:0xaaaaaa },
+  lava_bucket: { id:"lava_bucket", name:"Bucket of Lava", category:"material", stackSize:1,  color:0xff6600 },
 };

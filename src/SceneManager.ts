@@ -153,8 +153,14 @@ export class SceneManager {
     this._dayTime = (this._dayTime + dt / this.DAY_DURATION) % 1;
     const frame = sampleDayCycle(this._dayTime);
 
+    // Lava overrides sky/fog with orange
+    if (this._inLavaEffect) {
+      (this.scene.background as THREE.Color).setHex(0x8b2200);
+      (this.scene.fog as THREE.Fog).color.setHex(0x8b2200);
+      (this.scene.fog as THREE.Fog).near = 0.5;
+      (this.scene.fog as THREE.Fog).far  = 3;
     // Underwater overrides sky/fog
-    if (this._underwaterEffect) {
+    } else if (this._underwaterEffect) {
       (this.scene.background as THREE.Color).setHex(0x083560);
       (this.scene.fog as THREE.Fog).color.setHex(0x083560);
       (this.scene.fog as THREE.Fog).near = 1;
@@ -220,14 +226,21 @@ export class SceneManager {
     }
   }
 
+  private _inLavaEffect = false;
+
   /** Enable/disable the underwater fog effect. */
   setUnderwaterEffect(inWater: boolean): void {
     this._underwaterEffect = inWater;
   }
 
+  /** Enable/disable the in-lava orange fog effect. */
+  setInLavaEffect(inLava: boolean): void {
+    this._inLavaEffect = inLava;
+  }
+
   /** 0 = clear, 1 = heavy rain — darkens sky, tightens fog. */
   setWeatherIntensity(intensity: number): void {
-    if (this._underwaterEffect || intensity < 0.01) return;
+    if (this._underwaterEffect || this._inLavaEffect || intensity < 0.01) return;
     const frame = sampleDayCycle(this._dayTime);
     const rainy = 0x556677;
     const fogRainy = 0x445566;

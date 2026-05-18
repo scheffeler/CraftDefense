@@ -75,6 +75,11 @@ export class Game {
     light: THREE.PointLight;
   }>();
 
+  // Lava block lights keyed by "wx,wy,wz"
+  private readonly lavaLights = new Map<string, THREE.PointLight>();
+  private _lavaParticleTimer = 0;
+  private _lavaDamageTimer   = 0;
+
   // Hunger depletion timer
   private hungerTimer = 0;
   private _autoSaveTimer = 0;
@@ -179,6 +184,7 @@ export class Game {
     this.inventory.addItem("torch", 8);
     this.inventory.addItem("apple", 8);
     this.inventory.addItem("wheat_seeds", 8);
+    this.inventory.addItem("iron_bucket", 1);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -504,6 +510,26 @@ export class Game {
         this.refreshHotbar();
         this.ui.updateHunger(this.player.hunger, 20);
         this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      } else if (itemDef?.id === "iron_bucket" && tb) {
+        // Pick up lava with bucket
+        if (this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "lava") {
+          this.gameMap.world.setBlock(tb.wx, tb.wy, tb.wz, "air");
+          this.gameMap.world.rebuildDirtyChunks();
+          this.removeLavaLight(tb.wx, tb.wy, tb.wz);
+          this.inventory.removeItem("iron_bucket", 1);
+          this.inventory.addItem("lava_bucket", 1);
+          this.audio.play("block_place", 0.5);
+          this.refreshHotbar();
+        }
+      } else if (itemDef?.id === "lava_bucket") {
+        // Place lava using standard adjacent-block placement
+        const placed = this.blockInteraction.tryPlace("lava");
+        if (placed) {
+          this.inventory.removeItem("lava_bucket", 1);
+          this.inventory.addItem("iron_bucket", 1);
+          this.refreshHotbar();
+          // Add light at the placed position (tryPlace triggers onBlockPlaced which handles it)
+        }
       } else if (itemDef?.placesBlock && stack) {
         const placed = this.blockInteraction.tryPlace(itemDef.placesBlock);
         if (placed) {
@@ -551,6 +577,7 @@ export class Game {
         }
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
+      if (id === "lava")  this.removeLavaLight(wx, wy, wz);
       if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
 
       // Achievements
@@ -562,6 +589,7 @@ export class Game {
     this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
       this.audio.play("block_place", 0.5);
       if (id === "torch") this.addTorchLight(wx, wy, wz);
+      if (id === "lava")  this.addLavaLight(wx, wy, wz);
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
       this.refreshHotbar();
       if (id === "torch") this.unlockAchievement("torch_place", "Lighting the Way", "Place your first torch");
@@ -1099,6 +1127,48 @@ export class Game {
     if (nowInWater && !this._wasInWater) this.audio.play("splash", 0.8);
     this._wasInWater = nowInWater;
 
+    // Lava damage — player takes 2 HP/s when in lava
+    const playerFeetBlock = this.gameMap.world.getBlock(
+      Math.floor(this.player.position.x),
+      Math.floor(this.player.position.y),
+      Math.floor(this.player.position.z),
+    );
+    const playerInLava = playerFeetBlock === "lava";
+    this.scene.setInLavaEffect(playerInLava);
+    if (playerInLava) {
+      this._lavaDamageTimer += dt;
+      if (this._lavaDamageTimer >= 1.0) {
+        this._lavaDamageTimer = 0;
+        this.player.damage(2);
+        this.ui.showDamageVignette();
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      }
+    } else {
+      this._lavaDamageTimer = 0;
+    }
+
+    // Lava embers — spawn particles periodically from nearby lava blocks
+    this._lavaParticleTimer += dt;
+    if (this._lavaParticleTimer >= 0.25) {
+      this._lavaParticleTimer = 0;
+      const px = Math.floor(this.player.position.x);
+      const pz = Math.floor(this.player.position.z);
+      for (let dx = -6; dx <= 6; dx += 2) {
+        for (let dz = -6; dz <= 6; dz += 2) {
+          const lx = px + dx, lz = pz + dz;
+          if (lx < 0 || lx >= 64 || lz < 0 || lz >= 64) continue;
+          for (let ly = 3; ly <= 12; ly++) {
+            if (this.gameMap.world.getBlock(lx, ly, lz) === "lava") {
+              if (Math.random() < 0.35) {
+                this.particles.spawnLavaEmbers(lx, ly, lz);
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
     // Footstep sounds + head bob
     const isMovingH = input.forward || input.backward || input.left || input.right;
     if (isMovingH && this.player.onGround && !nowInWater) {
@@ -1572,6 +1642,17 @@ export class Game {
       if (!this.enemies.getEnemy(id)) this.enemyMeleeCooldown.delete(id);
     }
 
+    // Enemy lava damage — 1 damage per second when standing in lava
+    for (const state of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(state.id);
+      if (!pos) continue;
+      const bx = Math.floor(pos.x), by = Math.floor(pos.y), bz = Math.floor(pos.z);
+      if (this.gameMap.world.getBlock(bx, by, bz) === "lava" ||
+          this.gameMap.world.getBlock(bx, by - 1, bz) === "lava") {
+        this.enemies.damage(state.id, dt * 2);
+      }
+    }
+
     this.projectiles.update(
       dt,
       (id)         => this.enemies.getEnemyPosition(id),
@@ -1946,6 +2027,25 @@ export class Game {
       this.scene.scene.remove(light);
       light.dispose();
       this.torchLights.delete(key);
+    }
+  }
+
+  private addLavaLight(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.lavaLights.has(key)) return;
+    const light = new THREE.PointLight(0xff6600, 2.5, 12, 2);
+    light.position.set(wx + 0.5, wy + 1.0, wz + 0.5);
+    this.scene.scene.add(light);
+    this.lavaLights.set(key, light);
+  }
+
+  private removeLavaLight(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    const light = this.lavaLights.get(key);
+    if (light) {
+      this.scene.scene.remove(light);
+      light.dispose();
+      this.lavaLights.delete(key);
     }
   }
 

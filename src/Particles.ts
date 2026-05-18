@@ -184,6 +184,26 @@ export class ParticleSystem {
     }
   }
 
+  spawnLavaEmbers(x: number, y: number, z: number): void {
+    const colors = [0xff6600, 0xff4400, 0xffaa00, 0xff8800];
+    const count = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < count; i++) {
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const size  = 0.04 + Math.random() * 0.06;
+      const mesh  = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.8,
+        y + 0.5 + Math.random() * 0.2,
+        z + (Math.random() - 0.5) * 0.8,
+      );
+      const spd = 0.4 + Math.random() * 0.8;
+      this.spawnParticle(mesh, (Math.random() - 0.5) * 0.3, spd, (Math.random() - 0.5) * 0.3, 0.5 + Math.random() * 0.5);
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

@@ -533,6 +533,16 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "regen_potion", count: 1 },
   },
+
+  // --- Iron bucket (3 iron ingots in V-shape) ---
+  {
+    id: "iron_bucket",
+    pattern: [
+      [r("iron_ingot"), null,           r("iron_ingot")],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "iron_bucket", count: 1 },
+  },
 ];
 
 // Silence unused helper warning
