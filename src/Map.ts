@@ -45,6 +45,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
   bookshelf:        { id: "bookshelf",        name: "Bookshelf",        color: 0xc8a060, topColor: 0x7a3a14, hardness: 1.5,  placeable: true,  transparent: false },
   enchanting_table: { id: "enchanting_table", name: "Enchanting Table", color: 0x1a0a2a, topColor: 0xaa0022, hardness: 5.0,  placeable: true,  transparent: false },
   bed:              { id: "bed",              name: "Bed",              color: 0xcc3333, topColor: 0xaa2222, hardness: 0.2,  placeable: true,  transparent: false },
+  tnt:              { id: "tnt",              name: "TNT",              color: 0xcc2200, topColor: 0xeeeeee, hardness: 0,    placeable: true,  transparent: false },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];

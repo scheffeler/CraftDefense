@@ -373,6 +373,17 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+
+  // --- TNT (5 gunpowder + 4 sand, checkerboard pattern) ---
+  {
+    id: "tnt",
+    pattern: [
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+    ],
+    result: { itemId: "tnt", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

@@ -74,6 +74,7 @@ export class Game {
   private _nightSpawnTimer  = 0;
   private _flowUpdateTimer  = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
+  private readonly activeTNT   = new Map<string, number>(); // "wx,wy,wz" → fuse timer (counts up to TNT_FUSE_TIME)
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
   private openChestKey: string | null = null;
@@ -152,6 +153,7 @@ export class Game {
     this.inventory.addItem("torch", 8);
     this.inventory.addItem("apple", 8);
     this.inventory.addItem("wheat_seeds", 8);
+    this.inventory.addItem("gunpowder", 10);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -388,6 +390,16 @@ export class Game {
         return;
       }
 
+      // Right-click on TNT block — light the fuse
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "tnt") {
+        const key = `${tb.wx},${tb.wy},${tb.wz}`;
+        if (!this.activeTNT.has(key)) {
+          this.activeTNT.set(key, 0);
+          this.audio.play("creeper_hiss", 0.7);
+        }
+        return;
+      }
+
       // Check if looking at a bed — sleep to skip night
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "bed") {
         if (!this.scene.isDay) {
@@ -556,32 +568,7 @@ export class Game {
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
-      this.audio.play("explosion", 0.9);
-      this.scene.shake(0.18, 0.6);
-      this.particles.spawnExplosion(x, y + 0.5, z);
-      // Damage player if in range
-      const pp = this.player.position;
-      const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
-      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
-        this.player.damage(6);
-        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-        this.ui.showDamageVignette();
-      }
-      // Break nearby blocks
-      if (this.gameMap) {
-        for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
-          for (let by = Math.floor(y); by <= Math.ceil(y + radius); by++) {
-            for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
-              const ddx = bx - x, ddy = by - y, ddz = bz - z;
-              if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
-              const block = this.gameMap.world.getBlock(bx, by, bz);
-              if (block === "air" || block === "bedrock") continue;
-              if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
-            }
-          }
-        }
-        this.gameMap.world.rebuildDirtyChunks();
-      }
+      this.triggerExplosion(x, y, z, radius, 6);
       this.waves.onEnemyEliminated();
     };
 
@@ -1087,6 +1074,9 @@ export class Game {
     // Crop growth
     this.updateCrops(dt);
 
+    // TNT fuse countdown
+    this.updateTNT(dt);
+
     // Torch flicker — subtle sine-wave intensity variation
     if (this.torchLights.size > 0) {
       const t = performance.now() * 0.001;
@@ -1261,6 +1251,81 @@ export class Game {
       } else {
         this.activeCrops.set(key, 0);
       }
+    }
+  }
+
+  private static readonly TNT_FUSE_TIME = 4.0;   // seconds before detonation
+  private static readonly TNT_RADIUS    = 4.0;   // explosion radius (bigger than creeper)
+
+  private updateTNT(dt: number): void {
+    if (this.activeTNT.size === 0) return;
+    const toExplode: [number, number, number][] = [];
+    for (const [key, timer] of this.activeTNT) {
+      const newTimer = timer + dt;
+      if (newTimer >= Game.TNT_FUSE_TIME) {
+        const [wx, wy, wz] = key.split(",").map(Number);
+        toExplode.push([wx, wy, wz]);
+        this.activeTNT.delete(key);
+      } else {
+        this.activeTNT.set(key, newTimer);
+      }
+    }
+    for (const [wx, wy, wz] of toExplode) {
+      // Remove the TNT block before exploding
+      this.gameMap.world.setBlock(wx, wy, wz, "air");
+      this.triggerExplosion(wx + 0.5, wy + 0.5, wz + 0.5, Game.TNT_RADIUS, 8);
+    }
+  }
+
+  /** Shared explosion effect: sound, particles, screen shake, enemy/player damage, block destruction. */
+  private triggerExplosion(x: number, y: number, z: number, radius: number, playerDamage: number): void {
+    this.audio.play("explosion", 0.9);
+    this.scene.shake(0.18, 0.6);
+    this.particles.spawnExplosion(x, y + 0.5, z);
+
+    // Damage player if in range
+    const pp = this.player.position;
+    const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
+      this.player.damage(playerDamage);
+      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.ui.showDamageVignette();
+    }
+
+    // Damage enemies in range
+    for (const e of this.enemies.getAliveEnemies()) {
+      const ep = this.enemies.getEnemyPosition(e.id);
+      if (!ep) continue;
+      const edx = ep.x - x, edy = ep.y - y, edz = ep.z - z;
+      const dist = Math.sqrt(edx*edx + edy*edy + edz*edz);
+      if (dist <= radius) {
+        const dmg = Math.round(20 * (1 - dist / radius) + 5);
+        this.enemies.damage(e.id, dmg);
+      }
+    }
+
+    // Break and chain-detonate nearby TNT blocks
+    if (this.gameMap) {
+      for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+        for (let by = Math.floor(y - radius); by <= Math.ceil(y + radius); by++) {
+          for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+            const ddx = bx - x, ddy = by - y, ddz = bz - z;
+            if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
+            const block = this.gameMap.world.getBlock(bx, by, bz);
+            if (block === "air" || block === "bedrock") continue;
+            if (block === "tnt") {
+              // Chain detonation — short fuse
+              const chainKey = `${bx},${by},${bz}`;
+              if (!this.activeTNT.has(chainKey)) {
+                this.activeTNT.set(chainKey, Game.TNT_FUSE_TIME - 0.5);
+              }
+              continue;
+            }
+            if (Math.random() < 0.55) this.gameMap.world.setBlock(bx, by, bz, "air");
+          }
+        }
+      }
+      this.gameMap.world.rebuildDirtyChunks();
     }
   }
 
