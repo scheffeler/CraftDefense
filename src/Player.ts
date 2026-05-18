@@ -2,6 +2,13 @@ import * as THREE from "three";
 import type { VoxelWorld } from "./Map";
 import { sweepAABBWorld } from "./Physics";
 import type { MovementInput } from "./InputManager";
+import type { PotionEffectId } from "./config/items";
+
+export interface ActiveEffect {
+  id: PotionEffectId;
+  duration: number;   // remaining seconds
+  magnitude: number;
+}
 
 const WALK_SPEED      = 5.0;
 const SPRINT_MULT     = 1.6;
@@ -29,6 +36,9 @@ export class Player {
   level     = 0;
   armorValue = 0; // sum of equipped armor pieces, updated by Game.ts
 
+  readonly activeEffects = new Map<PotionEffectId, ActiveEffect>();
+  onEffectsChanged: (effects: Map<PotionEffectId, ActiveEffect>) => void = () => {};
+
   attackCooldown = 0;
   bowCharge      = 0;
   isBowCharging  = false;
@@ -53,8 +63,45 @@ export class Player {
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
     }
+    this.updateEffects(dt);
     this.applyMovement(dt, input);
     this.camera.position.copy(this.getCameraPosition());
+  }
+
+  applyEffect(effect: ActiveEffect): void {
+    const existing = this.activeEffects.get(effect.id);
+    // Refresh duration if already active (take the longer one)
+    if (existing) {
+      existing.duration = Math.max(existing.duration, effect.duration);
+    } else {
+      this.activeEffects.set(effect.id, { ...effect });
+    }
+    this.onEffectsChanged(this.activeEffects);
+  }
+
+  get speedMultiplier(): number {
+    return this.activeEffects.has("speed") ? 1.3 : 1.0;
+  }
+
+  get strengthBonus(): number {
+    const e = this.activeEffects.get("strength");
+    return e ? e.magnitude : 0;
+  }
+
+  get hasFireResistance(): boolean {
+    return this.activeEffects.has("fire_resistance");
+  }
+
+  private updateEffects(dt: number): void {
+    let changed = false;
+    for (const [id, effect] of this.activeEffects) {
+      effect.duration -= dt;
+      if (effect.duration <= 0) {
+        this.activeEffects.delete(id);
+        changed = true;
+      }
+    }
+    if (changed) this.onEffectsChanged(this.activeEffects);
   }
 
   /** Returns melee sphere params if attack was successful, null if on cooldown. */
@@ -130,7 +177,7 @@ export class Player {
   private applyMovement(dt: number, input: MovementInput): void {
     const yaw = this.getYaw();
 
-    let speed = WALK_SPEED;
+    let speed = WALK_SPEED * this.speedMultiplier;
     if (input.sprint) speed *= SPRINT_MULT;
     if (this.inWater) speed *= WATER_SPEED;
 

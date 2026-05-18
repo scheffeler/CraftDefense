@@ -373,6 +373,69 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+
+  // --- Glass Bottle (3 glass in V shape) ---
+  {
+    id: "glass_bottle",
+    pattern: [
+      [r("glass"), null,      r("glass")],
+      [null,       r("glass"), null     ],
+    ],
+    result: { itemId: "glass_bottle", count: 3 },
+  },
+
+  // --- Potion of Healing (glass_bottle + apple + gold_ingot) ---
+  {
+    id: "potion_healing",
+    pattern: [
+      [r("gold_ingot")  ],
+      [r("apple")       ],
+      [r("glass_bottle")],
+    ],
+    result: { itemId: "potion_healing", count: 1 },
+  },
+
+  // --- Potion of Regeneration (glass_bottle + cooked_beef + iron_ingot) ---
+  {
+    id: "potion_regeneration",
+    pattern: [
+      [r("iron_ingot")  ],
+      [r("cooked_beef") ],
+      [r("glass_bottle")],
+    ],
+    result: { itemId: "potion_regeneration", count: 1 },
+  },
+
+  // --- Potion of Swiftness (glass_bottle + diamond_ore + stick) ---
+  {
+    id: "potion_speed",
+    pattern: [
+      [r("diamond_ore") ],
+      [r("stick")       ],
+      [r("glass_bottle")],
+    ],
+    result: { itemId: "potion_speed", count: 1 },
+  },
+
+  // --- Potion of Strength (glass_bottle + iron_ingot + flint) ---
+  {
+    id: "potion_strength",
+    pattern: [
+      [r("iron_ingot"),  r("flint")        ],
+      [null,             r("glass_bottle") ],
+    ],
+    result: { itemId: "potion_strength", count: 1 },
+  },
+
+  // --- Potion of Fire Resistance (glass_bottle + coal_ore + gold_ingot) ---
+  {
+    id: "potion_fire_resist",
+    pattern: [
+      [r("coal_ore"),   r("gold_ingot")   ],
+      [null,            r("glass_bottle") ],
+    ],
+    result: { itemId: "potion_fire_resist", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

@@ -1,9 +1,16 @@
 import type { BlockId } from "../types";
 import type { ToolCategory } from "./blocks";
 
-export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material";
+export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material" | "potion";
 export type ToolTier     = "wood" | "stone" | "iron" | "diamond";
 export type ArmorSlot    = "head" | "chest" | "legs" | "feet";
+export type PotionEffectId = "healing" | "regeneration" | "speed" | "strength" | "fire_resistance";
+
+export interface PotionEffect {
+  id: PotionEffectId;
+  duration: number;   // seconds; 0 = instant
+  magnitude: number;  // effect-specific scalar
+}
 
 export interface ItemDef {
   id:         string;
@@ -24,6 +31,8 @@ export interface ItemDef {
   armorSlot?:    ArmorSlot;
   // Placeable block
   placesBlock?:  BlockId;
+  // Potion
+  potionEffect?: PotionEffect;
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -116,4 +125,17 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_chestplate: { id:"iron_chestplate", name:"Iron Chestplate", category:"armor", stackSize:1, color:0xbbbbbb, armorValue:5, armorSlot:"chest" },
   iron_leggings:   { id:"iron_leggings",   name:"Iron Leggings",   category:"armor", stackSize:1, color:0xbbbbbb, armorValue:4, armorSlot:"legs"  },
   iron_boots:      { id:"iron_boots",      name:"Iron Boots",      category:"armor", stackSize:1, color:0xbbbbbb, armorValue:2, armorSlot:"feet"  },
+
+  // --- Potions ---
+  glass_bottle: { id:"glass_bottle", name:"Glass Bottle", category:"material", stackSize:16, color:0x99ccdd },
+  potion_healing:       { id:"potion_healing",       name:"Potion of Healing",       category:"potion", stackSize:4,  color:0xff4466,
+    potionEffect: { id:"healing",       duration:0,   magnitude:8  } },
+  potion_regeneration:  { id:"potion_regeneration",  name:"Potion of Regeneration",  category:"potion", stackSize:4,  color:0xff8866,
+    potionEffect: { id:"regeneration",  duration:45,  magnitude:1  } },
+  potion_speed:         { id:"potion_speed",         name:"Potion of Swiftness",     category:"potion", stackSize:4,  color:0x88aaff,
+    potionEffect: { id:"speed",         duration:60,  magnitude:1  } },
+  potion_strength:      { id:"potion_strength",      name:"Potion of Strength",      category:"potion", stackSize:4,  color:0xdd2222,
+    potionEffect: { id:"strength",      duration:30,  magnitude:4  } },
+  potion_fire_resist:   { id:"potion_fire_resist",   name:"Potion of Fire Resistance", category:"potion", stackSize:4, color:0xff8800,
+    potionEffect: { id:"fire_resistance", duration:180, magnitude:1 } },
 };

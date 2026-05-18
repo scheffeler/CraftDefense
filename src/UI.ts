@@ -1,13 +1,15 @@
 import type { TowerTypeName, TowerState } from "./types";
 import type { Inventory, ItemStack } from "./Inventory";
 import { ITEMS } from "./config/items";
+import type { ActiveEffect } from "./Player";
+import type { PotionEffectId } from "./config/items";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel" | "potion"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -49,6 +51,12 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
       path = `<rect x="13" y="4" width="6" height="22" fill="#5c3a1a"/>
                <rect x="10" y="4" width="12" height="12" rx="3" fill="${color}"/>`;
       break;
+    case "potion":
+      path = `<rect x="12" y="2" width="8" height="4" fill="#888"/>
+               <rect x="10" y="6" width="12" height="2" fill="${color}"/>
+               <rect x="8" y="8" width="16" height="14" rx="6" fill="${color}"/>
+               <rect x="10" y="10" width="4" height="4" fill="${color}ee"/>`;
+      break;
     default: // material / block
       path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
                <rect x="4" y="4" width="24" height="4" fill="${color}cc"/>`;
@@ -85,6 +93,7 @@ function getItemIcon(itemId: string): string {
   else if (def.id.endsWith("_hoe")) shape = "hoe";
   else if (def.id === "bow") shape = "bow";
   else if (def.category === "food") shape = "food";
+  else if (def.category === "potion") shape = "potion";
   else if (def.category === "armor") shape = "armor";
   else if (def.category === "block") shape = "block";
   ITEM_ICONS[itemId] = makeItemIcon(hex, shape);
@@ -167,6 +176,7 @@ export class UI {
   private enchantItemSlot!: HTMLElement;
   private enchantOptionEls: HTMLElement[] = [];
   private enchantLevelEl!: HTMLElement;
+  private effectsHud!: HTMLElement;
   private workbenchCells: HTMLElement[][] = [];
   private workbenchResult!: HTMLElement;
   private _workbenchGrid: (string | null)[][] = [
@@ -238,7 +248,19 @@ export class UI {
     if (!def) { this.itemTooltip.style.display = "none"; return; }
     const durStr = (durability != null && def.durability != null)
       ? ` <span style="color:#aaa;font-size:7px">(${durability}/${def.durability})</span>` : "";
-    this.itemTooltip.innerHTML = def.name + durStr;
+    let extraStr = "";
+    if (def.potionEffect) {
+      const eff = def.potionEffect;
+      if (eff.duration > 0) {
+        const mins = Math.floor(eff.duration / 60);
+        const secs = eff.duration % 60;
+        const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : `${secs}s`;
+        extraStr = ` <span style="color:#88ff88;font-size:7px">(${timeStr})</span>`;
+      } else {
+        extraStr = ` <span style="color:#ff8888;font-size:7px">(+${eff.magnitude} HP)</span>`;
+      }
+    }
+    this.itemTooltip.innerHTML = def.name + durStr + extraStr;
     this.itemTooltip.style.display = "block";
   }
 
@@ -441,6 +463,7 @@ export class UI {
     this.buildDayClock();
     this.buildMinimap();
     this.buildCompass();
+    this.buildEffectsHud();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -672,6 +695,53 @@ export class UI {
     const DIRS = ["N","NE","E","SE","S","SW","W","NW"];
     const idx = Math.round(((yawRadians + Math.PI) / (Math.PI * 2)) * 8) & 7;
     this.compassEl.textContent = DIRS[idx];
+  }
+
+  private buildEffectsHud(): void {
+    const el = div("fps-effects-hud");
+    this.effectsHud = el;
+    this.container.appendChild(el);
+  }
+
+  updateActiveEffects(effects: Map<PotionEffectId, ActiveEffect>): void {
+    if (!this.effectsHud) return;
+    this.effectsHud.innerHTML = "";
+    for (const [, eff] of effects) {
+      const icon = div("fps-effect-icon");
+      const secs = Math.ceil(eff.duration);
+      const mins = Math.floor(secs / 60);
+      const s = secs % 60;
+      const label = mins > 0 ? `${mins}:${s.toString().padStart(2, "0")}` : `${secs}s`;
+      const colors: Record<PotionEffectId, string> = {
+        healing:        "#ff4466",
+        regeneration:   "#ff8866",
+        speed:          "#88aaff",
+        strength:       "#dd2222",
+        fire_resistance:"#ff8800",
+      };
+      const names: Record<PotionEffectId, string> = {
+        healing:        "Heal",
+        regeneration:   "Regen",
+        speed:          "Speed",
+        strength:       "Str",
+        fire_resistance:"Fire\nRes",
+      };
+      icon.style.cssText = `background:${colors[eff.id] ?? "#888"};`;
+      icon.innerHTML = `<span class="fps-effect-name">${names[eff.id] ?? eff.id}</span><span class="fps-effect-timer">${label}</span>`;
+      this.effectsHud.appendChild(icon);
+    }
+  }
+
+  showPotionEffect(name: string, color: number): void {
+    const hex = "#" + color.toString(16).padStart(6, "0");
+    const el = div("fps-potion-flash");
+    el.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      background:${hex}22;border:2px solid ${hex};color:${hex};
+      padding:8px 18px;border-radius:6px;font-size:14px;font-weight:bold;
+      pointer-events:none;z-index:300;animation:fps-potion-in 0.3s ease-out;`;
+    el.textContent = name;
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
   }
 
   private buildHotbar(): void {
@@ -1099,6 +1169,12 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "Glass Bottle", ingredients: "3 Glass (V shape) → 3 Bottles", key: "glass_bottle" },
+      { name: "Potion of Healing", ingredients: "Gold Ingot + Apple + Bottle → Heal 8 HP", key: "potion_healing" },
+      { name: "Potion of Regeneration", ingredients: "Iron Ingot + Cooked Beef + Bottle → Regen 45s", key: "potion_regeneration" },
+      { name: "Potion of Swiftness", ingredients: "Diamond + Stick + Bottle → Speed 60s", key: "potion_speed" },
+      { name: "Potion of Strength", ingredients: "Iron Ingot + Flint + Bottle → +4 dmg 30s", key: "potion_strength" },
+      { name: "Potion of Fire Resist", ingredients: "Coal + Gold + Bottle → Fire resist 3min", key: "potion_fire_resist" },
     ];
 
     const list = div("fps-rb-list");
@@ -1899,4 +1975,47 @@ const FPS_CSS = `
 .fps-rb-name { font-size: 9px; color: #fff; margin-bottom: 2px; }
 .fps-rb-ing  { font-size: 7px; color: #aaa; }
 .fps-rb-hint { font-size: 7px; color: #666; text-align: center; margin-top: 8px; }
+
+/* Active potion effects HUD */
+.fps-effects-hud {
+  position: absolute;
+  top: 80px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 50;
+}
+.fps-effect-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 6px;
+  border: 2px solid rgba(255,255,255,0.3);
+  opacity: 0.92;
+  font-family: monospace;
+}
+.fps-effect-name {
+  font-size: 8px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.1;
+}
+.fps-effect-timer {
+  font-size: 7px;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 1px 1px 0 #000;
+  margin-top: 1px;
+}
+@keyframes fps-potion-in {
+  from { opacity: 0; transform: translate(-50%, -60%); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
 `;
