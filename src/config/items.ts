@@ -121,8 +121,10 @@ export const ITEMS: Record<string, ItemDef> = {
   // --- Crossbow ---
   crossbow: { id:"crossbow", name:"Crossbow", category:"weapon", stackSize:1, color:0x5c3a1a, damage:12, durability:465 },
 
-  // --- Gunpowder (dropped by creepers) ---
-  gunpowder: { id:"gunpowder", name:"Gunpowder", category:"material", stackSize:64, color:0x444444 },
+  // --- Gunpowder, TNT & Flint and Steel ---
+  gunpowder:   { id:"gunpowder",   name:"Gunpowder",      category:"material", stackSize:64, color:0x444444 },
+  tnt:         { id:"tnt",         name:"TNT",             category:"block",    stackSize:64, color:0xcc2222, placesBlock:"tnt" },
+  flint_steel: { id:"flint_steel", name:"Flint and Steel", category:"tool",     stackSize:1,  color:0x999999, durability:64 },
 
   // --- Pistol + ammo ---
   bullet: { id:"bullet", name:"Bullet", category:"material", stackSize:64, color:0xcccccc },

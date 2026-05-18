@@ -67,6 +67,14 @@ export class Game {
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
 
+  // Primed TNT: key = "wx,wy,wz", mesh + light for blinking visual
+  private readonly primedTNT = new Map<string, {
+    timer: number;
+    flashTimer: number;
+    mesh: THREE.Mesh;
+    light: THREE.PointLight;
+  }>();
+
   // Hunger depletion timer
   private hungerTimer = 0;
   private _autoSaveTimer = 0;
@@ -450,6 +458,13 @@ export class Game {
         return;
       }
 
+      // Flint and Steel on TNT → prime it
+      if (tb && itemDef?.id === "flint_steel" && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "tnt") {
+        this._primeTNT(tb.wx, tb.wy, tb.wz);
+        this._damageHeldTool(stack!);
+        return;
+      }
+
       if (itemDef?.id === "crossbow" && this.inventory.hasItem("arrow_item", 1)) {
         if (this.player.isCrossbowLoaded) {
           // Second right-click: fire instantly
@@ -651,32 +666,7 @@ export class Game {
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
-      this.audio.play("explosion", 0.9);
-      this.scene.shake(0.18, 0.6);
-      this.particles.spawnExplosion(x, y + 0.5, z);
-      // Damage player if in range
-      const pp = this.player.position;
-      const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
-      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
-        this.player.damage(6);
-        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-        this.ui.showDamageVignette();
-      }
-      // Break nearby blocks
-      if (this.gameMap) {
-        for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
-          for (let by = Math.floor(y); by <= Math.ceil(y + radius); by++) {
-            for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
-              const ddx = bx - x, ddy = by - y, ddz = bz - z;
-              if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
-              const block = this.gameMap.world.getBlock(bx, by, bz);
-              if (block === "air" || block === "bedrock") continue;
-              if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
-            }
-          }
-        }
-        this.gameMap.world.rebuildDirtyChunks();
-      }
+      this._doExplosion(x, y, z, radius, 6);
       this.waves.onEnemyEliminated();
     };
 
@@ -1244,6 +1234,9 @@ export class Game {
         );
       }
     }
+
+    // Primed TNT countdown
+    if (this.primedTNT.size > 0) this._updatePrimedTNT(dt);
 
     // Passive mobs
     this.passiveMobs.update(dt);
@@ -1850,6 +1843,96 @@ export class Game {
       light.dispose();
       this.torchLights.delete(key);
     }
+  }
+
+  // ─── TNT helpers ───────────────────────────────────────────────────────────
+
+  private _primeTNT(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.primedTNT.has(key)) return;
+    // Remove the block so it doesn't render as solid
+    this.gameMap.world.setBlock(wx, wy, wz, "air");
+    this.gameMap.world.rebuildDirtyChunks();
+    // Create blinking TNT mesh
+    const geo  = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+    const mat  = new THREE.MeshLambertMaterial({ color: 0xcc2222 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(wx + 0.5, wy + 0.475, wz + 0.5);
+    this.scene.scene.add(mesh);
+    // Red point light
+    const light = new THREE.PointLight(0xff4422, 2.0, 8, 2);
+    light.position.copy(mesh.position);
+    this.scene.scene.add(light);
+    this.primedTNT.set(key, { timer: 4.0, flashTimer: 0, mesh, light });
+    this.audio.play("creeper_hiss", 0.8);
+    this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+  }
+
+  private _updatePrimedTNT(dt: number): void {
+    for (const [key, tnt] of this.primedTNT) {
+      tnt.timer -= dt;
+      tnt.flashTimer += dt;
+      // Blink rate accelerates as timer approaches 0 (0.5s → 0.1s period)
+      const blinkRate = tnt.timer > 1 ? 0.4 : 0.15;
+      const on = (tnt.flashTimer % blinkRate) < blinkRate * 0.5;
+      tnt.mesh.visible = on;
+      tnt.light.intensity = on ? 2.5 : 0;
+      if (tnt.timer <= 0) {
+        this.scene.scene.remove(tnt.mesh);
+        this.scene.scene.remove(tnt.light);
+        tnt.mesh.geometry.dispose();
+        (tnt.mesh.material as THREE.MeshLambertMaterial).dispose();
+        tnt.light.dispose();
+        this.primedTNT.delete(key);
+        const parts = key.split(",");
+        const x = parseInt(parts[0]) + 0.5;
+        const y = parseInt(parts[1]) + 0.5;
+        const z = parseInt(parts[2]) + 0.5;
+        this._doExplosion(x, y, z, 4.5, 8);
+      }
+    }
+  }
+
+  private _doExplosion(x: number, y: number, z: number, radius: number, playerDamage: number): void {
+    this.audio.play("explosion", 0.9);
+    this.scene.shake(0.25, 0.7);
+    this.particles.spawnExplosion(x, y + 0.5, z);
+    // Damage player if in range
+    const pp = this.player.position;
+    const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
+      this.player.damage(playerDamage);
+      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.ui.showDamageVignette();
+    }
+    // Break nearby blocks
+    for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+      for (let by = Math.floor(y - 1); by <= Math.ceil(y + radius); by++) {
+        for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+          const ddx = bx - x, ddy = by - y, ddz = bz - z;
+          if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
+          const block = this.gameMap.world.getBlock(bx, by, bz);
+          if (block === "air" || block === "bedrock") continue;
+          // Chain-prime adjacent TNT
+          if (block === "tnt") { this._primeTNT(bx, by, bz); continue; }
+          if (Math.random() < 0.55) this.gameMap.world.setBlock(bx, by, bz, "air");
+        }
+      }
+    }
+    this.gameMap.world.rebuildDirtyChunks();
+    this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+    // Damage nearby enemies
+    this.enemies.damageInRadius(x, y, z, radius, playerDamage * 1.5);
+  }
+
+  private _damageHeldTool(stack: import("./Inventory").ItemStack): void {
+    if (stack.durability == null) return;
+    stack.durability -= 1;
+    if (stack.durability <= 0) {
+      this.inventory.removeItem(stack.itemId, 1);
+      this.audio.play("block_break", 0.6);
+    }
+    this.refreshHotbar();
   }
 
   // ─── HUD helpers ───────────────────────────────────────────────────────────

@@ -331,6 +331,18 @@ export class EnemyManager {
     return [...this.enemies.values()].filter(e => e.alive && !e.dying);
   }
 
+  damageInRadius(x: number, y: number, z: number, radius: number, amount: number): void {
+    for (const [id, state] of this.enemies) {
+      if (!state.alive || state.dying) continue;
+      const pos = this.meshes.get(id)?.position;
+      if (!pos) continue;
+      const dx = pos.x - x, dy = pos.y - y, dz = pos.z - z;
+      if (dx*dx + dy*dy + dz*dz <= radius*radius) {
+        this.damage(id, amount);
+      }
+    }
+  }
+
   getEnemyPosition(id: number): THREE.Vector3 | null {
     return this.meshes.get(id)?.position ?? null;
   }

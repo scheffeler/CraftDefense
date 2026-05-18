@@ -467,6 +467,27 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "raygun", count: 1 },
   },
+
+  // --- TNT (5 gunpowder + 4 sand) ---
+  {
+    id: "tnt",
+    pattern: [
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+    ],
+    result: { itemId: "tnt", count: 1 },
+  },
+
+  // --- Flint and Steel (iron ingot + flint) ---
+  {
+    id: "flint_steel",
+    pattern: [
+      [r("iron_ingot"), null   ],
+      [null,            r("flint")],
+    ],
+    result: { itemId: "flint_steel", count: 1 },
+  },
 ];
 
 // Silence unused helper warning
