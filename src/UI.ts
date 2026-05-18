@@ -7,7 +7,7 @@ import { ITEMS } from "./config/items";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel" | "potion"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -49,6 +49,13 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
       path = `<rect x="13" y="4" width="6" height="22" fill="#5c3a1a"/>
                <rect x="10" y="4" width="12" height="12" rx="3" fill="${color}"/>`;
       break;
+    case "potion":
+      path = `<rect x="12" y="2" width="8" height="3" fill="#888"/>
+               <rect x="10" y="5" width="12" height="3" fill="${color}"/>
+               <rect x="6" y="8" width="20" height="16" rx="4" fill="${color}"/>
+               <rect x="8" y="8" width="5" height="8" fill="${color}ee" opacity="0.5"/>
+               <rect x="6" y="22" width="20" height="2" rx="1" fill="${color}cc"/>`;
+      break;
     default: // material / block
       path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
                <rect x="4" y="4" width="24" height="4" fill="${color}cc"/>`;
@@ -87,6 +94,7 @@ function getItemIcon(itemId: string): string {
   else if (def.category === "food") shape = "food";
   else if (def.category === "armor") shape = "armor";
   else if (def.category === "block") shape = "block";
+  else if (def.category === "potion") shape = "potion";
   ITEM_ICONS[itemId] = makeItemIcon(hex, shape);
   return ITEM_ICONS[itemId];
 }
@@ -127,6 +135,7 @@ export class UI {
   private hungerEls: HTMLElement[] = [];
   private xpBarFill!: HTMLElement;
   private xpLevelEl!: HTMLElement;
+  private effectsDisplay!: HTMLElement;
   private itemTooltip!: HTMLElement;
   private blockTooltip!: HTMLElement;
   private elWaveInfo!: HTMLElement;
@@ -238,7 +247,12 @@ export class UI {
     if (!def) { this.itemTooltip.style.display = "none"; return; }
     const durStr = (durability != null && def.durability != null)
       ? ` <span style="color:#aaa;font-size:7px">(${durability}/${def.durability})</span>` : "";
-    this.itemTooltip.innerHTML = def.name + durStr;
+    let extra = "";
+    if (def.category === "potion") {
+      if (def.healAmount) extra = ` <span style="color:#ff8888;font-size:7px">(+${def.healAmount} HP)</span>`;
+      else if (def.effect && def.effectDuration) extra = ` <span style="color:#aaffcc;font-size:7px">(${def.effectDuration}s)</span>`;
+    }
+    this.itemTooltip.innerHTML = def.name + durStr + extra;
     this.itemTooltip.style.display = "block";
   }
 
@@ -441,6 +455,7 @@ export class UI {
     this.buildDayClock();
     this.buildMinimap();
     this.buildCompass();
+    this.buildEffectsDisplay();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -672,6 +687,36 @@ export class UI {
     const DIRS = ["N","NE","E","SE","S","SW","W","NW"];
     const idx = Math.round(((yawRadians + Math.PI) / (Math.PI * 2)) * 8) & 7;
     this.compassEl.textContent = DIRS[idx];
+  }
+
+  private buildEffectsDisplay(): void {
+    const el = div("fps-effects");
+    this.effectsDisplay = el;
+    this.container.appendChild(el);
+  }
+
+  updateStatusEffects(effects: Map<string, number>): void {
+    if (!this.effectsDisplay) return;
+    const EFFECT_META: Record<string, { label: string; color: string; icon: string }> = {
+      speed:    { label: "Speed",    color: "#3388ff", icon: "💨" },
+      strength: { label: "Strength", color: "#ff4400", icon: "⚔" },
+      regen:    { label: "Regen",    color: "#ff88cc", icon: "❤" },
+    };
+    if (effects.size === 0) {
+      this.effectsDisplay.innerHTML = "";
+      return;
+    }
+    let html = "";
+    for (const [name, time] of effects) {
+      const meta = EFFECT_META[name] ?? { label: name, color: "#fff", icon: "✦" };
+      const secs = Math.ceil(time);
+      html += `<div class="fps-effect-badge" style="border-color:${meta.color}">
+        <span class="fps-effect-icon">${meta.icon}</span>
+        <span class="fps-effect-name" style="color:${meta.color}">${meta.label}</span>
+        <span class="fps-effect-time">${secs}s</span>
+      </div>`;
+    }
+    this.effectsDisplay.innerHTML = html;
   }
 
   private buildHotbar(): void {
@@ -1099,6 +1144,12 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "Glass Bottle", ingredients: "3 Glass (V shape) → 3 Bottles", key: "glass_bottle" },
+      { name: "Sugar", ingredients: "1 Wheat → 2 Sugar", key: "sugar" },
+      { name: "Healing Potion", ingredients: "Glass Bottle + Apple", key: "healing_potion" },
+      { name: "Speed Potion", ingredients: "Glass Bottle + Sugar", key: "speed_potion" },
+      { name: "Strength Potion", ingredients: "Glass Bottle + Iron Ingot", key: "strength_potion" },
+      { name: "Regen Potion", ingredients: "Glass Bottle + Diamond", key: "regen_potion" },
     ];
 
     const list = div("fps-rb-list");
@@ -1364,6 +1415,26 @@ const FPS_CSS = `
   pointer-events: none; z-index: 15;
   letter-spacing: 0.05em;
 }
+
+/* Status effects — top-left stack */
+.fps-effects {
+  position: absolute;
+  top: 8px; left: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  pointer-events: none; z-index: 15;
+}
+.fps-effect-badge {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.65);
+  border: 2px solid #fff;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+.fps-effect-icon { font-size: 10px; }
+.fps-effect-name { font-size: 8px; }
+.fps-effect-time { font-size: 7px; color: #ccc; margin-left: 4px; }
 
 /* Minimap — bottom right above hotbar */
 .fps-minimap {

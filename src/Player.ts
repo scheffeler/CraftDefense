@@ -33,6 +33,10 @@ export class Player {
   bowCharge      = 0;
   isBowCharging  = false;
 
+  // Status effects: effectName → remaining seconds
+  readonly activeEffects = new Map<string, number>();
+  private _regenTick = 0;
+
   onDeath: () => void = () => {};
 
   // Look direction extracted from camera quaternion
@@ -53,8 +57,42 @@ export class Player {
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
     }
+    this.updateEffects(dt);
     this.applyMovement(dt, input);
     this.camera.position.copy(this.getCameraPosition());
+  }
+
+  applyEffect(name: string, duration: number): void {
+    this.activeEffects.set(name, (this.activeEffects.get(name) ?? 0) + duration);
+  }
+
+  getSpeedMultiplier(): number {
+    return this.activeEffects.has("speed") ? 1.5 : 1.0;
+  }
+
+  getDamageBonus(): number {
+    return this.activeEffects.has("strength") ? 3 : 0;
+  }
+
+  updateEffects(dt: number): void {
+    for (const [name, time] of this.activeEffects) {
+      const newTime = time - dt;
+      if (newTime <= 0) {
+        this.activeEffects.delete(name);
+      } else {
+        this.activeEffects.set(name, newTime);
+      }
+    }
+    // Regeneration: +1 HP every 2 seconds
+    if (this.activeEffects.has("regen")) {
+      this._regenTick += dt;
+      if (this._regenTick >= 2.0) {
+        this._regenTick = 0;
+        this.heal(1);
+      }
+    } else {
+      this._regenTick = 0;
+    }
   }
 
   /** Returns melee sphere params if attack was successful, null if on cooldown. */
@@ -130,7 +168,7 @@ export class Player {
   private applyMovement(dt: number, input: MovementInput): void {
     const yaw = this.getYaw();
 
-    let speed = WALK_SPEED;
+    let speed = WALK_SPEED * this.getSpeedMultiplier();
     if (input.sprint) speed *= SPRINT_MULT;
     if (this.inWater) speed *= WATER_SPEED;
 

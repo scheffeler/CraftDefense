@@ -373,6 +373,53 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+
+  // ── Potions ──────────────────────────────────────────────────────────────
+  {
+    id: "glass_bottle",
+    pattern: [
+      [r("glass"), null,    r("glass")],
+      [null,       r("glass"), null   ],
+    ],
+    result: { itemId: "glass_bottle", count: 3 },
+  },
+  {
+    id: "sugar_from_wheat",
+    pattern: [[r("wheat")]],
+    result: { itemId: "sugar", count: 2 },
+  },
+  {
+    id: "healing_potion",
+    pattern: [
+      [r("glass_bottle")],
+      [r("apple")       ],
+    ],
+    result: { itemId: "healing_potion", count: 1 },
+  },
+  {
+    id: "speed_potion",
+    pattern: [
+      [r("glass_bottle")],
+      [r("sugar")       ],
+    ],
+    result: { itemId: "speed_potion", count: 1 },
+  },
+  {
+    id: "strength_potion",
+    pattern: [
+      [r("glass_bottle")],
+      [r("iron_ingot")  ],
+    ],
+    result: { itemId: "strength_potion", count: 1 },
+  },
+  {
+    id: "regen_potion",
+    pattern: [
+      [r("glass_bottle")],
+      [r("diamond")     ],
+    ],
+    result: { itemId: "regen_potion", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

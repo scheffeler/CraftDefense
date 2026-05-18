@@ -80,8 +80,9 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     scale: 1.1,
     xpReward: 15,
     drops: [
-      { itemId: "iron_ingot", chance: 0.5, count: 2 },
-      { itemId: "cobblestone",chance: 0.6, count: 4 },
+      { itemId: "iron_ingot",  chance: 0.5, count: 2 },
+      { itemId: "cobblestone", chance: 0.6, count: 4 },
+      { itemId: "glass_bottle",chance: 0.2, count: 1 },
     ],
   },
   troll: {

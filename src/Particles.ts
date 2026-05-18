@@ -7,6 +7,7 @@ interface Particle {
   vz: number;
   life: number;
   maxLife: number;
+  noGravity?: boolean;
 }
 
 export class ParticleSystem {
@@ -90,8 +91,26 @@ export class ParticleSystem {
     }
   }
 
-  private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
-    this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
+  /** Emit a gentle sparkle around the player to indicate an active potion effect. */
+  spawnStatusEffect(x: number, y: number, z: number, color: number): void {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.04, 4, 4),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 0.3 + Math.random() * 0.4;
+    mesh.position.set(
+      x + Math.cos(angle) * radius,
+      y + 0.5 + Math.random() * 1.5,
+      z + Math.sin(angle) * radius,
+    );
+    const upSpeed = 0.6 + Math.random() * 0.8;
+    const drift   = (Math.random() - 0.5) * 0.5;
+    this.spawnParticle(mesh, drift, upSpeed, drift * 0.5, 0.6 + Math.random() * 0.6, true);
+  }
+
+  private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number, noGravity = false): void {
+    this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife, noGravity });
     this.scene.add(mesh);
   }
 
@@ -109,15 +128,16 @@ export class ParticleSystem {
         continue;
       }
 
-      p.vy -= 9.8 * dt; // gravity
+      if (!p.noGravity) p.vy -= 9.8 * dt;
       p.mesh.position.x += p.vx * dt;
       p.mesh.position.y += p.vy * dt;
       p.mesh.position.z += p.vz * dt;
 
       // Fade out in last 30% of life
       if (t > 0.7) {
-        (p.mesh.material as THREE.MeshLambertMaterial).opacity = (1 - t) / 0.3;
-        (p.mesh.material as THREE.MeshLambertMaterial).transparent = true;
+        const mat = p.mesh.material as THREE.Material;
+        mat.transparent = true;
+        (mat as { opacity: number }).opacity = (1 - t) / 0.3;
       }
 
       p.mesh.rotation.x += dt * 5;

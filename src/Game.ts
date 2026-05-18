@@ -70,9 +70,10 @@ export class Game {
   private _regenTimer = 0;
   private _stepTimer  = 0;
   private _headBob    = 0;
-  private _wasInWater       = false;
-  private _nightSpawnTimer  = 0;
-  private _flowUpdateTimer  = 0;
+  private _wasInWater          = false;
+  private _nightSpawnTimer     = 0;
+  private _flowUpdateTimer     = 0;
+  private _effectParticleTimer = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
@@ -208,15 +209,15 @@ export class Game {
 
     // Dungeon chests — varied loot per dungeon
     const dungeonLoots: Array<Array<{itemId:string;count:number}|null>> = [
-      [{ itemId:"iron_pickaxe", count:1 }, { itemId:"iron_ingot", count:4 }, { itemId:"coal_ore", count:6 }, { itemId:"bread", count:3 },
+      [{ itemId:"iron_pickaxe", count:1 }, { itemId:"iron_ingot", count:4 }, { itemId:"coal_ore", count:6 }, { itemId:"healing_potion", count:2 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
+      [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"strength_potion", count:1 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"bow",          count:1 }, { itemId:"arrow_item", count:16 }, { itemId:"cooked_beef", count:4 }, { itemId:"flint", count:4 },
+      [{ itemId:"bow",          count:1 }, { itemId:"arrow_item", count:16 }, { itemId:"speed_potion", count:2 }, { itemId:"glass_bottle", count:3 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
+      [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"regen_potion", count:1 }, { itemId:"healing_potion", count:2 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
+      [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"strength_potion", count:1 }, { itemId:"speed_potion", count:1 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
     ];
     for (let i = 0; i < DUNGEON_CHEST_POSITIONS.length; i++) {
@@ -421,6 +422,18 @@ export class Game {
       if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
+      } else if (itemDef?.category === "potion" && stack) {
+        this.inventory.removeItem(stack.itemId, 1);
+        if (itemDef.healAmount) {
+          this.player.heal(itemDef.healAmount);
+          this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        }
+        if (itemDef.effect && itemDef.effectDuration) {
+          this.player.applyEffect(itemDef.effect, itemDef.effectDuration);
+        }
+        this.audio.play("eat", 0.8);
+        this.refreshHotbar();
+        this.ui.updateStatusEffects(this.player.activeEffects);
       } else if (itemDef?.category === "food" && itemDef.foodPoints && this.player.hunger < 20) {
         this.inventory.removeItem(stack!.itemId, 1);
         this.player.hunger = Math.min(20, this.player.hunger + itemDef.foodPoints);
@@ -1081,6 +1094,24 @@ export class Game {
     // Particles
     this.particles.update(dt);
 
+    // Status effect particle aura
+    this._effectParticleTimer += dt;
+    if (this._effectParticleTimer >= 0.18 && this.player.activeEffects.size > 0) {
+      this._effectParticleTimer = 0;
+      const EFFECT_COLORS: Record<string, number> = {
+        speed:    0x3388ff,
+        strength: 0xff4400,
+        regen:    0xff88cc,
+      };
+      for (const [eff] of this.player.activeEffects) {
+        const col = EFFECT_COLORS[eff] ?? 0xffffff;
+        this.particles.spawnStatusEffect(
+          this.player.position.x, this.player.position.y, this.player.position.z, col,
+        );
+      }
+      this.ui.updateStatusEffects(this.player.activeEffects);
+    }
+
     // Item entity drops
     this.updateItemEntities(dt);
 
@@ -1448,7 +1479,7 @@ export class Game {
     if (this.phase !== "playing" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
-    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack);
+    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack) + this.player.getDamageBonus();
 
     const result = this.player.tryMeleeAttack();
     if (!result) return;
