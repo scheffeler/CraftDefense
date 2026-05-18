@@ -1,5 +1,28 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-18 — Potions System (healing, speed, strength, splash slowness, regen)
+
+**What was done:**
+- `glass_bottle` crafted from 3 glass (V-shape); recipes for all potions at crafting table
+- `healing_potion`: instant +8 HP, pink particle orb burst
+- `speed_potion`: 30s × 1.5 movement speed multiplier
+- `strength_potion`: 30s +4 melee damage bonus
+- `regen_potion`: 20s accelerated health regen
+- `splash_slowness`: thrown in arc (right-click), splashes on ground, slows all enemies in radius 4 for 8s (reuses existing enemy slowTimer)
+- Player `activeEffects` Map — ticked each frame, applied to movement + damage
+- Active effects HUD panel bottom-right: colored pills with icon/name/countdown
+- `spawnHealEffect` (pink) and `spawnSplashEffect` (blue) particle methods
+- "Alchemist" achievement on first potion drink
+- Recipe book updated with all 6 potion entries
+- Merge-resolved concurrent changes: guns, crossbow, boss bar CSS, troll shockwave
+
+**Ideas for next time:**
+- Lava blocks / lava bucket (craft from bucket + lava source)
+- Fire spread mechanic — lava sets adjacent flammable blocks on fire
+- More potion types: fire resistance, night vision, invisibility
+- Brewing stand block UI (more authentic Minecraft brewing workflow)
+- Potion color overlay on hotbar bottle icon
+
 ## 2026-05-18 — TNT, Flint & Steel, chain explosions
 
 **What was done:**
