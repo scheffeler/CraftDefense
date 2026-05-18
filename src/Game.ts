@@ -1889,8 +1889,13 @@ export class Game {
     if (itemDef?.ammoType) {
       const ammoCount = this.inventory.countItem(itemDef.ammoType);
       this.ui.updateAmmoDisplay(ammoCount);
+      // Color-coded ammo badge on the gun's hotbar slot
+      const ammoDef  = ITEMS[itemDef.ammoType];
+      const maxStack = ammoDef?.stackSize ?? 64;
+      this.ui.setSlotAmmoBadge(this.inventory.activeSlot, ammoCount, maxStack);
     } else {
       this.ui.updateAmmoDisplay(null);
+      this.ui.setSlotAmmoBadge(null, 0, 1);
     }
   }
 

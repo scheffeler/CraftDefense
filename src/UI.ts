@@ -783,7 +783,8 @@ export class UI {
       const slot = div("fps-hotbar-slot");
       slot.innerHTML = `<span class="fps-slot-num">${i + 1}</span>
         <span class="fps-slot-icon"></span>
-        <span class="fps-slot-count"></span>`;
+        <span class="fps-slot-count"></span>
+        <span class="fps-ammo-badge" style="display:none"></span>`;
       bar.appendChild(slot);
       this.hotbarSlots.push(slot);
     }
@@ -813,6 +814,27 @@ export class UI {
     } else {
       this.ammoDisplay.textContent = `⚙ ${count}`;
       this.ammoDisplay.style.display = "block";
+    }
+  }
+
+  /**
+   * Show a small colored ammo badge on the specified hotbar slot.
+   * Pass slotIndex=null to clear all badges.
+   * Color: green ≥ 50%, yellow ≥ 20%, red < 20%.
+   */
+  setSlotAmmoBadge(slotIndex: number | null, count: number, maxCount: number): void {
+    for (let i = 0; i < this.hotbarSlots.length; i++) {
+      const badge = this.hotbarSlots[i].querySelector<HTMLElement>(".fps-ammo-badge");
+      if (!badge) continue;
+      if (slotIndex === null || i !== slotIndex || count <= 0) {
+        badge.style.display = "none";
+        continue;
+      }
+      const pct = maxCount > 0 ? count / maxCount : 0;
+      const color = pct >= 0.5 ? "#44ff88" : pct >= 0.2 ? "#ffcc00" : "#ff4444";
+      badge.textContent = String(count);
+      badge.style.color = color;
+      badge.style.display = "block";
     }
   }
 
@@ -1729,6 +1751,14 @@ const FPS_CSS = `
   position: absolute; bottom: 1px; right: 2px;
   font-size: 9px; font-weight: bold;
   color: #fff; text-shadow: 1px 1px 0 #000;
+}
+.fps-ammo-badge {
+  position: absolute; bottom: 1px; left: 2px;
+  font-size: 9px; font-weight: bold;
+  font-family: monospace;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+  z-index: 2;
 }
 .slot-dur-bar {
   position: absolute; bottom: 2px; left: 2px; right: 2px;

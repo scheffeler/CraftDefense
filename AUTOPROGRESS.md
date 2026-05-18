@@ -465,3 +465,33 @@
 - **Web strand visuals**: when player is webbed, show sticky white strands at screen edges
 - **Goblin miner mining animation**: sparks + chunk flying out when breaking walls
 - **XP system UI**: show XP bar fill progress toward next level below health
+
+---
+
+## 2026-05-18 — Ammo Hotbar Badge (Run 17)
+
+### What was done
+- **Ammo hotbar badge**: when a gun is equipped in the active hotbar slot, a small color-coded ammo count appears in the bottom-left corner of that slot
+  - Green (#44ff88) when ≥ 50% ammo remaining (relative to ammo item's stack size)
+  - Yellow (#ffcc00) when ≥ 20% ammo remaining
+  - Red (#ff4444) when < 20% ammo remaining — critical warning
+  - Disappears when switching to a non-gun slot or when ammo = 0
+  - `fps-ammo-badge` span added to each `fps-hotbar-slot` in `buildHotbar()`
+  - `setSlotAmmoBadge(slotIndex, count, maxCount)` method added to `UI.ts`
+  - `refreshHotbar()` in `Game.ts` calls `setSlotAmmoBadge` with current gun slot + reserve count vs ammo's `stackSize`
+  - `Game.ts` reads `ammoDef.stackSize` (64 for bullets/sniper/shells, 32 for energy_cell) as the max
+- Tested via Playwright: badge appears/disappears on slot switch, color transitions work correctly
+- Branch: `auto-iterate` — pushed to origin
+
+### Notes for next run
+- `npm install` required at session start (node_modules not committed)
+- `npx tsc -p tsconfig.emit.json` exits 0 cleanly (tsconfig now uses `moduleResolution: "bundler"`)
+- Base your work on `origin/auto-iterate` (this run), not master!
+- Many features already implemented: all 5 guns, boss, elites, spider web, strafe AI, troll stomp, endless mode, best wave scoreboard
+
+### Ideas for next run
+- **Skeleton flee**: when below 30% HP, skeleton turns and runs briefly then resumes attacking
+- **Web strand visuals**: when webbed, show sticky white strands overlaid at screen edges (CSS/canvas)
+- **Goblin miner mining animation**: sparks + flying chunk when breaking walls
+- **Crosshair spread**: expand crosshair when moving/shooting to indicate accuracy penalty
+- **Ammo pickup feedback**: brief flash on ammo badge when ammo is added to inventory
