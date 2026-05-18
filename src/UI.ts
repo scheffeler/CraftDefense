@@ -1099,6 +1099,8 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "Flint & Steel", ingredients: "1 Iron Ingot + 1 Flint (diagonal)", key: "flint_steel" },
+      { name: "TNT", ingredients: "5 Gunpowder + 4 Sand (checkerboard 3×3)", key: "tnt" },
     ];
 
     const list = div("fps-rb-list");

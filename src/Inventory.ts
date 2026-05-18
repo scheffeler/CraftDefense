@@ -117,4 +117,18 @@ export class Inventory {
     if (area === "hotbar") this.hotbar[index] = stack;
     else this.backpack[index] = stack;
   }
+
+  /** Reduce durability of the first matching stack by `amount`. Removes the stack if it breaks. */
+  damageTool(itemId: string, amount: number): void {
+    const allAreas: Array<(ItemStack | null)[]> = [this.hotbar, this.backpack];
+    for (const area of allAreas) {
+      for (let i = 0; i < area.length; i++) {
+        const slot = area[i];
+        if (!slot || slot.itemId !== itemId || slot.durability === undefined) continue;
+        slot.durability -= amount;
+        if (slot.durability <= 0) area[i] = null;
+        return;
+      }
+    }
+  }
 }

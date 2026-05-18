@@ -64,6 +64,9 @@ export class Game {
   // Torch point lights keyed by "wx,wy,wz"
   private readonly torchLights = new Map<string, THREE.PointLight>();
 
+  // Primed TNT: key="wx,wy,wz", value = { countdown seconds, blinking light }
+  private readonly primedTNT = new Map<string, { timer: number; light: THREE.PointLight; x: number; y: number; z: number }>();
+
   // Hunger depletion timer
   private hungerTimer = 0;
   private _autoSaveTimer = 0;
@@ -380,6 +383,14 @@ export class Game {
             return;
           }
         }
+      }
+
+      // Flint & Steel on TNT → prime it
+      if (tb && stack?.itemId === "flint_steel" && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "tnt") {
+        this._primeTNT(tb.wx, tb.wy, tb.wz);
+        this.inventory.damageTool(stack.itemId, 1);
+        this.refreshHotbar();
+        return;
       }
 
       // Check if looking at enchanting table — open enchanting UI
@@ -955,6 +966,9 @@ export class Game {
     // Tick all furnace states even when pointer unlocked
     this.updateFurnaces(dt);
 
+    // Primed TNT always ticks (explodes even while inventory open)
+    if (this.primedTNT.size > 0) this._tickPrimedTNT(dt);
+
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
@@ -1510,6 +1524,97 @@ export class Game {
       light.dispose();
       this.torchLights.delete(key);
     }
+  }
+
+  // ─── TNT ──────────────────────────────────────────────────────────────────
+
+  private _primeTNT(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.primedTNT.has(key)) return;
+    // Remove the block immediately
+    this.gameMap.world.setBlock(wx, wy, wz, "air");
+    this.gameMap.world.rebuildDirtyChunks();
+    this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+    // Add a red pulsing light at that position
+    const light = new THREE.PointLight(0xff2200, 2.5, 8, 2);
+    light.position.set(wx + 0.5, wy + 0.5, wz + 0.5);
+    this.scene.scene.add(light);
+    this.primedTNT.set(key, { timer: 4.0, light, x: wx + 0.5, y: wy + 0.5, z: wz + 0.5 });
+    this.audio.play("creeper_hiss", 0.6);
+  }
+
+  private _tickPrimedTNT(dt: number): void {
+    for (const [key, entry] of this.primedTNT) {
+      entry.timer -= dt;
+      // Pulse light faster as countdown shortens
+      const freq = 2 + (4 - Math.max(0, entry.timer)) * 4;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.001 * freq * Math.PI * 2);
+      entry.light.intensity = 1.5 + pulse * 2.5;
+      if (entry.timer <= 0) {
+        this.scene.scene.remove(entry.light);
+        entry.light.dispose();
+        this.primedTNT.delete(key);
+        this._detonateTNT(entry.x, entry.y, entry.z);
+      }
+    }
+  }
+
+  private _detonateTNT(x: number, y: number, z: number): void {
+    const radius = 4.5;
+    this.audio.play("explosion", 1.0);
+    this.scene.shake(0.25, 0.8);
+    this.particles.spawnExplosion(x, y, z);
+
+    // Damage player in range
+    const pp = this.player.position;
+    const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq <= (radius + 2) * (radius + 2)) {
+      const dmg = Math.round(8 * (1 - Math.sqrt(distSq) / (radius + 2)));
+      if (dmg > 0) {
+        this.player.damage(dmg);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+      }
+    }
+
+    // Damage enemies in range
+    for (const enemy of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(enemy.id);
+      if (!pos) continue;
+      const ex = pos.x - x, ey = pos.y - y, ez = pos.z - z;
+      const eDist = Math.sqrt(ex * ex + ey * ey + ez * ez);
+      if (eDist <= radius + 1) {
+        const dmg = Math.round(12 * (1 - eDist / (radius + 1)));
+        if (dmg > 0) enemy.health -= dmg;
+      }
+    }
+
+    // Break/destroy surrounding blocks
+    for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+      for (let by = Math.floor(y - radius); by <= Math.ceil(y + radius); by++) {
+        for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+          const ddx = bx - x, ddy = by - y, ddz = bz - z;
+          if (ddx * ddx + ddy * ddy + ddz * ddz > radius * radius) continue;
+          const block = this.gameMap.world.getBlock(bx, by, bz);
+          if (block === "air" || block === "bedrock") continue;
+          if (Math.random() < 0.65) this.gameMap.world.setBlock(bx, by, bz, "air");
+        }
+      }
+    }
+    this.gameMap.world.rebuildDirtyChunks();
+    this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+
+    // Chain reaction — prime any adjacent TNT blocks caught in blast
+    for (const [otherKey, otherEntry] of this.primedTNT) {
+      const dist = new THREE.Vector3(otherEntry.x - x, otherEntry.y - y, otherEntry.z - z).length();
+      if (dist <= radius + 1) {
+        otherEntry.timer = Math.min(otherEntry.timer, 0.5);
+      }
+      void otherKey;
+    }
+
+    this.unlockAchievement("use_tnt", "BOOM!", "Detonate your first TNT");
   }
 
   // ─── HUD helpers ───────────────────────────────────────────────────────────

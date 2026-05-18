@@ -373,6 +373,27 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+
+  // --- Flint & Steel (iron ingot + flint) ---
+  {
+    id: "flint_steel",
+    pattern: [
+      [r("iron_ingot"), null       ],
+      [null,            r("flint") ],
+    ],
+    result: { itemId: "flint_steel", count: 1 },
+  },
+
+  // --- TNT (alternating gunpowder + sand, 3x3) ---
+  {
+    id: "tnt",
+    pattern: [
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+    ],
+    result: { itemId: "tnt", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

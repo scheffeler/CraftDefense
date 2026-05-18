@@ -69,6 +69,11 @@ export const ITEMS: Record<string, ItemDef> = {
   // --- Bed ---
   bed: { id:"bed", name:"Bed", category:"block", stackSize:64, color:0xcc3333, placesBlock:"bed" },
 
+  // --- TNT & fire starter ---
+  gunpowder:   { id:"gunpowder",   name:"Gunpowder",   category:"material", stackSize:64, color:0x555555 },
+  flint_steel: { id:"flint_steel", name:"Flint & Steel", category:"tool",   stackSize:1,  color:0xaaaaaa, durability:64 },
+  tnt:         { id:"tnt",         name:"TNT",          category:"block",    stackSize:64, color:0xcc2222, placesBlock:"tnt" },
+
   // --- Books & enchanting ---
   paper:            { id:"paper",            name:"Paper",            category:"material", stackSize:64, color:0xf0eedd },
   book:             { id:"book",             name:"Book",             category:"material", stackSize:64, color:0xc8a060 },
