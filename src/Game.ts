@@ -705,6 +705,12 @@ export class Game {
       this.unlockAchievement("boss_slain", "The Battle of Helm's Deep", "Defeated the Uruk-hai Captain!");
     };
 
+    this.enemies.onBossWarCry = (_x, _z) => {
+      this.ui.showBossWarCry();
+      this.scene.shake(0.08, 0.4);
+      this.audio.play("explosion", 0.25);
+    };
+
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
       this._doExplosion(x, y, z, radius, 6);
       this.waves.onEnemyEliminated();

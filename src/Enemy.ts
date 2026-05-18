@@ -55,6 +55,13 @@ const STOMP_COOLDOWN    = 5.0;  // seconds between stomps
 const STOMP_RADIUS      = 3.5;  // AoE blast radius
 const STOMP_DAMAGE      = 8;    // damage on direct hit (within radius)
 
+// uruk_captain war cry — buffs nearby allies
+const WAR_CRY_COOLDOWN      = 14;   // seconds between cries
+const WAR_CRY_BUFF_RADIUS   = 16;   // world units
+const WAR_CRY_SPEED_MULT    = 1.7;  // 70% speed boost for nearby enemies
+const WAR_CRY_BUFF_DURATION = 6;    // seconds the buff lasts
+const WAR_CRY_FLASH_DURATION = 1.0; // seconds the boss flashes gold
+
 export class EnemyManager {
   private readonly enemies   = new Map<number, EnemyState>();
   private readonly meshes    = new Map<number, THREE.Group>();
@@ -76,6 +83,7 @@ export class EnemyManager {
   onBossHealthChanged: (name: string, pct: number) => void = () => {};
   onBossDied: () => void = () => {};
   onTrollStomp: (x: number, y: number, z: number, radius: number, damage: number) => void = () => {};
+  onBossWarCry: (x: number, z: number) => void = () => {};
 
   private _playerX = 32;
   private _playerZ = 32;
@@ -168,6 +176,9 @@ export class EnemyManager {
       useFlowField: FLOW_FIELD_TYPES.has(type),
       breakTarget: null,
       breakTimer: 0,
+      // War cry for uruk_captain — first cry at 8s (half cooldown)
+      warCryTimer: type === "uruk_captain" ? WAR_CRY_COOLDOWN * 0.55 : undefined,
+      warCryFlash: 0,
     };
     this.enemies.set(id, state);
 
@@ -226,6 +237,40 @@ export class EnemyManager {
 
       if (this.flowField) {
         this.updateFlowFieldEnemy(id, state, group, dt);
+      }
+
+      // uruk_captain war cry
+      if (state.config.type === "uruk_captain" && state.warCryTimer !== undefined) {
+        state.warCryTimer -= dt;
+
+        // Handle boss flash during war cry
+        if (state.warCryFlash !== undefined && state.warCryFlash > 0) {
+          state.warCryFlash -= dt;
+          const t = 1 - state.warCryFlash / WAR_CRY_FLASH_DURATION;
+          const bright = Math.sin(t * Math.PI * 8) * 0.5 + 0.5;
+          this.setBossWarCryGlow(id, bright > 0.5);
+          if (state.warCryFlash <= 0) this.clearBossWarCryGlow(id);
+        }
+
+        if (state.warCryTimer <= 0) {
+          state.warCryTimer = WAR_CRY_COOLDOWN;
+          state.warCryFlash = WAR_CRY_FLASH_DURATION;
+          const pos = group.position;
+          this.onBossWarCry(pos.x, pos.z);
+          // Buff all nearby non-boss enemies
+          for (const [otherId, other] of this.enemies) {
+            if (otherId === id || !other.alive || other.dying) continue;
+            const oGroup = this.meshes.get(otherId);
+            if (!oGroup) continue;
+            const dx = oGroup.position.x - pos.x;
+            const dz = oGroup.position.z - pos.z;
+            if (dx * dx + dz * dz <= WAR_CRY_BUFF_RADIUS * WAR_CRY_BUFF_RADIUS) {
+              other.speed = other.config.speed * WAR_CRY_SPEED_MULT;
+              other.slowTimer = Math.max(other.slowTimer, WAR_CRY_BUFF_DURATION);
+              this.applyWarCryTint(otherId);
+            }
+          }
+        }
       }
 
       this.updateHealthBar(id, state, group.position);
@@ -1055,6 +1100,50 @@ export class EnemyManager {
       const mat = m.material as THREE.MeshLambertMaterial;
       mat.emissive.setHex(0xff2200);
       mat.emissiveIntensity = 0.4;
+    });
+  }
+
+  private setBossWarCryGlow(id: number, on: boolean): void {
+    const group = this.meshes.get(id);
+    if (!group) return;
+    group.traverse(c => {
+      const m = c as THREE.Mesh;
+      if (!m.isMesh || m.name === "boss_eye") return;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      if (on) {
+        mat.emissive.setHex(0xffaa00);
+        mat.emissiveIntensity = 1.0;
+      } else {
+        mat.emissive.setHex(0xff2200);
+        mat.emissiveIntensity = 0.4;
+      }
+    });
+  }
+
+  private clearBossWarCryGlow(id: number): void {
+    const state = this.enemies.get(id);
+    if (!state) return;
+    const isRaging = state.health / state.config.maxHealth <= BOSS_RAGE_THRESHOLD;
+    const group = this.meshes.get(id);
+    if (!group) return;
+    group.traverse(c => {
+      const m = c as THREE.Mesh;
+      if (!m.isMesh || m.name === "boss_eye") return;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.emissive.setHex(isRaging ? 0xff2200 : 0x000000);
+      mat.emissiveIntensity = isRaging ? 0.4 : 0;
+    });
+  }
+
+  private applyWarCryTint(id: number): void {
+    const group = this.meshes.get(id);
+    if (!group) return;
+    group.traverse(c => {
+      const m = c as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.emissive.setHex(0xcc6600);
+      mat.emissiveIntensity = 0.45;
     });
   }
 

@@ -375,6 +375,14 @@ export class UI {
     setTimeout(() => el.remove(), 2500);
   }
 
+  showBossWarCry(): void {
+    const el = document.createElement("div");
+    el.className = "boss-war-cry";
+    el.textContent = "WAR CRY!";
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+  }
+
   showAchievement(title: string, desc: string): void {
     const el = document.createElement("div");
     el.className = "achievement-toast";
@@ -2116,6 +2124,29 @@ const FPS_CSS = `
   80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.0) translateY(-20px); }
 }
+/* Boss war cry announcement — fiery orange, centered */
+.boss-war-cry {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 28px;
+  color: #ff8800;
+  text-shadow: 0 0 14px #ff4400, 3px 3px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+  z-index: 55;
+  animation: warCryAnnounce 2.0s ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes warCryAnnounce {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.6) rotate(-3deg); }
+  15%  { opacity: 1; transform: translateX(-50%) scale(1.2) rotate(2deg); }
+  35%  { opacity: 1; transform: translateX(-50%) scale(1.0) rotate(0deg); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.95) translateY(-24px); }
+}
+
 /* Minecraft-style achievement toast */
 .achievement-toast {
   position: absolute;

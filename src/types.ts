@@ -102,6 +102,9 @@ export interface EnemyState {
   stompCooldown?: number;    // seconds until next stomp is available
   stompCharging?: boolean;   // true during wind-up before stomp fires
   stompChargeTimer?: number; // counts up to STOMP_CHARGE_TIME
+  // uruk_captain war cry (buffs nearby enemies)
+  warCryTimer?: number;      // counts down to next war cry
+  warCryFlash?: number;      // countdown for the boss visual flash
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error
