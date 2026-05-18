@@ -1,5 +1,34 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-18 — Best Endless Wave Scoreboard (Run 16)
+
+### What was done
+- **Best Endless Wave Scoreboard** — tracks and displays the player's highest endless wave across sessions:
+  - `_bestEndlessWave` field in `Game.ts` loaded from `localStorage.getItem("craftdefense_best_endless")`
+  - On death in endless mode: saves new record to localStorage if current wave exceeds previous best
+  - **Death screen**: shows "Fell at endless wave N" (yellow text) with "★ NEW RECORD! Best: Wave N" badge if new record, or "Best: Wave N" if not
+  - **Victory screen**: shows "★ Best Endless Wave: N" badge when a previous record exists
+  - `.death-record` and `.end-record` paragraph elements added to respective overlays
+  - `showDeathScreen(endlessWave?, bestWave?)` signature updated to support optional endless context
+  - `showEnd(type, detail, bestEndlessWave?)` updated to show record badge on victory screen
+- **TypeScript compilation**: passes cleanly (exit 0)
+- Note: This run started from origin/auto-iterate (Run 15 was the base — spider web-shot), not from master
+
+### Notes for next run
+- `npm install` required at session start (node_modules not committed)
+- `npx tsc -p tsconfig.emit.json` exits 0 cleanly
+- Browser symlink needed: `mkdir -p /opt/pw-browsers/chromium_headless_shell-1223/chrome-headless-shell-linux64 && ln -sf /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell /opt/pw-browsers/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell`
+- Dev server: `npm run dev` → port 5175
+- `git checkout origin/auto-iterate -B auto-iterate` to get the current branch (NOT master)
+
+### Ideas for next run
+- **Skeleton flee**: when HP < 30%, skeleton turns and runs for 2s before re-engaging
+- **Ammo hotbar indicator**: small ammo count overlay directly on hotbar gun slots
+- **Web strand visuals**: sticky white strands at screen edges when player is webbed
+- **XP bar progress**: fill bar from current to next level under health bar
+- **Goblin miner sparks**: particle sparks when goblin miner breaks a wall block
+- **Sound polish**: distinct reload click for crossbow, boss roar on spawn
+
 ## 2026-05-17 — Sniper Scope Overlay (Run 14)
 
 ### What was done
