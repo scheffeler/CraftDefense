@@ -1,5 +1,26 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-18 — Uruk-hai Captain War Cry Ability
+
+**What was done:**
+- Added war cry ability to the existing Uruk-hai Captain boss (wave 10)
+- War cry fires every 14 seconds (first at ~8s after spawn)
+- All enemies within 16 blocks get a 70% speed boost for 6 seconds
+- Buffed enemies flash orange-gold; boss flashes bright gold during the cry
+- "WAR CRY!" center-screen announcement with pulsing orange animation + screen shake
+- `setBossWarCryGlow`/`clearBossWarCryGlow` helpers preserve rage-mode visuals after cry
+- New `warCryTimer` and `warCryFlash` fields added to `EnemyState`
+- `onBossWarCry` callback wired from EnemyManager → Game → UI
+
+**Ideas for next time:**
+- Fire blocks: lava sets adjacent wood/planks/leaves on fire; fire damages player/enemies
+- Lava spread: lava source blocks flow 2–3 blocks into adjacent air (like Minecraft)
+- Water+lava → obsidian generation (touch-interaction physics)
+- Golden tools: fast but low durability (32 uses), smelted gold_ingot as material
+- Second boss variant: a "Dark Shaman" who summons skeletons every 20s (for endless mode)
+- Boss arena effect: when uruk_captain spawns in wave 10, darken sky + distant horn sound
+- War cry visual: particle burst ring around the boss at cry moment
+
 ## 2026-05-18 — Lava Moat Defense System
 
 **What was done:**
