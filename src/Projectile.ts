@@ -182,12 +182,15 @@ export class ProjectileManager {
     p.mesh.visible = true;
   }
 
+  onPlayerArrowHitBlock: (bx: number, by: number, bz: number, blockId: string) => void = () => {};
+
   update(
     dt: number,
     getEnemyPos: (id: number) => THREE.Vector3 | null,
     damageEnemy: (id: number, dmg: number, slow: number, slowDur: number) => void,
     getEnemiesInRadius: (center: THREE.Vector3, radius: number) => number[],
     getAliveEnemyIds?: () => number[],
+    getBlockAt?: (x: number, y: number, z: number) => string,
   ): void {
     // Tower projectiles (homing)
     for (const p of this.pool) {
@@ -236,6 +239,19 @@ export class ProjectileManager {
         const dir = a.velocity.clone().normalize();
         a.mesh.lookAt(a.mesh.position.clone().add(dir));
         a.mesh.rotateX(Math.PI / 2);
+      }
+
+      // Hit detection vs solid blocks
+      if (getBlockAt) {
+        const bx = Math.floor(a.mesh.position.x);
+        const by = Math.floor(a.mesh.position.y);
+        const bz = Math.floor(a.mesh.position.z);
+        const bid = getBlockAt(bx, by, bz);
+        if (bid !== "air" && bid !== "water" && bid !== "torch") {
+          this.onPlayerArrowHitBlock(bx, by, bz, bid);
+          this.deactivateArrow(a);
+          continue;
+        }
       }
 
       // Hit detection vs all alive enemies

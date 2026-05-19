@@ -189,6 +189,8 @@ export class Game {
     this.inventory.addItem("apple", 8);
     this.inventory.addItem("wheat_seeds", 8);
     this.inventory.addItem("iron_bucket", 1);
+    this.inventory.addItem("gunpowder", 10);
+    this.inventory.addItem("sand", 8);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -720,6 +722,15 @@ export class Game {
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
       this._doExplosion(x, y, z, radius, 6);
       this.waves.onEnemyEliminated();
+    };
+
+    // Arrow hits a block — detonate TNT on contact
+    this.projectiles.onPlayerArrowHitBlock = (bx, by, bz, blockId) => {
+      if (blockId === "tnt") {
+        this.gameMap.world.setBlock(bx, by, bz, "air");
+        this.gameMap.world.rebuildDirtyChunks();
+        this._doExplosion(bx + 0.5, by + 0.5, bz + 0.5, 4.5, 8);
+      }
     };
 
     // Player death
@@ -1707,6 +1718,7 @@ export class Game {
         .filter(e => { const p = this.enemies.getEnemyPosition(e.id); return p ? p.distanceTo(c) <= r : false; })
         .map(e => e.id),
       ()           => this.enemies.getAliveEnemies().map(e => e.id),
+      (x, y, z)   => this.gameMap.world.getBlock(x, y, z),
     );
   }
 
