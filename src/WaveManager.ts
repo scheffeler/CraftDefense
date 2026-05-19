@@ -1,39 +1,10 @@
 import type { EnemyTypeName, WaveConfig } from "./types";
-import { WAVE_CONFIGS } from "./config/waves";
+import { WAVE_CONFIGS, generateEndlessWave } from "./config/waves";
 
 interface SpawnEntry {
   type: EnemyTypeName;
   gate: "north" | "south";
   delay: number;
-}
-
-/** Procedurally generate an endless wave config for waves beyond the scripted ones. */
-function generateEndlessConfig(waveNum: number): WaveConfig {
-  // Scale factor grows with each wave beyond 10
-  const n = waveNum - WAVE_CONFIGS.length; // n=1 for wave 11, n=2 for wave 12, ...
-  const scale = 1 + n * 0.15;
-
-  const goblinCount  = Math.round(10 * scale);
-  const orcCount     = Math.round(4  * scale);
-  const trollCount   = Math.min(6, 1 + Math.floor(n / 3));
-  const creeperCount = Math.min(4, Math.floor(n / 4));
-  const eliteOrc     = n >= 3 ? Math.round(2 * (1 + n * 0.1)) : 0;
-
-  const groups: WaveConfig["groups"] = [
-    { type: "goblin", count: goblinCount, spawnInterval: Math.max(0.6, 1.8 / scale), gate: "north" },
-    { type: "orc",    count: orcCount,    spawnInterval: Math.max(1.0, 2.2 / scale), gate: "south" },
-    { type: "troll",  count: trollCount,  spawnInterval: 3.5, gate: "north" },
-  ];
-  if (creeperCount > 0) groups.push({ type: "creeper", count: creeperCount, spawnInterval: 5.0, gate: "north" });
-  if (eliteOrc > 0)     groups.push({ type: "orc",     count: eliteOrc,     spawnInterval: 2.0, gate: "south" });
-
-  // Every 5 endless waves (15, 20, 25...) spawn a mini-boss (uruk captain at reduced HP)
-  if (n % 5 === 0) {
-    groups.push({ type: "uruk_captain", count: 1, spawnInterval: 0, gate: "north" });
-  }
-
-  const bonusGold = Math.round(100 * scale);
-  return { wave: waveNum, groups, bonusGold };
 }
 
 export class WaveManager {
@@ -44,6 +15,7 @@ export class WaveManager {
   private waveActive        = false;
   private _betweenWaveTimer = 0;
   private _endless          = false;
+  private _currentCfg: WaveConfig | null = null;
 
   readonly betweenWaveDuration = 120; // seconds between waves
 
@@ -53,8 +25,11 @@ export class WaveManager {
 
   get wave():        number  { return this.currentWave; }
   get isActive():    boolean { return this.waveActive; }
-  get totalWaves():  number  { return WAVE_CONFIGS.length; }
+  /** Returns Infinity in endless mode so the HUD can show "∞". */
+  get totalWaves():  number  { return this._endless ? Infinity : WAVE_CONFIGS.length; }
   get isEndless():   boolean { return this._endless; }
+  /** Alias for Game.ts callers that use isEndlessMode. */
+  get isEndlessMode(): boolean { return this._endless; }
   get timeUntilNextWave(): number { return Math.ceil(this._betweenWaveTimer); }
   get isBetweenWaves(): boolean {
     return !this.waveActive &&
@@ -70,14 +45,14 @@ export class WaveManager {
     this.activeEnemyCount = 0;
     this._betweenWaveTimer = 0;
 
-    const cfg = this.currentWave <= WAVE_CONFIGS.length
+    this._currentCfg = this.currentWave <= WAVE_CONFIGS.length
       ? WAVE_CONFIGS[this.currentWave - 1]
-      : generateEndlessConfig(this.currentWave);
+      : generateEndlessWave(this.currentWave);
 
     this.spawnQueue = [];
 
     let cumDelay = 0;
-    for (const group of cfg.groups) {
+    for (const group of this._currentCfg.groups) {
       for (let i = 0; i < group.count; i++) {
         this.spawnQueue.push({
           type: group.type,
@@ -135,12 +110,10 @@ export class WaveManager {
       this.waveActive
     ) {
       this.waveActive = false;
-      const cfg = this.currentWave <= WAVE_CONFIGS.length
-        ? WAVE_CONFIGS[this.currentWave - 1]
-        : generateEndlessConfig(this.currentWave);
+      const bonusGold = this._currentCfg?.bonusGold ?? 0;
       const isLast = !this._endless && this.isLastWave();
       this._betweenWaveTimer = isLast ? 0 : this.betweenWaveDuration;
-      this.onWaveComplete(this.currentWave, cfg.bonusGold);
+      this.onWaveComplete(this.currentWave, bonusGold);
     }
   }
 
@@ -157,5 +130,6 @@ export class WaveManager {
     this._betweenWaveTimer = 0;
     this._tickAccum       = 0;
     this._endless         = false;
+    this._currentCfg      = null;
   }
 }
