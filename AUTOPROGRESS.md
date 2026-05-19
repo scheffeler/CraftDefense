@@ -1,5 +1,22 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-19 — Spider/golem wave integration + richer endless mode generator
+
+**What was done:**
+- Added spiders (flanking units) to waves 3-6 from the south gate, increasing variety from the earliest waves
+- Added golems (high-HP tanks) to waves 7-9, and 3 golems + 10 spiders to wave 10 alongside the uruk_captain boss
+- Replaced the basic `generateEndlessConfig` in WaveManager with a richer `generateEndlessWave` exported from waves.ts: all 9 enemy types appear, spiders and skeletons from wave 2, golems from wave 2, Uruk-hai Captain boss every 5th endless wave (15, 20, 25…)
+- Spawn intervals decay exponentially (0.93^n); enemy counts scale 1.18× per wave
+- WaveManager.totalWaves returns Infinity in endless mode so the HUD shows "∞ Wave N" in orange
+- Added `isEndlessMode` getter alias on WaveManager; cached current wave config to avoid recomputation
+
+**Ideas for next time:**
+- Spider wall-climbing special ability: spiders bypass fortress walls by scaling vertically, forcing different defensive strategy
+- Brewing stand block for potion crafting UI (Minecraft-style fire aspect, speed, healing potions)
+- Wither effect from skeleton arrows (lingering damage)
+- "Endless Score" leaderboard in the victory screen showing best endless wave reached
+- Nether portal (4×5 obsidian frame + flint & steel) for a second dimension with harder mobs
+
 ## 2026-05-19 — Fire spread system (flint & steel, lava auto-ignition, Three.js overlay)
 
 **What was done:**
