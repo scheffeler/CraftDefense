@@ -67,6 +67,26 @@ export class ParticleSystem {
     }
   }
 
+  spawnFuseSpark(x: number, y: number, z: number): void {
+    const colors = [0xffffff, 0xffcc00, 0xff8800];
+    const count = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.04, 0.04),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.15,
+        y + Math.random() * 0.1,
+        z + (Math.random() - 0.5) * 0.15,
+      );
+      const theta = Math.random() * Math.PI * 2;
+      const spd   = 0.5 + Math.random() * 1.0;
+      this.spawnParticle(mesh, Math.cos(theta) * spd * 0.3, 1.5 + Math.random() * 1.0, Math.sin(theta) * spd * 0.3, 0.3 + Math.random() * 0.2);
+    }
+  }
+
   spawnExplosion(x: number, y: number, z: number): void {
     const colors = [0xff8800, 0xff4400, 0xffcc00, 0xffffff];
     for (let i = 0; i < 22; i++) {

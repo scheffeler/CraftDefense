@@ -106,6 +106,7 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "bedrock":      return 12;
     case "gold_ore":     return 14;
     case "diamond_ore":  return 15;
+    case "tnt":          return 16;
     default:             return 13;
   }
 }
@@ -127,8 +128,8 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    // 17 textures × 16px wide = 272px atlas, 16px tall
+    const ATLAS_TILES = 17;
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -307,6 +308,21 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // 16: TNT — red body with dark cross (classic Minecraft look)
+    fill(16 * S, "#cc2222");
+    { ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(16 * S + 0, 5, S, 6);   // horizontal dark band
+      ctx.fillRect(16 * S + 5, 0, 6, S);   // vertical dark band
+      ctx.fillStyle = "#ee4444";
+      ctx.fillRect(16 * S + 6, 6, 4, 4);   // bright center highlight
+      ctx.fillStyle = "rgba(255,255,255,0.1)";
+      for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++)
+        ctx.fillRect(16 * S + x, y, 1, 1);
+      for (let y = 11; y < S; y++) for (let x = 11; x < S; x++)
+        ctx.fillRect(16 * S + x, y, 1, 1);
+    }
+    border(16 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -392,7 +408,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / 17, u1 = (texIdx + 1) / 17;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {
