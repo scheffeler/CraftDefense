@@ -1,5 +1,24 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-19 — TNT arrow-detonation, fuse system, chain explosions
+
+**What was done:**
+- Added player-arrow block-hit detection to `ProjectileManager`: new `onPlayerArrowHitBlock` callback and `getBlockAt` parameter in `update()`, checking block at arrow position each frame
+- TNT blocks detonate instantly when hit by a player arrow: block removed, `_doExplosion()` called
+- Arrow-detonated TNT chains: `_doExplosion()` primes any adjacent TNT in blast radius with 0.5s fuse
+- Creeper explosions call `_doExplosion()` (shared), which also chain-primes TNT in range
+- Player starts with 10 gunpowder + 8 sand for immediate TNT crafting (5 gunpowder + 4 sand)
+- Creeper drop updated: 90% gunpowder ×2 + flint + coal (was just coal/flint)
+- Merged cleanly with upstream's `_primeTNT` (blinking mesh + red PointLight), lava, potions, guns, crossbow — kept upstream's superior TNT animation and `_doExplosion` helper
+
+**Ideas for next time:**
+- Potion throwing arc visualization (show landing point for splash potions)
+- Fire spread: flint_steel on wood/planks/leaves creates a fire block that spreads
+- Lava bucket placement gives a lava source that damages enemies walking through it
+- "TNT Trap" achievement: kill 3+ enemies with one explosion
+- Crossbow auto-load indicator in HUD when crossbow is selected
+- Nether portal: build obsidian frame 4×5, light with flint_steel → different biome music
+
 ## 2026-05-19 — Golden tools + enchantment effects (Fire Aspect, Looting, Efficiency, Protection)
 
 **What was done:**
