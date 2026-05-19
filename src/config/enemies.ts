@@ -147,8 +147,8 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     scale: 0.9,
     xpReward: 10,
     drops: [
-      { itemId: "coal_ore", chance: 0.5, count: 1 },
-      { itemId: "flint",    chance: 0.3, count: 2 },
+      { itemId: "gunpowder", chance: 0.8, count: 2 },
+      { itemId: "coal_ore",  chance: 0.3, count: 1 },
     ],
   },
 };

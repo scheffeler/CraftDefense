@@ -45,6 +45,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
   bookshelf:        { id: "bookshelf",        name: "Bookshelf",        color: 0xc8a060, topColor: 0x7a3a14, hardness: 1.5,  placeable: true,  transparent: false },
   enchanting_table: { id: "enchanting_table", name: "Enchanting Table", color: 0x1a0a2a, topColor: 0xaa0022, hardness: 5.0,  placeable: true,  transparent: false },
   bed:              { id: "bed",              name: "Bed",              color: 0xcc3333, topColor: 0xaa2222, hardness: 0.2,  placeable: true,  transparent: false },
+  tnt:              { id: "tnt",              name: "TNT",              color: 0xcc2200, topColor: 0x886644, hardness: 0.5,  placeable: true,  transparent: false },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];
@@ -104,6 +105,7 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "bedrock":      return 12;
     case "gold_ore":     return 14;
     case "diamond_ore":  return 15;
+    case "tnt":          return (isTop || isBot) ? 17 : 16;
     default:             return 13;
   }
 }
@@ -125,8 +127,8 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    // 18 textures × 16px wide = 288px atlas, 16px tall
+    const ATLAS_TILES = 18;
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -305,6 +307,38 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // 16: TNT sides — red with white "TNT" band
+    fill(16 * S, "#cc2200");
+    { const r = rng(2016);
+      // subtle red noise
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 30;
+        pixel(16 * S + x, y, `rgb(${Math.min(255,(204+v))|0},${Math.max(0,(v*0.3))|0},0)`);
+      }
+      // white band in the middle (rows 5-10) like a label
+      ctx.fillStyle = "#eeeeee"; ctx.fillRect(16 * S + 1, 5, S - 2, 6);
+      // "TNT" text in the white band
+      ctx.fillStyle = "#cc2200";
+      // T
+      ctx.fillRect(16 * S + 2, 6, 2, 1); ctx.fillRect(16 * S + 3, 6, 1, 3);
+      // N
+      ctx.fillRect(16 * S + 5, 6, 1, 4); ctx.fillRect(16 * S + 6, 7, 1, 1); ctx.fillRect(16 * S + 7, 8, 1, 1); ctx.fillRect(16 * S + 8, 6, 1, 4);
+      // T
+      ctx.fillRect(16 * S + 10, 6, 2, 1); ctx.fillRect(16 * S + 11, 6, 1, 3);
+    }
+    border(16 * S);
+
+    // 17: TNT top/bottom — sand-green checkerboard
+    { const r = rng(2017);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const checker = ((x >> 1) + (y >> 1)) % 2 === 0;
+        const base = checker ? 130 : 90;
+        const v = (r() - 0.5) * 20;
+        pixel(17 * S + x, y, `rgb(${(base+v)|0},${(base*0.85+v)|0},${(base*0.5+v)|0})`);
+      }
+    }
+    border(17 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -390,7 +424,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / 18, u1 = (texIdx + 1) / 18;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {

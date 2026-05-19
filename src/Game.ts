@@ -98,6 +98,9 @@ export class Game {
   // Achievement tracking
   private readonly _achievements = new Set<string>();
 
+  // Active TNT: key = "wx,wy,wz", value = { timer (seconds until explode), mesh }
+  private readonly activeTNT = new Map<string, { timer: number; mesh: THREE.Mesh }>();
+
   // Item entity drops — floating 3D items in the world
   private readonly itemEntities: Array<{
     group: THREE.Group;
@@ -217,6 +220,8 @@ export class Game {
       [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
+       null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      [{ itemId:"gunpowder",    count:8 }, { itemId:"flint_and_steel", count:1 }, { itemId:"tnt", count:2 }, { itemId:"iron_ingot", count:4 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
     ];
     for (let i = 0; i < DUNGEON_CHEST_POSITIONS.length; i++) {
@@ -388,6 +393,13 @@ export class Game {
         return;
       }
 
+      // Flint and Steel on TNT → prime it
+      if (tb && stack?.itemId === "flint_and_steel" && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "tnt") {
+        this.primeTNT(tb.wx, tb.wy, tb.wz);
+        this.audio.play("block_place", 0.4);
+        return;
+      }
+
       // Check if looking at a bed — sleep to skip night
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "bed") {
         if (!this.scene.isDay) {
@@ -556,32 +568,7 @@ export class Game {
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
-      this.audio.play("explosion", 0.9);
-      this.scene.shake(0.18, 0.6);
-      this.particles.spawnExplosion(x, y + 0.5, z);
-      // Damage player if in range
-      const pp = this.player.position;
-      const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
-      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius + 1) {
-        this.player.damage(6);
-        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-        this.ui.showDamageVignette();
-      }
-      // Break nearby blocks
-      if (this.gameMap) {
-        for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
-          for (let by = Math.floor(y); by <= Math.ceil(y + radius); by++) {
-            for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
-              const ddx = bx - x, ddy = by - y, ddz = bz - z;
-              if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
-              const block = this.gameMap.world.getBlock(bx, by, bz);
-              if (block === "air" || block === "bedrock") continue;
-              if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
-            }
-          }
-        }
-        this.gameMap.world.rebuildDirtyChunks();
-      }
+      this.triggerExplosion(x, y, z, radius, 0); // creepers don't damage other enemies
       this.waves.onEnemyEliminated();
     };
 
@@ -1078,6 +1065,9 @@ export class Game {
     // Sync armor value each frame
     this.player.armorValue = this.inventory.getArmorValue();
 
+    // TNT fuse timers
+    this.updateActiveTNT(dt);
+
     // Particles
     this.particles.update(dt);
 
@@ -1509,6 +1499,113 @@ export class Game {
       this.scene.scene.remove(light);
       light.dispose();
       this.torchLights.delete(key);
+    }
+  }
+
+  // ─── TNT ───────────────────────────────────────────────────────────────────
+
+  private primeTNT(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.activeTNT.has(key)) return;
+
+    // Remove block and replace with flashing mesh
+    this.gameMap.world.setBlock(wx, wy, wz, "air");
+    this.gameMap.world.rebuildDirtyChunks();
+
+    const geo = new THREE.BoxGeometry(0.98, 0.98, 0.98);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(wx + 0.5, wy + 0.5, wz + 0.5);
+    this.scene.scene.add(mesh);
+
+    this.activeTNT.set(key, { timer: 4.0, mesh });
+    this.audio.play("creeper_hiss", 0.8);
+  }
+
+  private updateActiveTNT(dt: number): void {
+    for (const [key, entry] of this.activeTNT) {
+      entry.timer -= dt;
+      // Flash: alternate between red and white
+      const flashRate = 2 + (4 - entry.timer) * 1.5;
+      const isWhite = Math.floor(entry.timer * flashRate) % 2 === 0;
+      (entry.mesh.material as THREE.MeshBasicMaterial).color.setHex(isWhite ? 0xffffff : 0xff2200);
+
+      if (entry.timer <= 0) {
+        this.scene.scene.remove(entry.mesh);
+        this.activeTNT.delete(key);
+        const [wx, wy, wz] = key.split(",").map(Number);
+        this.triggerExplosion(wx + 0.5, wy + 0.5, wz + 0.5, 4, 25);
+      }
+    }
+  }
+
+  triggerExplosion(x: number, y: number, z: number, radius: number, enemyDamage = 25): void {
+    this.audio.play("explosion", 0.9);
+    this.scene.shake(0.22, 0.7);
+    this.particles.spawnExplosion(x, y + 0.5, z);
+
+    // Damage player
+    const pp = this.player.position;
+    const dx = pp.x - x, dy = pp.y - y, dz = pp.z - z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist <= radius + 1) {
+      const dmg = Math.round(8 * Math.max(0, 1 - dist / (radius + 1)));
+      if (dmg > 0) {
+        this.player.damage(dmg);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+      }
+    }
+
+    // Damage enemies in radius
+    for (const state of this.enemies.getAliveEnemies()) {
+      const ep = this.enemies.getEnemyPosition(state.id);
+      if (!ep) continue;
+      const edx = ep.x - x, edy = ep.y - y, edz = ep.z - z;
+      const edist = Math.sqrt(edx * edx + edy * edy + edz * edz);
+      if (edist <= radius + 1) {
+        const dmg = Math.round(enemyDamage * Math.max(0, 1 - edist / (radius + 1)));
+        if (dmg > 0) this.enemies.damage(state.id, dmg);
+      }
+    }
+
+    // Break nearby blocks and chain TNT
+    if (this.gameMap) {
+      const chainPositions: [number, number, number][] = [];
+      for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+        for (let by = Math.floor(y - radius * 0.5); by <= Math.ceil(y + radius); by++) {
+          for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+            const ddx = bx - x, ddy = by - y, ddz = bz - z;
+            if (ddx * ddx + ddy * ddy + ddz * ddz > radius * radius) continue;
+            const block = this.gameMap.world.getBlock(bx, by, bz);
+            if (block === "air" || block === "bedrock") continue;
+            if (block === "tnt") {
+              chainPositions.push([bx, by, bz]);
+              this.gameMap.world.setBlock(bx, by, bz, "air");
+            } else if (Math.random() < 0.55) {
+              this.gameMap.world.setBlock(bx, by, bz, "air");
+            }
+          }
+        }
+      }
+      this.gameMap.world.rebuildDirtyChunks();
+
+      // Chain: detonate nearby TNT blocks with a short delay
+      for (const [cx, cy, cz] of chainPositions) {
+        const key = `${cx},${cy},${cz}`;
+        const existing = this.activeTNT.get(key);
+        if (existing) {
+          existing.timer = Math.min(existing.timer, 0.5);
+        } else {
+          // Prime with very short fuse
+          const geo = new THREE.BoxGeometry(0.98, 0.98, 0.98);
+          const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(cx + 0.5, cy + 0.5, cz + 0.5);
+          this.scene.scene.add(mesh);
+          this.activeTNT.set(key, { timer: 0.3 + Math.random() * 0.4, mesh });
+        }
+      }
     }
   }
 

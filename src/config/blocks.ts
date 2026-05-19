@@ -34,4 +34,5 @@ export const BLOCK_BEHAVIORS: Partial<Record<BlockId, BlockBehavior>> = {
   wheat_1:        { toolCategory: "hand",    requiresTool: false, drops: []               },
   wheat_2:        { toolCategory: "hand",    requiresTool: false, drops: []               },
   wheat_3:        { toolCategory: "hand",    requiresTool: false, drops: []               },
+  tnt:            { toolCategory: "hand",    requiresTool: false, drops: ["tnt"]          },
 };

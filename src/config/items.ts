@@ -54,6 +54,11 @@ export const ITEMS: Record<string, ItemDef> = {
   diamond_ore:  { id:"diamond_ore",  name:"Diamond",      category:"material", stackSize:64, color:0x00cccc },
   gold_ingot:   { id:"gold_ingot",   name:"Gold Ingot",   category:"material", stackSize:64, color:0xffdd44 },
   diamond:      { id:"diamond",      name:"Diamond",      category:"material", stackSize:64, color:0x55ffff },
+  gunpowder:    { id:"gunpowder",    name:"Gunpowder",    category:"material", stackSize:64, color:0x666666 },
+
+  // --- Explosives ---
+  tnt:            { id:"tnt",            name:"TNT",            category:"block",    stackSize:64, color:0xcc2200, placesBlock:"tnt" },
+  flint_and_steel: { id:"flint_and_steel", name:"Flint and Steel", category:"tool", stackSize:1,  color:0x888888, durability:64 },
 
   // --- Food ---
   apple:           { id:"apple",           name:"Apple",           category:"food", stackSize:64, color:0xdd2222, foodPoints:4 },
