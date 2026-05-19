@@ -1,5 +1,24 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-19 — TNT block texture + tsconfig fix + conflict resolution
+
+**What was done:**
+- Fixed TypeScript 6 deprecation: changed `moduleResolution: "Node"` → `"bundler"` in tsconfig.json (was causing `exit code 2` on every build)
+- Added TNT block texture (tile 16, red with dark cross pattern) to the texture atlas; expanded atlas from 16 → 17 tiles and fixed UV divisor from `/16` → `/17`
+- Added `spawnFuseSpark` particle method (rising white/orange sparks, reusable)
+- Conflict resolution: upstream had already implemented `_primeTNT` (blinking mesh + red PointLight), `_doExplosion`, `primedTNT` map, crossbow, sniper_rifle, lava, potions, guns — kept upstream's superior TNT animation, removed my simpler duplicate `activeTnt`/`updateTnt`/`triggerExplosion`
+- Cleaned up: removed duplicate `gunpowder`/`tnt`/`flint_steel` entries from items.ts
+- Final compile: exit 0, pushed cleanly to auto-iterate
+
+**Ideas for next time:**
+- Potion brewing stand block (more authentic UI — upstream has potions but no brewing stand)
+- Lava flow: lava source blocks should spread to adjacent air blocks (Minecraft-like physics)
+- Water-lava interaction: water touching lava → obsidian or cobblestone
+- Golden tools: fast but fragile (between wood and stone tier)
+- Enchanting improvements: more enchant types (fire aspect, looting, protection)
+- Boss arena effect: dramatic sky darkening + horn sound when wave 10 starts
+- "TNT Trap" achievement: kill 3+ enemies with one explosion
+
 ## 2026-05-18 — Uruk-hai Captain War Cry Ability
 
 **What was done:**
