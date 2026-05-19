@@ -3,7 +3,7 @@
 // the pointer is locked, which headless Chromium will not grant.
 import { chromium } from "playwright";
 
-const URL = process.env.URL || "http://localhost:5175/";
+const URL = process.env.URL || "http://localhost:6173/";
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });

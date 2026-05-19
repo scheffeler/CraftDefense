@@ -51,7 +51,8 @@ export const viteConfig = {
   },
   server: {
     host: "0.0.0.0",
-    port: Number(getFlagValue("--port", "5175"))
+    port: Number(getFlagValue("--port", "6173")),
+    strictPort: true
   },
   preview: {
     host: "0.0.0.0",

@@ -21,7 +21,7 @@ await page.route('**/*', route => {
 });
 
 const ts = Date.now();
-await page.goto(`http://localhost:5175/?_t=${ts}`, { waitUntil: 'load' });
+await page.goto(`http://localhost:6173/?_t=${ts}`, { waitUntil: 'load' });
 await page.waitForSelector('canvas', { timeout: 10000 });
 await page.waitForTimeout(3500);
 

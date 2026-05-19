@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.emit.json && node scripts/build.mjs",
     "preview": "node scripts/preview.mjs",
     "screenshot": "node scripts/screenshot.mjs",
-    "restart-dev": "npx kill-port 5175 && npm run dev"
+    "restart-dev": "npx kill-port 6173 && npm run dev"
   },
   "dependencies": {
     "three": "^0.165.0",

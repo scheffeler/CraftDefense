@@ -7,7 +7,7 @@ mkdirSync('screenshots', { recursive: true });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 
-await page.goto('http://localhost:5175');
+await page.goto('http://localhost:6173');
 await page.addStyleTag({ content: `
   #app { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
   canvas { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
