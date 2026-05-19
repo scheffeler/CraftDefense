@@ -12,6 +12,7 @@ const TIER_SPEED: Record<ToolTier, number> = {
   wood:    2.0,
   stone:   4.0,
   iron:    6.0,
+  gold:    12.0,
   diamond: 8.0,
 };
 
@@ -188,8 +189,10 @@ export class BlockInteraction {
     }
 
     // Correct tool: use tier speed multiplier (or item's own speedMult)
-    const speedMult = itemDef?.speedMult ??
-      (tier ? TIER_SPEED[tier] : 1);
+    let speedMult = itemDef?.speedMult ?? (tier ? TIER_SPEED[tier] : 1);
+    // Efficiency enchantment bonus
+    if (this.activeItem?.enchantments?.includes("efficiency_2")) speedMult *= 2.0;
+    else if (this.activeItem?.enchantments?.includes("efficiency_1")) speedMult *= 1.5;
     this.breakHardness = hardness / speedMult;
     this.willYieldDrops = true;
   }

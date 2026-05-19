@@ -108,6 +108,10 @@ export class Game {
   // Enchanting table
   private _enchantItem: import("./Inventory").ItemStack | null = null;
 
+  // Fire Aspect burn tracker: enemy id → seconds remaining
+  private readonly burningEnemies = new Map<number, number>();
+  private _burnTickTimer = 0;
+
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
 
@@ -618,7 +622,9 @@ export class Game {
       this.unlockAchievement("first_kill", "Monster Hunter", `Defeated your first ${state.config.name}`);
       if (state.config.drops && pos) {
         // Elites always drop their loot (100% chance each drop)
-        const dropMultiplier = isElite ? 2 : 1;
+        const activeWeapon = this.inventory.getActiveItem();
+        const hasLooting   = activeWeapon?.enchantments?.includes("looting_1") ?? false;
+        const dropMultiplier = (isElite ? 2 : 1) + (hasLooting ? 1 : 0);
         for (const drop of state.config.drops) {
           const roll = isElite ? 0 : Math.random(); // elites always drop
           if (roll < drop.chance) {
@@ -1309,6 +1315,9 @@ export class Game {
     // Thrown splash potions
     this.updateThrownPotions(dt);
 
+    // Fire Aspect burn damage — 1 HP/s per burning enemy
+    this.updateBurningEnemies(dt);
+
     // Crop growth
     this.updateCrops(dt);
 
@@ -1464,6 +1473,32 @@ export class Game {
     }
   }
 
+  // ─── Fire Aspect ────────────────────────────────────────────────────────────
+
+  private updateBurningEnemies(dt: number): void {
+    if (this.burningEnemies.size === 0) return;
+    this._burnTickTimer += dt;
+    const burnDt = 1.0; // damage once per second
+    if (this._burnTickTimer < burnDt) return;
+    this._burnTickTimer -= burnDt;
+
+    for (const [id, remaining] of this.burningEnemies) {
+      const newRemaining = remaining - burnDt;
+      if (newRemaining <= 0) {
+        this.burningEnemies.delete(id);
+      } else {
+        this.burningEnemies.set(id, newRemaining);
+      }
+      // Apply burn damage
+      const state = this.enemies.getEnemy(id);
+      if (!state || !state.alive || state.dying) { this.burningEnemies.delete(id); continue; }
+      this.enemies.damage(id, 2);
+      // Spawn small flame particles on the burning enemy
+      const pos = this.enemies.getEnemyPosition(id);
+      if (pos) this.particles.spawnBlockBreak(pos.x, pos.y + 1, pos.z, 0xff4400);
+    }
+  }
+
   // ─── Farming ───────────────────────────────────────────────────────────────
 
   private updateCrops(dt: number): void {
@@ -1532,8 +1567,9 @@ export class Game {
     { id: "fortune_1",    name: "Fortune I",         cost: 2, categories: ["tool"] },
     { id: "power_1",      name: "Power I",           cost: 1, categories: ["weapon"] },
     { id: "fire_aspect",  name: "Fire Aspect I",     cost: 2, categories: ["weapon"] },
-    { id: "thorns_1",     name: "Thorns I",          cost: 2, categories: ["armor"] },
-    { id: "feather_fall", name: "Feather Falling I", cost: 1, categories: ["armor"] },
+    { id: "looting_1",   name: "Looting I",         cost: 2, categories: ["weapon"] },
+    { id: "thorns_1",    name: "Thorns I",          cost: 2, categories: ["armor"] },
+    { id: "feather_fall",name: "Feather Falling I", cost: 1, categories: ["armor"] },
   ];
 
   private _buildEnchantOptions(item: import("./Inventory").ItemStack): Array<{ id: string; name: string; cost: number }> {
@@ -1695,6 +1731,7 @@ export class Game {
 
     this.audio.play("swing");
     this.scene.swingArm();
+    const hasFireAspect = stack?.enchantments?.includes("fire_aspect") ?? false;
     let hitSomething = false;
     for (const state of this.enemies.getAliveEnemies()) {
       const pos = this.enemies.getEnemyPosition(state.id);
@@ -1703,6 +1740,10 @@ export class Game {
         this.audio.play("hit", 0.4);
         this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
         hitSomething = true;
+        if (hasFireAspect) {
+          // Set enemy on fire for 4 seconds
+          this.burningEnemies.set(state.id, Math.max(this.burningEnemies.get(state.id) ?? 0, 4));
+        }
       }
     }
     // Also check passive mobs (in free play)

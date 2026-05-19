@@ -132,6 +132,80 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "iron_axe", count: 1 },
   },
 
+  // --- Gold tools & weapons (lightning-fast, super fragile) ---
+  {
+    id: "gold_pickaxe",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [null,            r("stick"),      null           ],
+      [null,            r("stick"),      null           ],
+    ],
+    result: { itemId: "gold_pickaxe", count: 1 },
+  },
+  {
+    id: "gold_sword",
+    pattern: [
+      [r("gold_ingot")],
+      [r("gold_ingot")],
+      [r("stick")     ],
+    ],
+    result: { itemId: "gold_sword", count: 1 },
+  },
+  {
+    id: "gold_axe",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), r("stick")     ],
+      [null,            r("stick")     ],
+    ],
+    result: { itemId: "gold_axe", count: 1 },
+  },
+  {
+    id: "gold_shovel",
+    pattern: [
+      [r("gold_ingot")],
+      [r("stick")     ],
+      [r("stick")     ],
+    ],
+    result: { itemId: "gold_shovel", count: 1 },
+  },
+
+  // --- Gold armor ---
+  {
+    id: "gold_helmet",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+    ],
+    result: { itemId: "gold_helmet", count: 1 },
+  },
+  {
+    id: "gold_chestplate",
+    pattern: [
+      [r("gold_ingot"), null,            r("gold_ingot")],
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+    ],
+    result: { itemId: "gold_chestplate", count: 1 },
+  },
+  {
+    id: "gold_leggings",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+    ],
+    result: { itemId: "gold_leggings", count: 1 },
+  },
+  {
+    id: "gold_boots",
+    pattern: [
+      [r("gold_ingot"), null,            r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+    ],
+    result: { itemId: "gold_boots", count: 1 },
+  },
+
   // --- Iron block ---
   {
     id: "iron_block",

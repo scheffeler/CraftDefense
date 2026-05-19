@@ -2,7 +2,7 @@ import type { BlockId } from "../types";
 import type { ToolCategory } from "./blocks";
 
 export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material" | "potion";
-export type ToolTier     = "wood" | "stone" | "iron" | "diamond";
+export type ToolTier     = "wood" | "stone" | "iron" | "gold" | "diamond";
 export type ArmorSlot    = "head" | "chest" | "legs" | "feet";
 
 export type WeaponType = "melee" | "ranged" | "gun";
@@ -108,6 +108,18 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_sword:   { id:"iron_sword",   name:"Iron Sword",   category:"weapon", stackSize:1, color:0xbbbbbb, damage:6, durability:250 },
   iron_pickaxe: { id:"iron_pickaxe", name:"Iron Pickaxe", category:"tool",   stackSize:1, color:0xbbbbbb, toolCategory:"pickaxe", tier:"iron",  speedMult:6.0, durability:250 },
   iron_axe:     { id:"iron_axe",     name:"Iron Axe",     category:"tool",   stackSize:1, color:0xbbbbbb, toolCategory:"axe",     tier:"iron",  speedMult:6.0, durability:250 },
+
+  // --- Gold tools & weapons (fastest mining but fragile) ---
+  gold_sword:   { id:"gold_sword",   name:"Gold Sword",   category:"weapon", stackSize:1, color:0xffdd44, damage:4, durability:32 },
+  gold_pickaxe: { id:"gold_pickaxe", name:"Gold Pickaxe", category:"tool",   stackSize:1, color:0xffdd44, toolCategory:"pickaxe", tier:"gold", speedMult:12.0, durability:32 },
+  gold_axe:     { id:"gold_axe",     name:"Gold Axe",     category:"tool",   stackSize:1, color:0xffdd44, toolCategory:"axe",     tier:"gold", speedMult:12.0, durability:32 },
+  gold_shovel:  { id:"gold_shovel",  name:"Gold Shovel",  category:"tool",   stackSize:1, color:0xffdd44, toolCategory:"shovel",  tier:"gold", speedMult:12.0, durability:32 },
+
+  // --- Gold armor (better than iron, weaker than diamond) ---
+  gold_helmet:     { id:"gold_helmet",     name:"Gold Helmet",     category:"armor", stackSize:1, color:0xffdd44, armorValue:2, armorSlot:"head"  },
+  gold_chestplate: { id:"gold_chestplate", name:"Gold Chestplate", category:"armor", stackSize:1, color:0xffdd44, armorValue:5, armorSlot:"chest" },
+  gold_leggings:   { id:"gold_leggings",   name:"Gold Leggings",   category:"armor", stackSize:1, color:0xffdd44, armorValue:3, armorSlot:"legs"  },
+  gold_boots:      { id:"gold_boots",      name:"Gold Boots",      category:"armor", stackSize:1, color:0xffdd44, armorValue:1, armorSlot:"feet"  },
 
   // --- Diamond tools & weapons ---
   diamond_sword:   { id:"diamond_sword",   name:"Diamond Sword",   category:"weapon", stackSize:1, color:0x55ffff, damage:10, durability:1561 },

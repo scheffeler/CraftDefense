@@ -1,5 +1,27 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-19 — Golden tools + enchantment effects (Fire Aspect, Looting, Efficiency, Protection)
+
+**What was done:**
+- Added `gold` tool tier (speedMult 12.0 — fastest in game, even faster than diamond) with durability 32
+- Added gold_sword, gold_pickaxe, gold_axe, gold_shovel (crafted from gold_ingot + sticks)
+- Added gold_helmet, gold_chestplate, gold_leggings, gold_boots (armor values 2/5/3/1)
+- Recipes: all gold tools and armor added to 3×3 workbench pattern
+- **Fire Aspect I** enchantment now actually burns enemies: sets on fire for 4s (2 HP/s DoT) with orange flame particles. Tracked via `burningEnemies` Map in Game.ts, ticked in `updateBurningEnemies()`.
+- **Looting I** enchantment now doubles drop count from killed enemies (added to ENCHANT_POOL, applied in onEnemyDied drop loop)
+- **Protection I/II** enchantments now add +1/+2 armor to the equipped piece via `getArmorValue()` in Inventory.ts
+- **Efficiency I/II** enchantments now multiply mining speedMult by 1.5×/2.0× in `computeBreakHardness()` in BlockInteraction.ts
+- All enchantments now functional — enchanting table investment has real payoff
+
+**Ideas for next time:**
+- Lava flow/spread mechanic (lava spreads into adjacent air blocks, like Minecraft)
+- Fire spread (flint & steel ignites wood/planks/leaves, fire spreads)
+- Brewing stand block (more authentic potion crafting UI — currently potions are crafted at workbench)
+- Thorns enchantment effect (reflect melee damage back to attacker)
+- Feather Falling effect (reduce fall damage)
+- Fortune enchantment effect (block drops give more materials)
+- Unbreaking enchantment effect (reduce durability loss chance)
+
 ## 2026-05-19 — TNT block texture + tsconfig fix + conflict resolution
 
 **What was done:**
