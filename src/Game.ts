@@ -80,6 +80,12 @@ export class Game {
   private _lavaParticleTimer = 0;
   private _lavaDamageTimer   = 0;
 
+  // Fire spread: key = "wx,wy,wz", value = { burnTimer (remaining burn time), spreadTimer (time until next spread attempt) }
+  private readonly activeFire = new Map<string, { burnTimer: number; spreadTimer: number }>();
+  private readonly fireLights = new Map<string, THREE.PointLight>();
+  private readonly fireMeshes = new Map<string, THREE.Mesh>();
+  private _fireDamageTimer = 0;
+
   // Hunger depletion timer
   private hungerTimer = 0;
   private _autoSaveTimer = 0;
@@ -485,6 +491,23 @@ export class Game {
         this._primeTNT(tb.wx, tb.wy, tb.wz);
         this._damageHeldTool(stack!);
         return;
+      }
+
+      // Flint and Steel on flammable block → ignite fire on adjacent air face
+      if (tb && itemDef?.id === "flint_steel") {
+        const targetId = this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz);
+        const FLAMMABLE: Set<string> = new Set(["wood", "planks", "leaves"]);
+        if (FLAMMABLE.has(targetId)) {
+          // Place fire on top of the flammable block if air
+          const fy = tb.wy + 1;
+          if (fy < 32 && this.gameMap.world.getBlock(tb.wx, fy, tb.wz) === "air") {
+            this._igniteBlock(tb.wx, fy, tb.wz);
+            this._damageHeldTool(stack!);
+            this.audio.play("block_place", 0.6);
+            this.unlockAchievement("playing_with_fire", "Playing with Fire", "Used Flint & Steel to ignite a block");
+          }
+          return;
+        }
       }
 
       if (itemDef?.id === "crossbow" && this.inventory.hasItem("arrow_item", 1)) {
@@ -1171,6 +1194,7 @@ export class Game {
     }
 
     // Lava embers — spawn particles periodically from nearby lava blocks
+    // Also: lava can ignite adjacent flammable blocks (low probability each tick)
     this._lavaParticleTimer += dt;
     if (this._lavaParticleTimer >= 0.25) {
       this._lavaParticleTimer = 0;
@@ -1184,6 +1208,17 @@ export class Game {
             if (this.gameMap.world.getBlock(lx, ly, lz) === "lava") {
               if (Math.random() < 0.35) {
                 this.particles.spawnLavaEmbers(lx, ly, lz);
+              }
+              // Lava ignites adjacent flammable blocks (1.5% chance per tick)
+              if (Math.random() < 0.015 && this.activeFire.size < Game.MAX_FIRE_BLOCKS) {
+                const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+                const [rdx, rdz] = dirs[Math.floor(Math.random() * dirs.length)];
+                const fx = lx + rdx, fz = lz + rdz;
+                const fTop = ly + 1;
+                if (fTop < 32 && Game.FLAMMABLE.has(this.gameMap.world.getBlock(fx, ly, fz))
+                    && this.gameMap.world.getBlock(fx, fTop, fz) === "air") {
+                  this._igniteBlock(fx, fTop, fz);
+                }
               }
               break;
             }
@@ -1328,6 +1363,9 @@ export class Game {
 
     // Fire Aspect burn damage — 1 HP/s per burning enemy
     this.updateBurningEnemies(dt);
+
+    // Fire spread and damage
+    if (this.activeFire.size > 0) this._updateFire(dt);
 
     // Crop growth
     this.updateCrops(dt);
@@ -2105,6 +2143,190 @@ export class Game {
       this.scene.scene.remove(light);
       light.dispose();
       this.lavaLights.delete(key);
+    }
+  }
+
+  // ─── Fire helpers ──────────────────────────────────────────────────────────
+
+  private static readonly FLAMMABLE = new Set<string>(["wood", "planks", "leaves"]);
+  private static readonly FIRE_BURN_MIN = 18;
+  private static readonly FIRE_BURN_MAX = 35;
+  private static readonly FIRE_SPREAD_INTERVAL = 4.5;
+  private static readonly MAX_FIRE_BLOCKS = 40;
+
+  private _igniteBlock(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.activeFire.has(key)) return;
+    if (this.activeFire.size >= Game.MAX_FIRE_BLOCKS) return;
+    const burnDuration = Game.FIRE_BURN_MIN + Math.random() * (Game.FIRE_BURN_MAX - Game.FIRE_BURN_MIN);
+    this.activeFire.set(key, { burnTimer: burnDuration, spreadTimer: Game.FIRE_SPREAD_INTERVAL * (0.5 + Math.random()) });
+    this._addFireMesh(wx, wy, wz);
+    this._addFireLight(wx, wy, wz);
+  }
+
+  private _extinguishBlock(wx: number, wy: number, wz: number): void {
+    this.activeFire.delete(`${wx},${wy},${wz}`);
+    this._removeFireMesh(wx, wy, wz);
+    this._removeFireLight(wx, wy, wz);
+    // Consume the flammable block beneath when fire burns out
+    const below = this.gameMap.world.getBlock(wx, wy - 1, wz);
+    if (Game.FLAMMABLE.has(below)) {
+      this.gameMap.world.setBlock(wx, wy - 1, wz, "air");
+      this.gameMap.world.rebuildDirtyChunks();
+    }
+  }
+
+  private _addFireLight(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.fireLights.has(key)) return;
+    const light = new THREE.PointLight(0xff8800, 1.8, 8, 2);
+    light.position.set(wx + 0.5, wy + 0.7, wz + 0.5);
+    this.scene.scene.add(light);
+    this.fireLights.set(key, light);
+  }
+
+  private _removeFireLight(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    const light = this.fireLights.get(key);
+    if (light) {
+      this.scene.scene.remove(light);
+      light.dispose();
+      this.fireLights.delete(key);
+    }
+  }
+
+  private _addFireMesh(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.fireMeshes.has(key)) return;
+    // Two crossed vertical planes — Minecraft-style fire visualization
+    const hw = 0.42, hh = 0.5;
+    const positions = new Float32Array([
+      -hw, -hh, 0,   hw, -hh, 0,   hw, hh, 0,   -hw, hh, 0,  // plane along X
+       0, -hh, -hw,   0, -hh, hw,   0, hh, hw,    0, hh, -hw, // plane along Z
+    ]);
+    const indices = new Uint16Array([
+      0,1,2, 0,2,3, 2,1,0, 3,2,0,
+      4,5,6, 4,6,7, 6,5,4, 7,6,4,
+    ]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xff7722, transparent: true, opacity: 0.9,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(wx + 0.5, wy + 0.4, wz + 0.5);
+    this.scene.scene.add(mesh);
+    this.fireMeshes.set(key, mesh);
+  }
+
+  private _removeFireMesh(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    const mesh = this.fireMeshes.get(key);
+    if (mesh) {
+      this.scene.scene.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+      this.fireMeshes.delete(key);
+    }
+  }
+
+  private _updateFire(dt: number): void {
+    const toExtinguish: string[] = [];
+    const t = performance.now() * 0.001;
+
+    for (const [key, state] of this.activeFire) {
+      const [wx, wy, wz] = key.split(",").map(Number);
+
+      // Flicker the fire light
+      const light = this.fireLights.get(key);
+      if (light) {
+        light.intensity = 1.5 + Math.sin(t * 9.1 + wx) * 0.5 + Math.sin(t * 13.7 + wz) * 0.3;
+      }
+
+      // Animate the fire mesh — slight rotation and scale wobble
+      const fireMesh = this.fireMeshes.get(key);
+      if (fireMesh) {
+        fireMesh.rotation.y = t * 1.8 + wx * 1.4;
+        fireMesh.scale.y = 0.9 + Math.sin(t * 11.7 + wz * 2.3) * 0.12;
+      }
+
+      state.burnTimer -= dt;
+      if (state.burnTimer <= 0) {
+        toExtinguish.push(key);
+        continue;
+      }
+
+      // Spread attempt
+      state.spreadTimer -= dt;
+      if (state.spreadTimer <= 0) {
+        state.spreadTimer = Game.FIRE_SPREAD_INTERVAL * (0.6 + Math.random() * 0.8);
+        this._trySpreadFire(wx, wy, wz);
+      }
+    }
+
+    for (const key of toExtinguish) {
+      const [wx, wy, wz] = key.split(",").map(Number);
+      this._extinguishBlock(wx, wy, wz);
+    }
+
+    // Fire damage to player every second
+    if (this.activeFire.size > 0) {
+      this._fireDamageTimer += dt;
+      if (this._fireDamageTimer >= 1.0) {
+        this._fireDamageTimer = 0;
+        // Check if player is standing in or adjacent to fire
+        const px = Math.round(this.player.position.x);
+        const py = Math.round(this.player.position.y);
+        const pz = Math.round(this.player.position.z);
+        for (const [key] of this.activeFire) {
+          const [fx, fy, fz] = key.split(",").map(Number);
+          if (Math.abs(fx - px) <= 1 && Math.abs(fy - py) <= 1 && Math.abs(fz - pz) <= 1) {
+            this.player.damage(1);
+            this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+            this.ui.showDamageVignette();
+            this.audio.play("player_hurt", 0.4);
+            break;
+          }
+        }
+
+        // Fire damage to enemies
+        for (const state of this.enemies.getAliveEnemies()) {
+          const ep = this.enemies.getEnemyPosition(state.id);
+          if (!ep) continue;
+          const ex = Math.round(ep.x), ey = Math.round(ep.y), ez = Math.round(ep.z);
+          for (const [key] of this.activeFire) {
+            const [fx, fy, fz] = key.split(",").map(Number);
+            if (Math.abs(fx - ex) <= 1 && Math.abs(fy - ey) <= 1 && Math.abs(fz - ez) <= 1) {
+              this.enemies.damage(state.id, 1);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private _trySpreadFire(wx: number, wy: number, wz: number): void {
+    if (this.activeFire.size >= Game.MAX_FIRE_BLOCKS) return;
+    // Check all 6 adjacent blocks for flammable material + adjacent air
+    const neighbors = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    for (const [dx, dy, dz] of neighbors) {
+      const nx = wx + dx, ny = wy + dy, nz = wz + dz;
+      if (ny < 0 || ny >= 32) continue;
+      const nid = this.gameMap.world.getBlock(nx, ny, nz);
+      if (!Game.FLAMMABLE.has(nid)) continue;
+      // Try to place fire above the flammable block
+      const fy = ny + 1;
+      if (fy >= 32) continue;
+      const above = this.gameMap.world.getBlock(nx, fy, nz);
+      if (above !== "air") continue;
+      if (this.activeFire.has(`${nx},${fy},${nz}`)) continue;
+      if (Math.random() < 0.3) {
+        this._igniteBlock(nx, fy, nz);
+        this.particles.spawnExplosion(nx + 0.5, fy + 0.5, nz + 0.5);
+      }
     }
   }
 

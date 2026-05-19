@@ -1,5 +1,25 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-19 — Fire spread system (flint & steel, lava auto-ignition, Three.js overlay)
+
+**What was done:**
+- Added fire spread: right-clicking flammable blocks (wood, planks, leaves) with flint_steel ignites fire above them
+- Fire uses Three.js crossed-plane meshes (Minecraft-style) + PointLight — bypasses voxel block system entirely (lava/fire BlockId had a Vite module caching issue that prevented setBlock from working)
+- Each fire has random burn duration 18–35s; spreads to adjacent flammable blocks every ~4.5s (30% chance per neighbor)
+- When fire burns out it consumes the flammable block beneath (wood → air)
+- Fire damages player (1 HP/s if standing within 1 block) and enemies (1 HP/s if adjacent)
+- Lava blocks auto-ignite adjacent flammable blocks at a low rate (1.5% chance per tick) to make lava moats hazardous
+- Fire lights flicker via PointLight intensity animation; mesh wobbles with y-scale and rotation animation
+- Max 40 simultaneous fire blocks to keep performance
+- Unlocks "Playing with Fire" achievement on first flint_steel ignition
+
+**Ideas for next time:**
+- Potion throwing arc visualization (show landing point for splash potions)
+- Lava flow/spread mechanic (lava spreads into adjacent air blocks)
+- "TNT Trap" achievement: kill 3+ enemies with one explosion
+- Crossbow auto-load indicator in HUD when crossbow is selected
+- Brewing stand block (more authentic potion crafting UI)
+
 ## 2026-05-19 — TNT arrow-detonation, fuse system, chain explosions
 
 **What was done:**
