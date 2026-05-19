@@ -16,7 +16,10 @@ import { ParticleSystem } from "./Particles";
 import { BLOCK_BEHAVIORS } from "./config/blocks";
 import { BLOCK_DEFS } from "./Map";
 import { ITEMS } from "./config/items";
-import { getSpawnPositions, DUNGEON_CHEST_POSITIONS } from "./WorldGen";
+import { getSpawnPositions, DUNGEON_CHEST_POSITIONS, VILLAGER_SPAWNS } from "./WorldGen";
+import { VillagerNPCManager } from "./VillagerNPC";
+import { VILLAGE_TRADES } from "./config/trades";
+import type { VillagerProfession } from "./config/trades";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
@@ -109,6 +112,7 @@ export class Game {
 
   private particles!:        ParticleSystem;
   private passiveMobs!:      PassiveMobManager;
+  private villagerNPCs!:     VillagerNPCManager;
   private weather!:          WeatherSystem;
   private scene!:            SceneManager;
   private gameMap!:          GameMap;
@@ -172,6 +176,7 @@ export class Game {
       this.audio.play("thunder", 0.85);
       this.ui.flashThunder();
     };
+    this.villagerNPCs = new VillagerNPCManager(this.scene.scene);
     this.passiveMobs = new PassiveMobManager(this.scene.scene);
     this.passiveMobs.onMobDied = (x, y, z, drops, xp) => {
       for (const d of drops) {
@@ -255,7 +260,7 @@ export class Game {
         // Show pause menu only if game is in progress (pointer was locked and user pressed Esc)
         if (this.phase !== "gameover" && this.phase !== "win" &&
             !this.ui.isInventoryOpen() && !this.ui.isWorkbenchOpen() &&
-            !this.ui.isChestOpen() && !this.ui.isFurnaceOpen() && !this.ui.isEnchantingOpen()) {
+            !this.ui.isChestOpen() && !this.ui.isFurnaceOpen() && !this.ui.isEnchantingOpen() && !this.ui.isTradeOpen()) {
           this.ui.showPause(true);
         }
         this.ui.showInventory(false);
@@ -298,6 +303,11 @@ export class Game {
         this.ui.onEnchantClose();
         return;
       }
+      if (this.ui.isTradeOpen()) {
+        this.ui.showTrade(false);
+        if (!this.scene.isPointerLocked) this.scene.lockPointer();
+        return;
+      }
       if (this.ui.isWorkbenchOpen()) {
         this.ui.showWorkbench(false);
         if (!this.scene.isPointerLocked) this.scene.lockPointer();
@@ -333,6 +343,14 @@ export class Game {
       if (this.ui.isInventoryOpen()) return;
       const stack   = this.inventory.getActiveItem();
       const itemDef = stack ? ITEMS[stack.itemId] : null;
+
+      // Check if near a villager NPC — open trade UI
+      const pp = this.player.position;
+      const nearVillager = this.villagerNPCs.getNearestInRange(pp.x, pp.z);
+      if (nearVillager) {
+        this._openVillagerTrade(nearVillager.profession);
+        return;
+      }
 
       // Check if looking at a crafting_table — open workbench
       const tb = this.blockInteraction.getTargetBlock();
@@ -626,6 +644,7 @@ export class Game {
     // Continue saved game
     this.ui.onContinueGame = () => {
       this.loadGame();
+      this.spawnVillagers();
       if (this.mode === "freeplay") {
         this.ui.setObjective("Free Play — Mine, Build, Explore!");
         this.ui.updateWaveInfo(0, 10, 0);
@@ -651,6 +670,8 @@ export class Game {
     // Mode selection
     this.ui.onModeSelect = (mode) => {
       this.mode = mode;
+      // Spawn villagers in both modes
+      this.spawnVillagers();
       if (mode === "freeplay") {
         this.ui.setObjective("Free Play — Mine, Build, Explore!");
         this.ui.updateWaveInfo(0, 10, 0);
@@ -955,7 +976,7 @@ export class Game {
     // Tick all furnace states even when pointer unlocked
     this.updateFurnaces(dt);
 
-    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
+    if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen() || this.ui.isTradeOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
     // Player movement + bow charge accumulation
@@ -1107,8 +1128,9 @@ export class Game {
       }
     }
 
-    // Passive mobs
+    // Passive mobs & Villager NPCs
     this.passiveMobs.update(dt);
+    this.villagerNPCs.update(dt);
     this.enemies.setPlayerPosition(this.player.position.x, this.player.position.z, this.player.position.y);
 
     // Weather
@@ -1132,14 +1154,21 @@ export class Game {
     }).filter((p): p is {x: number; z: number} => p !== null);
     this.ui.updateMinimap(this.player.position.x, this.player.position.z, enemyPositions);
 
-    // Block name tooltip when targeting a block
-    const tb2 = this.blockInteraction.getTargetBlock();
-    if (tb2) {
-      const blockId = this.gameMap.world.getBlock(tb2.wx, tb2.wy, tb2.wz);
-      const blockName = BLOCK_DEFS[blockId]?.name ?? blockId;
-      this.ui.showBlockTooltip(blockName);
+    // Block name tooltip (or villager hint) when targeting
+    const pp2 = this.player.position;
+    const nearV = this.villagerNPCs.getNearestInRange(pp2.x, pp2.z);
+    if (nearV) {
+      const profName = nearV.profession.charAt(0).toUpperCase() + nearV.profession.slice(1);
+      this.ui.showBlockTooltip(`${profName} Villager — Right-click to trade`);
     } else {
-      this.ui.showBlockTooltip(null);
+      const tb2 = this.blockInteraction.getTargetBlock();
+      if (tb2) {
+        const blockId = this.gameMap.world.getBlock(tb2.wx, tb2.wy, tb2.wz);
+        const blockName = BLOCK_DEFS[blockId]?.name ?? blockId;
+        this.ui.showBlockTooltip(blockName);
+      } else {
+        this.ui.showBlockTooltip(null);
+      }
     }
   }
 
@@ -1322,6 +1351,29 @@ export class Game {
       picked.push(valid[(seed + i * 3) % valid.length]);
     }
     return picked;
+  }
+
+  private spawnVillagers(): void {
+    this.villagerNPCs.dispose();
+    for (const [x, z, profession] of VILLAGER_SPAWNS) {
+      this.villagerNPCs.spawn(profession, x, z);
+    }
+  }
+
+  private _openVillagerTrade(profession: VillagerProfession): void {
+    const trades = VILLAGE_TRADES[profession];
+    this.ui.showTrade(true, profession, trades, this.inventory);
+    this.ui.onTradeExecute = (index) => {
+      const t = trades[index];
+      if (!t) return;
+      if (!this.inventory.removeItem(t.input.itemId, t.input.count)) return;
+      this.inventory.addItem(t.output.itemId, t.output.count);
+      this.audio.play("pickup", 0.5);
+      this.refreshHotbar();
+      this.ui.refreshTradeList(trades, this.inventory);
+      this.ui.showAchievement("Trade Complete!", `Received ${t.output.count}× ${t.output.itemId}`);
+    };
+    this.scene.unlockPointer();
   }
 
   private _openEnchantingTable(): void {

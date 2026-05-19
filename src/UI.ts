@@ -1,6 +1,7 @@
 import type { TowerTypeName, TowerState } from "./types";
 import type { Inventory, ItemStack } from "./Inventory";
 import { ITEMS } from "./config/items";
+import type { VillagerProfession, VillagerTrade } from "./config/trades";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
@@ -162,6 +163,11 @@ export class UI {
   private furnaceOutputSlot!: HTMLElement;
   private furnaceFireFill!: HTMLElement;
   private furnaceProgressFill!: HTMLElement;
+  // Trade overlay
+  private tradeOverlay!: HTMLElement;
+  private tradeTitle!: HTMLElement;
+  private tradeList!: HTMLElement;
+  onTradeExecute: (index: number) => void = () => {};
   // Enchanting overlay
   private enchantOverlay!: HTMLElement;
   private enchantItemSlot!: HTMLElement;
@@ -494,6 +500,7 @@ export class UI {
     this.buildFurnaceOverlay();
     this.buildEnchantingOverlay();
     this.buildRecipeBookOverlay();
+    this.buildTradeOverlay();
     this.buildPauseOverlay();
     this.buildDeathOverlay();
     this.buildEndOverlay();
@@ -1126,6 +1133,91 @@ export class UI {
 
   showRecipeBook(open: boolean): void {
     this.recipeBookOverlay.style.display = open ? "flex" : "none";
+  }
+
+  private buildTradeOverlay(): void {
+    const ov = div("fps-inventory overlay hidden");
+    ov.style.cssText = "position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(0,0,0,0.75);";
+
+    const box = div("fps-inv-box");
+    box.style.cssText = "background:#1a1a10;border:2px solid #a07840;border-radius:6px;padding:16px 20px;min-width:340px;max-width:400px;";
+
+    this.tradeTitle = div("");
+    this.tradeTitle.style.cssText = "font-size:15px;margin-bottom:4px;color:#ffdd88;text-align:center;letter-spacing:0.06em;font-weight:bold;";
+    box.appendChild(this.tradeTitle);
+
+    const hint = div("");
+    hint.style.cssText = "font-size:10px;color:#888;margin-bottom:12px;text-align:center;";
+    hint.textContent = "Click a trade to execute · [E] to close";
+    box.appendChild(hint);
+
+    this.tradeList = div("");
+    this.tradeList.style.cssText = "display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;";
+    box.appendChild(this.tradeList);
+
+    const closeBtn = div("fps-inv-close-btn");
+    closeBtn.textContent = "✕ Close";
+    closeBtn.style.marginTop = "14px";
+    closeBtn.addEventListener("click", () => this.showTrade(false));
+    box.appendChild(closeBtn);
+
+    ov.appendChild(box);
+    this.tradeOverlay = ov;
+    this.container.appendChild(ov);
+  }
+
+  isTradeOpen(): boolean { return this.tradeOverlay.style.display !== "none"; }
+
+  showTrade(open: boolean, profession?: VillagerProfession, trades?: VillagerTrade[], inventory?: Inventory): void {
+    this.tradeOverlay.style.display = open ? "flex" : "none";
+    if (!open || !profession || !trades || !inventory) return;
+    const profName = profession.charAt(0).toUpperCase() + profession.slice(1);
+    this.tradeTitle.textContent = `Villager — ${profName}`;
+    this.refreshTradeList(trades, inventory);
+  }
+
+  refreshTradeList(trades: VillagerTrade[], inventory: Inventory): void {
+    this.tradeList.innerHTML = "";
+    for (let i = 0; i < trades.length; i++) {
+      const t = trades[i];
+      const inDef  = ITEMS[t.input.itemId];
+      const outDef = ITEMS[t.output.itemId];
+      const have   = inventory.countItem(t.input.itemId);
+      const canTrade = have >= t.input.count;
+
+      const row = document.createElement("div");
+      row.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:4px;cursor:${canTrade ? "pointer" : "default"};background:${canTrade ? "#2a2010" : "#181810"};border:1px solid ${canTrade ? "#806030" : "#333"};opacity:${canTrade ? "1" : "0.55"};`;
+
+      const inputLabel = document.createElement("span");
+      inputLabel.style.cssText = "flex:1;font-size:12px;color:#ffcc88;";
+      inputLabel.textContent = `${t.input.count}× ${inDef?.name ?? t.input.itemId}`;
+
+      const arrow = document.createElement("span");
+      arrow.style.cssText = "font-size:13px;color:#aaa;";
+      arrow.textContent = "→";
+
+      const outputLabel = document.createElement("span");
+      outputLabel.style.cssText = "flex:1;font-size:12px;color:#88ffcc;text-align:right;";
+      outputLabel.textContent = `${t.output.count}× ${outDef?.name ?? t.output.itemId}`;
+
+      const haveLabel = document.createElement("span");
+      haveLabel.style.cssText = `font-size:10px;color:${canTrade ? "#88cc44" : "#cc4444"};width:60px;text-align:right;`;
+      haveLabel.textContent = `(have ${have})`;
+
+      row.appendChild(inputLabel);
+      row.appendChild(arrow);
+      row.appendChild(outputLabel);
+      row.appendChild(haveLabel);
+
+      if (canTrade) {
+        const idx = i;
+        row.addEventListener("click", () => this.onTradeExecute(idx));
+        row.addEventListener("mouseenter", () => { row.style.background = "#3a2e14"; });
+        row.addEventListener("mouseleave", () => { row.style.background = "#2a2010"; });
+      }
+
+      this.tradeList.appendChild(row);
+    }
   }
 
   private buildPauseOverlay(): void {

@@ -1,5 +1,6 @@
 import type { VoxelWorld } from "./Map";
 import { WORLD_WIDTH, WORLD_DEPTH, GROUND_OFFSET } from "./config/map";
+import type { VillagerProfession } from "./config/trades";
 
 // ---------------------------------------------------------------------------
 // Fortress geometry constants
@@ -50,6 +51,18 @@ function getBiome(x: number, z: number): Biome {
 /** Positions of pre-generated dungeon chests for Game.ts loot seeding. */
 export const DUNGEON_CHEST_POSITIONS: Array<[number, number, number]> = [
   [8,  3, 30], [55, 3, 25], [12, 3, 45], [50, 3, 48], [30, 3, 8],
+];
+
+/** Villager NPC spawn positions: [x, z, profession] */
+export const VILLAGER_SPAWNS: Array<[number, number, VillagerProfession]> = [
+  // NW village (cx=9, cz=13)
+  [ 9, 13, "farmer"     ],  // at the well
+  [13, 13, "blacksmith" ],  // at east house
+  [ 9,  5, "librarian"  ],  // at north house
+  // SE village (cx=53, cz=50)
+  [53, 50, "butcher"    ],  // at the well
+  [57, 50, "blacksmith" ],  // at east house
+  [53, 42, "farmer"     ],  // at north house
 ];
 
 export function generateWorld(world: VoxelWorld): void {
