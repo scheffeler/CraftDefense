@@ -94,6 +94,13 @@ export interface EnemyState {
   strafeTimer?: number;     // seconds until next strafe direction flip
   // Spider-specific
   webCooldown?: number;     // seconds until next web shot
+  // Spider wall-climbing state machine
+  climbPhase?: "approach" | "up" | "across" | "down";
+  climbTargetX?: number;    // wall X column to climb
+  climbTargetZ?: number;    // wall Z row (outer face)
+  climbInnerZ?: number;     // Z at which to start descending (inner face)
+  climbDirZ?: number;       // +1 = toward south interior, -1 = toward north interior
+  climbTimer?: number;      // seconds spent in "across" phase
   // Knockback / stagger (all melee enemy types)
   knockbackTimer?: number;  // > 0: briefly staggered, can't attack
   // Elite variant

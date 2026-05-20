@@ -3,14 +3,25 @@ import type { EnemyState, EnemyTypeName } from "./types";
 import { ENEMY_CONFIGS } from "./config/enemies";
 import type { FlowField } from "./FlowField";
 import type { VoxelWorld } from "./Map";
-import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z, ENEMY_Y as CFG_ENEMY_Y } from "./config/map";
+import {
+  FORTRESS_CENTER_X, FORTRESS_CENTER_Z, ENEMY_Y as CFG_ENEMY_Y,
+  GROUND_OFFSET, WALL_HEIGHT,
+  FORTRESS_WALL_NORTH_Z, FORTRESS_WALL_SOUTH_Z,
+  FORTRESS_INNER_NORTH_Z, FORTRESS_INNER_SOUTH_Z,
+  FORTRESS_GATE_X1, FORTRESS_GATE_X2,
+  FORTRESS_WALL_WEST_X, FORTRESS_WALL_EAST_X,
+} from "./config/map";
 import { getSpawnPositions } from "./WorldGen";
 
 export type { EnemyState };
 
-const ENEMY_Y       = CFG_ENEMY_Y;
-const REACH_RADIUS  = 2.0; // distance to fortress center that counts as "reached base"
+const ENEMY_Y        = CFG_ENEMY_Y;
+const REACH_RADIUS   = 2.0;  // distance to fortress center that counts as "reached base"
 const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
+
+// Spider wall-climbing
+const SPIDER_CLIMB_SPEED   = 4.5; // blocks/s vertical movement
+const SPIDER_WALL_TOP_Y    = GROUND_OFFSET + WALL_HEIGHT + 1.5; // ~13.5 — apex of climb
 
 // All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
 const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
@@ -181,6 +192,11 @@ export class EnemyManager {
       warCryFlash: 0,
     };
     this.enemies.set(id, state);
+
+    // Assign spider a random wall segment to climb (outside the gate opening)
+    if (type === "spider") {
+      this.assignSpiderClimbTarget(state, spawnZ);
+    }
 
     const group = this.buildMesh(type, cfg.scale);
 
@@ -618,6 +634,14 @@ export class EnemyManager {
       }
     }
 
+    // Spider wall-climbing: bypass fortress walls by scaling vertically
+    if (state.config.type === "spider" && state.climbPhase) {
+      this.updateSpiderClimb(state, group, pos, dt);
+      state.movePhase += dt * state.speed * 4;
+      this.animateLegs(id, state.movePhase);
+      return;
+    }
+
     // Move in flow direction
     if (flow.dx !== 0 || flow.dz !== 0) {
       pos.x += flow.dx * state.speed * dt;
@@ -630,6 +654,108 @@ export class EnemyManager {
 
     state.movePhase += dt * state.speed * 4;
     this.animateLegs(id, state.movePhase);
+  }
+
+  private assignSpiderClimbTarget(state: import("./types").EnemyState, spawnZ?: number): void {
+    // Determine which wall to target based on spawn side
+    const targetingNorth = spawnZ === undefined || spawnZ < FORTRESS_CENTER_Z;
+    const wallZ   = targetingNorth ? FORTRESS_WALL_NORTH_Z : FORTRESS_WALL_SOUTH_Z;
+    const innerZ  = targetingNorth ? FORTRESS_INNER_NORTH_Z : FORTRESS_INNER_SOUTH_Z;
+    const dirZ    = targetingNorth ? 1 : -1;  // +1 = climbing inward from north
+
+    // Pick a random X column that's NOT the gate opening
+    let wallX: number;
+    do {
+      wallX = FORTRESS_WALL_WEST_X + 1 +
+        Math.floor(Math.random() * (FORTRESS_WALL_EAST_X - FORTRESS_WALL_WEST_X - 1));
+    } while (wallX >= FORTRESS_GATE_X1 && wallX <= FORTRESS_GATE_X2);
+
+    state.climbPhase   = "approach";
+    state.climbTargetX = wallX + 0.5;
+    state.climbTargetZ = wallZ;
+    state.climbInnerZ  = innerZ;
+    state.climbDirZ    = dirZ;
+  }
+
+  private updateSpiderClimb(
+    state: import("./types").EnemyState,
+    group: THREE.Group,
+    pos: THREE.Vector3,
+    dt: number,
+  ): void {
+    const targetX = state.climbTargetX ?? pos.x;
+    const targetZ = state.climbTargetZ ?? pos.z;
+    const innerZ  = state.climbInnerZ  ?? pos.z;
+    const dirZ    = state.climbDirZ    ?? 1;
+
+    switch (state.climbPhase) {
+      case "approach": {
+        // Walk directly to wall base (ignores flow field)
+        const dx = targetX - pos.x;
+        const dz = targetZ - pos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < 1.0) {
+          pos.x = targetX;
+          state.climbPhase = "up";
+        } else {
+          const spd = state.speed * dt;
+          pos.x += (dx / dist) * spd;
+          pos.z += (dz / dist) * spd;
+          pos.y = ENEMY_Y;
+        }
+        group.rotation.x = 0;
+        group.rotation.y = Math.atan2(targetX - pos.x, targetZ - pos.z);
+        break;
+      }
+      case "up": {
+        // Climb upward while holding X position at wall column
+        pos.y += SPIDER_CLIMB_SPEED * dt;
+        pos.z = targetZ; // pressed against the wall face
+        // Tilt spider forward (climbing pose)
+        group.rotation.x = -Math.PI / 2.2;
+        group.rotation.y = dirZ > 0 ? 0 : Math.PI;
+        if (pos.y >= SPIDER_WALL_TOP_Y) {
+          pos.y = SPIDER_WALL_TOP_Y;
+          state.climbPhase = "across";
+          state.climbTimer = 0;
+        }
+        break;
+      }
+      case "across": {
+        // Scurry across the wall top toward fortress interior
+        state.climbTimer = (state.climbTimer ?? 0) + dt;
+        pos.z += dirZ * state.speed * 0.9 * dt;
+        pos.y = SPIDER_WALL_TOP_Y;
+        group.rotation.x = 0;
+        group.rotation.y = dirZ > 0 ? 0 : Math.PI;
+        // Switch to descent when past the inner wall edge
+        if (dirZ > 0 ? pos.z >= innerZ : pos.z <= innerZ) {
+          state.climbPhase = "down";
+        }
+        break;
+      }
+      case "down": {
+        // Descend to ground level, then resume flow-field navigation
+        pos.y -= SPIDER_CLIMB_SPEED * dt;
+        pos.z += dirZ * state.speed * 0.3 * dt; // drift inward while descending
+        group.rotation.x = Math.PI / 2.2;
+        group.rotation.y = dirZ > 0 ? 0 : Math.PI;
+        if (pos.y <= ENEMY_Y) {
+          pos.y = ENEMY_Y;
+          group.rotation.x = 0;
+          // Clear climb state — resume normal flow field
+          state.climbPhase   = undefined;
+          state.climbTargetX = undefined;
+          state.climbTargetZ = undefined;
+          state.climbInnerZ  = undefined;
+          state.climbDirZ    = undefined;
+          state.climbTimer   = undefined;
+        }
+        break;
+      }
+    }
+
+    group.position.copy(pos);
   }
 
   private fireSkeletonArrow(from: THREE.Vector3, damage: number): void {
@@ -1002,8 +1128,10 @@ export class EnemyManager {
         (c as THREE.Object3D).rotation.x = Math.sin(phase + (1 - idx) * Math.PI) * 0.45;
       }
     });
-    // Slight walk bob
-    group.position.y = ENEMY_Y + Math.abs(Math.sin(phase * 2)) * 0.04;
+    // Slight walk bob — only at ground level (preserved by caller for climbing)
+    if (Math.abs(group.position.y - ENEMY_Y) < 0.1) {
+      group.position.y = ENEMY_Y + Math.abs(Math.sin(phase * 2)) * 0.04;
+    }
   }
 
   // ─── Health bar ────────────────────────────────────────────────────────────

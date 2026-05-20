@@ -184,3 +184,25 @@
 - Sound: dedicated TNT fuse burning sound distinct from creeper hiss
 - Gold tools (fast but low durability, between wood and stone)
 - Fishing rod, cauldron, or other late-game Minecraft items
+
+## 2026-05-20 — Spider wall-climbing special ability
+
+**What was done:**
+- Spiders now bypass fortress gates by scaling the walls vertically — a unique mechanic that forces players to defend the wall face, not just the gate chokepoints
+- Each spider spawned outside the fortress is assigned a random wall column (x ∈ 19–44, excluding gate x=29–34) at the north or south wall face (z=18/45)
+- 4-phase state machine in `EnemyState`: `approach → up → across → down`
+  - **approach**: spider walks directly toward the assigned wall column (ignores flow field)
+  - **up**: presses against the wall face and climbs vertically at 4.5 blocks/s, tilted forward (rotation.x = −π/2.2)
+  - **across**: scurries along the wall top at SPIDER_WALL_TOP_Y = 13.5 until it crosses the inner wall edge (z=20 for north, z=43 for south)
+  - **down**: descends back to ENEMY_Y = 7.5, rotation.x = +π/2.2, then resumes normal flow-field navigation inside the fortress
+- `animateLegs()` walk-bob guard: Y bob only applies when `|group.position.y − ENEMY_Y| < 0.1`, preventing bob from overriding climb height
+- Added `FORTRESS_WALL_*` and `FORTRESS_GATE_*` constants to `src/config/map.ts` for reusable fortress geometry
+
+**Ideas for next time:**
+- Spider "web anchor" visual: draw a thin line mesh from spider to wall while climbing (rope effect)
+- Spider alert the player with a hissing sound when they start climbing (audio cue)
+- `Wither` DoT effect from skeleton arrows (2 HP/s for 4s) — lingering darkness on screen
+- "Endless Score" leaderboard in the victory screen showing best endless wave reached
+- Brewing stand block for authentic Minecraft potion UI (currently crafted at workbench)
+- Fortune enchantment: block drops give +1-2 extra materials
+- Unbreaking enchantment: 50%/66% chance to not consume durability

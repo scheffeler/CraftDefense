@@ -18,6 +18,18 @@ export const FORTRESS_CENTER_X = 32;
 export const FORTRESS_CENTER_Z = 32;
 export const WALL_HEIGHT = 6;
 
+// Fortress wall outer positions (matches WorldGen.ts constants)
+export const FORTRESS_WALL_NORTH_Z = 18;
+export const FORTRESS_WALL_SOUTH_Z = 45;
+export const FORTRESS_WALL_WEST_X  = 18;
+export const FORTRESS_WALL_EAST_X  = 45;
+// Inner edges of the wall (first passable row inside fortress)
+export const FORTRESS_INNER_NORTH_Z = 20;
+export const FORTRESS_INNER_SOUTH_Z = 43;
+// Gate opening — spiders choose wall X outside this range
+export const FORTRESS_GATE_X1 = 29;
+export const FORTRESS_GATE_X2 = 34;
+
 // Enemy spawn gate positions (world Z)
 export const SPAWN_GATE_NORTH_Z = 2;
 export const SPAWN_GATE_SOUTH_Z = 61;
