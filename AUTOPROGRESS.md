@@ -1,5 +1,30 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-20 — Wither DoT, Fortune, and Unbreaking enchantment effects
+
+**What was done:**
+- **Wither effect** from skeleton arrows: 1 HP every 0.5s for 5 seconds after being hit by a skeleton
+  - Dark purple pulsing vignette overlay + "WITHER" center-screen text (5.2s fade)
+  - Purple skull "☠" pill in the active-effects HUD with 5s countdown
+  - `showWitherIndicator()` added to UI.ts (mirrors the webbed indicator pattern)
+  - `_witherTickTimer` added to Game.ts; wither damage ticked in main update loop
+- **Fortune I enchantment** now functional: Fortune-enchanted pickaxe gives ×2 drops for ore blocks (iron, coal, gold, diamond ore)
+  - Floating "×2" bonus number displayed in green when Fortune triggers
+  - Existing enchanting-table investment now rewarding for miners
+- **Unbreaking I enchantment** now functional: 50% chance to skip durability loss on any Unbreaking-enchanted tool, weapon, or armor piece
+  - Applied in `_damageHeldTool()` — covers all tool/weapon uses including flint & steel
+- tsconfig.json was already at `moduleResolution: "bundler"` (fixed by prior run) — no change needed
+
+**Ideas for next time:**
+- Fortune II enchantment: 3× ore drops (add to ENCHANT_POOL at higher cost)
+- "TNT Trap" achievement: kill 3+ enemies with a single explosion (track in _doExplosion)
+- Brewing stand block for authentic Minecraft potion UI
+- Lava flow/spread mechanic (Minecraft-like lava physics)
+- Endless Score leaderboard: display best wave in win/death screen
+- Spider web anchor line: thin mesh rope from spider to wall during climbing
+- Haste potion: increases mining speed (could use speedMult on break timer)
+- Night vision potion: increases ambient light for 30s
+
 ## 2026-05-19 — Spider/golem wave integration + richer endless mode generator
 
 **What was done:**
