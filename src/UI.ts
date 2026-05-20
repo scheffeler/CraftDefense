@@ -274,6 +274,7 @@ export class UI {
       speed:    { label: "Speed",     icon: "⚡", color: "#ffdd44" },
       strength: { label: "Strength",  icon: "⚔",  color: "#cc2222" },
       regen:    { label: "Regen",     icon: "✚",  color: "#ff88cc" },
+      wither:   { label: "Wither",    icon: "☠",  color: "#7700aa" },
     };
     const active = [...effects.entries()].filter(([, e]) => e.timer > 0);
     if (active.length === 0) {
@@ -488,6 +489,18 @@ export class UI {
     label.textContent = "WEBBED";
     this.container.appendChild(label);
     setTimeout(() => { vignette.remove(); label.remove(); }, 3200);
+  }
+
+  showWitherIndicator(): void {
+    this.container.querySelectorAll(".wither-vignette,.wither-indicator").forEach(e => e.remove());
+    const vignette = document.createElement("div");
+    vignette.className = "wither-vignette";
+    this.container.appendChild(vignette);
+    const label = document.createElement("div");
+    label.className = "wither-indicator";
+    label.textContent = "WITHER";
+    this.container.appendChild(label);
+    setTimeout(() => { vignette.remove(); label.remove(); }, 5200);
   }
 
   showScopeOverlay(show: boolean): void {
@@ -2208,6 +2221,34 @@ const FPS_CSS = `
 @keyframes webbedPulse {
   0%   { opacity: 1; }
   70%  { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+.wither-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 57;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(40,0,60,0.65) 100%);
+  animation: witherPulse 5.2s ease-out forwards;
+}
+.wither-indicator {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 65;
+  color: #bb88ee;
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-family: monospace;
+  text-shadow: 0 0 10px #7700aa, 0 2px 4px #000;
+  letter-spacing: 0.2em;
+  animation: witherPulse 5.2s ease-out forwards;
+}
+@keyframes witherPulse {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.7; }
   100% { opacity: 0; }
 }
 @keyframes damageFlash {

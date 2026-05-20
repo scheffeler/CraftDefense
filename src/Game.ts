@@ -116,7 +116,8 @@ export class Game {
 
   // Fire Aspect burn tracker: enemy id → seconds remaining
   private readonly burningEnemies = new Map<number, number>();
-  private _burnTickTimer = 0;
+  private _burnTickTimer   = 0;
+  private _witherTickTimer = 0;
 
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
@@ -601,9 +602,25 @@ export class Game {
       if (yieldsDrops) {
         const behavior = BLOCK_BEHAVIORS[id];
         const drops    = behavior?.drops ?? [id];
+        const activeTool = this.inventory.getActiveItem();
+        const hasFortune = activeTool?.enchantments?.includes("fortune_1") ?? false;
+        const ORE_BLOCKS = new Set(["iron_ore", "coal_ore", "gold_ore", "diamond_ore"]);
+        const fortuneMult = (hasFortune && ORE_BLOCKS.has(id)) ? 2 : 1;
         for (const drop of drops) {
-          if (ITEMS[drop]) this.spawnItemEntity(wx + 0.5, wy + 0.7, wz + 0.5, drop);
+          if (ITEMS[drop]) {
+            const count = fortuneMult;
+            for (let i = 0; i < count; i++) {
+              this.spawnItemEntity(
+                wx + 0.5 + (i > 0 ? (Math.random() - 0.5) * 0.3 : 0),
+                wy + 0.7,
+                wz + 0.5 + (i > 0 ? (Math.random() - 0.5) * 0.3 : 0),
+                drop,
+              );
+            }
+          }
         }
+        if (hasFortune && fortuneMult > 1)
+          this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
       if (id === "lava")  this.removeLavaLight(wx, wy, wz);
@@ -700,6 +717,9 @@ export class Game {
       this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
       this.ui.showDamageVignette();
       this.audio.play("player_hurt", 0.5);
+      // Skeleton arrows apply Wither — 2 HP/s for 5 seconds
+      this.player.applyEffect("wither", 5, 2);
+      this.ui.showWitherIndicator();
     };
 
     this.enemies.onSpiderWebHit = () => {
@@ -1360,6 +1380,20 @@ export class Game {
 
     // Thrown splash potions
     this.updateThrownPotions(dt);
+
+    // Wither DoT — 1 HP every 0.5s while active
+    const witherEff = this.player.activeEffects.get("wither");
+    if (witherEff && witherEff.timer > 0) {
+      this._witherTickTimer += dt;
+      if (this._witherTickTimer >= 0.5) {
+        this._witherTickTimer -= 0.5;
+        this.player.damage(1);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+      }
+    } else {
+      this._witherTickTimer = 0;
+    }
 
     // Fire Aspect burn damage — 1 HP/s per burning enemy
     this.updateBurningEnemies(dt);
@@ -2412,6 +2446,8 @@ export class Game {
 
   private _damageHeldTool(stack: import("./Inventory").ItemStack): void {
     if (stack.durability == null) return;
+    // Unbreaking I: 50% chance to skip durability loss
+    if (stack.enchantments?.includes("unbreaking_1") && Math.random() < 0.5) return;
     stack.durability -= 1;
     if (stack.durability <= 0) {
       this.inventory.removeItem(stack.itemId, 1);
