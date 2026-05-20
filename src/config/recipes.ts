@@ -373,6 +373,24 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+
+  // --- Explosives ---
+  {
+    id: "tnt",
+    pattern: [
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+    ],
+    result: { itemId: "tnt", count: 1 },
+  },
+  {
+    id: "pressure_plate",
+    pattern: [
+      [r("planks"), r("planks")],
+    ],
+    result: { itemId: "pressure_plate", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

@@ -116,4 +116,9 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_chestplate: { id:"iron_chestplate", name:"Iron Chestplate", category:"armor", stackSize:1, color:0xbbbbbb, armorValue:5, armorSlot:"chest" },
   iron_leggings:   { id:"iron_leggings",   name:"Iron Leggings",   category:"armor", stackSize:1, color:0xbbbbbb, armorValue:4, armorSlot:"legs"  },
   iron_boots:      { id:"iron_boots",      name:"Iron Boots",      category:"armor", stackSize:1, color:0xbbbbbb, armorValue:2, armorSlot:"feet"  },
+
+  // --- Explosives ---
+  gunpowder:      { id:"gunpowder",      name:"Gunpowder",      category:"material", stackSize:64, color:0x555555 },
+  tnt:            { id:"tnt",            name:"TNT",             category:"block",    stackSize:64, color:0xcc2222, placesBlock:"tnt" },
+  pressure_plate: { id:"pressure_plate", name:"Pressure Plate",  category:"block",    stackSize:64, color:0x999080, placesBlock:"pressure_plate" },
 };

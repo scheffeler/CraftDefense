@@ -1099,6 +1099,8 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "TNT", ingredients: "Sand+Gunpowder alternating 3×3 → TNT trap block", key: "tnt" },
+      { name: "Pressure Plate", ingredients: "2 Planks side-by-side → Pressure Plate", key: "pressure_plate" },
     ];
 
     const list = div("fps-rb-list");

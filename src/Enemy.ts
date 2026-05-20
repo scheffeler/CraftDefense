@@ -46,6 +46,10 @@ export class EnemyManager {
   onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
   onCreeperPrime: () => void = () => {};
   onSkeletonArrowHit: (damage: number) => void = () => {};
+  onPressurePlateTriggered: (wx: number, wy: number, wz: number) => void = () => {};
+
+  // Track recently triggered pressure plates to avoid double-triggering
+  private readonly _triggeredPlates = new Set<string>();
 
   private _playerX = 32;
   private _playerZ = 32;
@@ -152,6 +156,11 @@ export class EnemyManager {
         this.updateFlowFieldEnemy(id, state, group, dt);
       }
 
+      // Pressure plate detection (after movement)
+      if (this.world && state.alive && !state.dying) {
+        this.checkPressurePlate(group.position);
+      }
+
       this.updateHealthBar(id, state, group.position);
     }
 
@@ -206,6 +215,10 @@ export class EnemyManager {
       state.dyingTimer = 0.4;
       this.onEnemyDied(state);
     }
+  }
+
+  clearTriggeredPlate(wx: number, wy: number, wz: number): void {
+    this._triggeredPlates.delete(`${wx},${wy},${wz}`);
   }
 
   getAliveEnemies(): EnemyState[] {
@@ -386,6 +399,25 @@ export class EnemyManager {
 
     state.movePhase += dt * state.speed * 4;
     this.animateLegs(id, state.movePhase);
+  }
+
+  private checkPressurePlate(pos: THREE.Vector3): void {
+    if (!this.world) return;
+    const px = Math.floor(pos.x);
+    const pz = Math.floor(pos.z);
+    // Check the block at and just below enemy feet level
+    const pyFeet = Math.floor(pos.y - 0.5);
+    for (const py of [pyFeet, pyFeet - 1]) {
+      if (py < 0) continue;
+      if (this.world.getBlock(px, py, pz) === "pressure_plate") {
+        const key = `${px},${py},${pz}`;
+        if (!this._triggeredPlates.has(key)) {
+          this._triggeredPlates.add(key);
+          this.onPressurePlateTriggered(px, py, pz);
+        }
+        return;
+      }
+    }
   }
 
   private fireSkeletonArrow(from: THREE.Vector3, damage: number): void {

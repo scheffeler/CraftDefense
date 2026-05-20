@@ -98,6 +98,11 @@ export class Game {
   // Achievement tracking
   private readonly _achievements = new Set<string>();
 
+  // Pending chain-reaction explosions: { x, y, z, radius, damage, delay }
+  private readonly _pendingExplosions: Array<{
+    x: number; y: number; z: number; radius: number; damage: number; delay: number;
+  }> = [];
+
   // Item entity drops — floating 3D items in the world
   private readonly itemEntities: Array<{
     group: THREE.Group;
@@ -585,6 +590,29 @@ export class Game {
       this.waves.onEnemyEliminated();
     };
 
+    this.enemies.onPressurePlateTriggered = (wx, wy, wz) => {
+      if (!this.gameMap) return;
+      // Remove the plate
+      this.gameMap.world.setBlock(wx, wy, wz, "air");
+      this.enemies.clearTriggeredPlate(wx, wy, wz);
+      // Detonate adjacent TNT (6 cardinal directions + same cell)
+      const offsets: [number, number, number][] = [
+        [0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+      ];
+      let tntFound = false;
+      for (const [dx, dy, dz] of offsets) {
+        const tx = wx + dx, ty = wy + dy, tz = wz + dz;
+        if (this.gameMap.world.getBlock(tx, ty, tz) === "tnt") {
+          tntFound = true;
+          this.detonateTNT(tx, ty, tz);
+        }
+      }
+      if (!tntFound) {
+        // No TNT adjacent — just rebuild to remove the plate visually
+        this.gameMap.world.rebuildDirtyChunks();
+      }
+    };
+
     // Player death
     this.player.onDeath = () => {
       this.phase = "gameover";
@@ -954,6 +982,16 @@ export class Game {
 
     // Tick all furnace states even when pointer unlocked
     this.updateFurnaces(dt);
+
+    // Tick chain-reaction explosions even when paused
+    for (let i = this._pendingExplosions.length - 1; i >= 0; i--) {
+      const pe = this._pendingExplosions[i];
+      pe.delay -= dt;
+      if (pe.delay <= 0) {
+        this._pendingExplosions.splice(i, 1);
+        this.triggerExplosion(pe.x, pe.y, pe.z, pe.radius, pe.damage);
+      }
+    }
 
     if (!this.scene.isPointerLocked || this.ui.isInventoryOpen() || this.ui.isWorkbenchOpen() || this.ui.isChestOpen() || this.ui.isFurnaceOpen()) return;
     // Recipe book doesn't pause gameplay, just a HUD overlay
@@ -1510,6 +1548,80 @@ export class Game {
       light.dispose();
       this.torchLights.delete(key);
     }
+  }
+
+  // ─── TNT / Explosions ─────────────────────────────────────────────────────
+
+  /** Core explosion: damages enemies + player, breaks blocks, chains TNT. */
+  private triggerExplosion(cx: number, cy: number, cz: number, radius: number, damage: number): void {
+    this.audio.play("explosion", 0.9);
+    this.scene.shake(0.2, 0.7);
+    this.particles.spawnExplosion(cx, cy + 0.5, cz);
+
+    // Damage player
+    const pp = this.player.position;
+    const pdist = Math.sqrt((pp.x - cx) ** 2 + (pp.y - cy) ** 2 + (pp.z - cz) ** 2);
+    if (pdist <= radius + 1) {
+      const pdmg = Math.round(damage * Math.max(0, 1 - pdist / (radius + 1)));
+      if (pdmg > 0) {
+        this.player.damage(pdmg);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+      }
+    }
+
+    // Damage enemies in blast radius
+    for (const es of this.enemies.getAliveEnemies()) {
+      const epos = this.enemies.getEnemyPosition(es.id);
+      if (!epos) continue;
+      const ed = Math.sqrt((epos.x - cx) ** 2 + (epos.y - cy) ** 2 + (epos.z - cz) ** 2);
+      if (ed <= radius) {
+        const edmg = Math.round(damage * Math.max(0.2, 1 - ed / radius));
+        this.enemies.damage(es.id, edmg);
+      }
+    }
+
+    // Break blocks; collect chained TNT
+    if (this.gameMap) {
+      const chained: [number, number, number][] = [];
+      for (let bx = Math.floor(cx - radius); bx <= Math.ceil(cx + radius); bx++) {
+        for (let by = Math.max(0, Math.floor(cy - radius)); by <= Math.ceil(cy + radius); by++) {
+          for (let bz = Math.floor(cz - radius); bz <= Math.ceil(cz + radius); bz++) {
+            const d2 = (bx - cx) ** 2 + (by - cy) ** 2 + (bz - cz) ** 2;
+            if (d2 > radius * radius) continue;
+            const block = this.gameMap.world.getBlock(bx, by, bz);
+            if (block === "air" || block === "bedrock") continue;
+            if (block === "tnt") {
+              chained.push([bx, by, bz]);
+              this.gameMap.world.setBlock(bx, by, bz, "air");
+            } else if (block !== "pressure_plate" && Math.random() < 0.5) {
+              this.gameMap.world.setBlock(bx, by, bz, "air");
+            }
+          }
+        }
+      }
+      this.gameMap.world.rebuildDirtyChunks();
+      if (cy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
+
+      // Schedule chain-reaction explosions with staggered delays
+      for (let i = 0; i < chained.length; i++) {
+        const [tx, ty, tz] = chained[i];
+        this._pendingExplosions.push({
+          x: tx + 0.5, y: ty + 0.5, z: tz + 0.5,
+          radius, damage,
+          delay: 0.25 + i * 0.15,
+        });
+      }
+    }
+  }
+
+  /** Detonate a placed TNT block at (wx,wy,wz). Removes block then explodes. */
+  private detonateTNT(wx: number, wy: number, wz: number): void {
+    if (!this.gameMap) return;
+    if (this.gameMap.world.getBlock(wx, wy, wz) !== "tnt") return;
+    this.gameMap.world.setBlock(wx, wy, wz, "air");
+    this.gameMap.world.rebuildDirtyChunks();
+    this.triggerExplosion(wx + 0.5, wy + 0.5, wz + 0.5, 4, 18);
   }
 
   // ─── HUD helpers ───────────────────────────────────────────────────────────
