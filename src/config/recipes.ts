@@ -617,6 +617,17 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "iron_bucket", count: 1 },
   },
+
+  // --- Arrow Dispenser (7 cobblestone + 1 bow = auto-shooting turret) ---
+  {
+    id: "dispenser",
+    pattern: [
+      [r("cobblestone"), r("cobblestone"), r("cobblestone")],
+      [r("cobblestone"), r("bow"),         r("cobblestone")],
+      [r("cobblestone"), r("cobblestone"), r("cobblestone")],
+    ],
+    result: { itemId: "dispenser", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

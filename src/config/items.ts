@@ -197,4 +197,7 @@ export const ITEMS: Record<string, ItemDef> = {
   // --- Buckets ---
   iron_bucket: { id:"iron_bucket", name:"Iron Bucket",    category:"material", stackSize:16, color:0xaaaaaa },
   lava_bucket: { id:"lava_bucket", name:"Bucket of Lava", category:"material", stackSize:1,  color:0xff6600 },
+
+  // --- Defensive structures ---
+  dispenser: { id:"dispenser", name:"Arrow Dispenser", category:"block", stackSize:16, color:0x555544, placesBlock:"dispenser" },
 };

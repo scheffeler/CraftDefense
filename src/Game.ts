@@ -99,6 +99,10 @@ export class Game {
   private _nightSpawnTimer  = 0;
   private _flowUpdateTimer  = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
+  // Arrow dispensers: keyed by "wx,wy,wz", value = {x,y,z,timer}
+  private readonly dispenserBlocks = new Map<string, { x: number; y: number; z: number; timer: number }>();
+  // TNT fuses: keyed by "wx,wy,wz", value = {x,y,z,timer,flashTimer}
+  private readonly tntFuses = new Map<string, { x: number; y: number; z: number; timer: number; flashTimer: number }>();
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
   private openChestKey: string | null = null;
@@ -465,6 +469,15 @@ export class Game {
         return;
       }
 
+      // Arrow Dispenser info on right-click
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "dispenser") {
+        const key = `${tb.wx},${tb.wy},${tb.wz}`;
+        const d = this.dispenserBlocks.get(key);
+        const status = d ? `Range: ${this.DISPENSER_RANGE}m · Damage: ${this.DISPENSER_DAMAGE} · Active` : "Inactive";
+        this.ui.showAchievement("Arrow Dispenser", status);
+        return;
+      }
+
       // Check if looking at a furnace — open furnace UI
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "furnace") {
         const key = `${tb.wx},${tb.wy},${tb.wz}`;
@@ -628,6 +641,18 @@ export class Game {
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
       if (id === "lava")  this.removeLavaLight(wx, wy, wz);
+      if (id === "dispenser") this.dispenserBlocks.delete(`${wx},${wy},${wz}`);
+      // TNT: re-place and start fuse instead of dropping item
+      if (id === "tnt") {
+        this.gameMap.world.setBlock(wx, wy, wz, "tnt");
+        this.gameMap.world.rebuildDirtyChunks();
+        const key = `${wx},${wy},${wz}`;
+        if (!this.tntFuses.has(key)) {
+          this.tntFuses.set(key, { x: wx, y: wy, z: wz, timer: 3.5, flashTimer: 0 });
+          this.audio.play("creeper_hiss", 0.7);
+        }
+        return;
+      }
       if (wy >= 1) this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
 
       // Achievements
@@ -640,9 +665,11 @@ export class Game {
       this.audio.play("block_place", 0.5);
       if (id === "torch") this.addTorchLight(wx, wy, wz);
       if (id === "lava")  this.addLavaLight(wx, wy, wz);
+      if (id === "dispenser") this.dispenserBlocks.set(`${wx},${wy},${wz}`, { x: wx, y: wy, z: wz, timer: 0.5 });
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
       this.refreshHotbar();
       if (id === "torch") this.unlockAchievement("torch_place", "Lighting the Way", "Place your first torch");
+      if (id === "dispenser") this.unlockAchievement("dispenser_place", "Tower Defense", "Place your first Arrow Dispenser");
     };
 
     // Enemy events
@@ -1126,6 +1153,8 @@ export class Game {
     this.enemies.reset();
     this.projectiles.reset();
     this.waves.reset();
+    this.dispenserBlocks.clear();
+    this.tntFuses.clear();
     this.player.health    = this.player.maxHealth;
     this.player.xp        = 0;
     this.player.level     = 0;
@@ -1430,6 +1459,12 @@ export class Game {
     // Crop growth
     this.updateCrops(dt);
 
+    // Arrow dispensers auto-shoot
+    this.updateDispensers(dt);
+
+    // TNT fuses countdown
+    this.updateTNT(dt);
+
     // Torch flicker — subtle sine-wave intensity variation
     if (this.torchLights.size > 0) {
       const t = performance.now() * 0.001;
@@ -1635,6 +1670,96 @@ export class Game {
         this.activeCrops.set(key, 0);
       }
     }
+  }
+
+  private readonly DISPENSER_RANGE    = 14;
+  private readonly DISPENSER_INTERVAL = 2.0;
+  private readonly DISPENSER_DAMAGE   = 5;
+
+  private updateDispensers(dt: number): void {
+    if (this.dispenserBlocks.size === 0) return;
+    for (const [, d] of this.dispenserBlocks) {
+      d.timer -= dt;
+      if (d.timer > 0) continue;
+      d.timer = this.DISPENSER_INTERVAL;
+
+      // Find nearest enemy in range
+      const from = new THREE.Vector3(d.x + 0.5, d.y + 0.8, d.z + 0.5);
+      let nearestId   = -1;
+      let nearestDist = this.DISPENSER_RANGE;
+      for (const enemy of this.enemies.getAliveEnemies()) {
+        const pos = this.enemies.getEnemyPosition(enemy.id);
+        if (!pos) continue;
+        const dist = from.distanceTo(pos);
+        if (dist < nearestDist) { nearestDist = dist; nearestId = enemy.id; }
+      }
+      if (nearestId < 0) continue;
+
+      this.projectiles.fire("arrow", from, nearestId, this.DISPENSER_DAMAGE, 12);
+      this.audio.play("arrow_release", 0.25);
+      // Small flash at the dispenser front face
+      this.particles.spawnBlockBreak(d.x, d.y, d.z, 0xffdd88);
+    }
+  }
+
+  private updateTNT(dt: number): void {
+    if (this.tntFuses.size === 0) return;
+    for (const [key, tnt] of this.tntFuses) {
+      tnt.timer     -= dt;
+      tnt.flashTimer -= dt;
+      if (tnt.flashTimer <= 0) {
+        tnt.flashTimer = 0.3;
+        this.particles.spawnBlockBreak(tnt.x, tnt.y + 0.5, tnt.z, 0xff5533);
+      }
+      if (tnt.timer > 0) continue;
+      // Explode
+      this.tntFuses.delete(key);
+      this.gameMap.world.setBlock(tnt.x, tnt.y, tnt.z, "air");
+      this.gameMap.world.rebuildDirtyChunks();
+      this.triggerExplosion(tnt.x + 0.5, tnt.y + 0.5, tnt.z + 0.5, 4.5, 14, 0.6);
+    }
+  }
+
+  private triggerExplosion(x: number, y: number, z: number, radius: number, maxDamage: number, shakeAmt: number): void {
+    this.audio.play("explosion", 0.9);
+    this.scene.shake(shakeAmt, 0.7);
+    this.particles.spawnExplosion(x, y, z);
+
+    // Damage enemies
+    for (const enemy of this.enemies.getAliveEnemies()) {
+      const pos = this.enemies.getEnemyPosition(enemy.id);
+      if (!pos) continue;
+      const dist = pos.distanceTo(new THREE.Vector3(x, y, z));
+      if (dist > radius) continue;
+      const dmg = Math.round(maxDamage * (1 - dist / radius)) + 4;
+      this.enemies.damage(enemy.id, dmg, 1, 0);
+      const ep = this.enemies.getEnemyPosition(enemy.id);
+      if (ep) this.showDamageNumber(dmg, ep.x, ep.y + 1.8, ep.z);
+    }
+
+    // Damage player if nearby
+    const pp  = this.player.position;
+    const pdx = pp.x - x, pdy = pp.y - y, pdz = pp.z - z;
+    if (Math.sqrt(pdx*pdx + pdy*pdy + pdz*pdz) <= radius + 1) {
+      const dmg = Math.round(maxDamage * 0.5);
+      this.player.damage(dmg);
+      this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+      this.ui.showDamageVignette();
+    }
+
+    // Break blocks
+    for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+      for (let by = Math.max(0, Math.floor(y - radius)); by <= Math.ceil(y + radius); by++) {
+        for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+          const dx = bx - x, dy2 = by - y, dz = bz - z;
+          if (dx*dx + dy2*dy2 + dz*dz > radius*radius) continue;
+          const block = this.gameMap.world.getBlock(bx, by, bz);
+          if (block === "air" || block === "bedrock") continue;
+          if (Math.random() < 0.55) this.gameMap.world.setBlock(bx, by, bz, "air");
+        }
+      }
+    }
+    this.gameMap.world.rebuildDirtyChunks();
   }
 
   private handleFarmingBreak(wx: number, wy: number, wz: number, id: string): void {

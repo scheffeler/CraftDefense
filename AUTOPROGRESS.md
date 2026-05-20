@@ -251,3 +251,24 @@
 - Brewing stand block for authentic Minecraft potion UI (currently crafted at workbench)
 - Fortune enchantment: block drops give +1-2 extra materials
 - Unbreaking enchantment: 50%/66% chance to not consume durability
+
+## 2026-05-20 — Arrow Dispenser + TNT blocks (auto-iterate branch)
+
+**What was done:**
+- Added `dispenser` block: craftable auto-turret (7 cobblestone + 1 bow = 1 dispenser). When placed it auto-shoots homing arrow projectiles at the nearest enemy within 14 blocks every 2 seconds. Deals 5 damage per shot. Right-click shows status/range info. Tracked in `dispenserBlocks` Map in Game.ts, cleared on game reset.
+- Added `tnt` block: craftable explosive (sand/coal checkerboard pattern = 1 TNT). When mined/left-clicked it starts a 3.5-second fuse (with red particle flashes and creeper hiss audio). Explodes for up to 14 damage in a 4.5-block radius, damaging enemies AND the player if nearby, and destroys blocks.
+- Refactored explosion code: shared `triggerExplosion(x, y, z, radius, maxDamage, shakeAmt)` helper used by TNT. Creeper explosion kept separate (doesn't damage other enemies).
+- Added achievements: "Tower Defense" for first dispenser placement.
+- Added items, block defs, behaviors, and recipes for both blocks.
+
+**What compiles:** Clean (only pre-existing TS5107 deprecation warning).
+
+**Ideas for next runs:**
+- Give dispensers a visible "barrel" model or glowing arrow icon on the front face (currently just a colored block)
+- Add a shop/trade NPC between waves where gold can be spent on items (gold is currently earned but never spent)
+- Add a scoreboard/statistics screen at wave end showing dispensers placed, TNT used, blocks broken, etc.
+- Add more Helm's Deep themed structures: siege towers, battering rams (enemy siege equipment)
+- Consider adding a Ballista upgrade to the dispenser: place iron block on top of dispenser to upgrade it to shoot longer range + more damage
+- Passive mobs should drop leather → add leather armor tier
+- World save/load doesn't save placed blocks — implementing block serialization would hugely improve the game
+- Add a "flint and steel" item to activate TNT from range (more strategic use)
