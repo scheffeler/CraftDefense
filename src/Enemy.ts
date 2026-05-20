@@ -26,10 +26,13 @@ const SPIDER_WALL_TOP_Y    = GROUND_OFFSET + WALL_HEIGHT + 1.5; // ~13.5 — ape
 // All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
 const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
   "goblin", "orc", "troll", "goblin_miner",
-  "zombie", "spider", "golem", "creeper", "skeleton", "uruk_captain",
+  "zombie", "spider", "golem", "creeper", "skeleton", "uruk_captain", "troll_king",
 ]);
 
-const BOSS_RAGE_THRESHOLD = 0.5; // fraction of HP at which boss enters rage
+const BOSS_RAGE_THRESHOLD = 0.5;
+const BOSS_SLAM_INTERVAL = 5.0;
+const BOSS_SLAM_RANGE    = 7.0;
+const BOSS_BERSERK_HP    = 0.50;
 
 interface SkeletonArrow {
   mesh: THREE.Mesh;
@@ -95,6 +98,7 @@ export class EnemyManager {
   onBossDied: () => void = () => {};
   onTrollStomp: (x: number, y: number, z: number, radius: number, damage: number) => void = () => {};
   onBossWarCry: (x: number, z: number) => void = () => {};
+  onBossSlam: (damage: number, x: number, z: number) => void = () => {};
 
   private _playerX = 32;
   private _playerZ = 32;
@@ -441,6 +445,17 @@ export class EnemyManager {
     return isFinite(dist) ? 1 / (1 + dist) : 0;
   }
 
+  /** Returns the current alive Troll King state and position, or null if not present. */
+  getBossState(): { state: EnemyState; pos: THREE.Vector3 } | null {
+    for (const [id, state] of this.enemies) {
+      if (state.config.type === "troll_king" && state.alive && !state.dying) {
+        const pos = this.meshes.get(id)?.position;
+        if (pos) return { state, pos };
+      }
+    }
+    return null;
+  }
+
   // ─── Flow-field movement ───────────────────────────────────────────────────
 
   private updateFlowFieldEnemy(
@@ -646,6 +661,38 @@ export class EnemyManager {
       return;
     }
 
+    // Troll King boss behaviour
+    if (state.config.type === "troll_king") {
+      // Berserker rage at BOSS_BERSERK_HP
+      if (!state.berserking && state.health / state.config.maxHealth < BOSS_BERSERK_HP) {
+        state.berserking = true;
+        state.speed = state.config.speed * 2.0;
+        group.traverse(c => {
+          const m = c as THREE.Mesh;
+          if (m.isMesh) {
+            const mat = m.material as THREE.MeshLambertMaterial;
+            mat.emissive.setHex(0x660000);
+            mat.emissiveIntensity = 0.6;
+          }
+        });
+      }
+
+      // Ground slam
+      state.slamCooldown = (state.slamCooldown ?? BOSS_SLAM_INTERVAL) - dt;
+      if (state.slamCooldown <= 0) {
+        state.slamCooldown = BOSS_SLAM_INTERVAL;
+        const dxP = this._playerX - pos.x;
+        const dzP = this._playerZ - pos.z;
+        if (Math.sqrt(dxP * dxP + dzP * dzP) < BOSS_SLAM_RANGE) {
+          this.onBossSlam(state.config.damage, pos.x, pos.z);
+          group.scale.set(state.config.scale * 1.15, state.config.scale * 0.75, state.config.scale * 1.15);
+          setTimeout(() => {
+            group.scale.setScalar(state.config.scale);
+          }, 200);
+        }
+      }
+    }
+
     // Move in flow direction
     if (flow.dx !== 0 || flow.dz !== 0) {
       pos.x += flow.dx * state.speed * dt;
@@ -819,6 +866,8 @@ export class EnemyManager {
       this.buildSkeletonMesh(group);
     } else if (type === "uruk_captain") {
       this.buildUrukCaptainMesh(group);
+    } else if (type === "troll_king") {
+      this.buildTrollKingMesh(group);
     } else {
       this.buildHumanoidMesh(group, type);
     }
@@ -964,6 +1013,90 @@ export class EnemyManager {
       legPivot.name = `legpivot_${i}`;
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), darkMat);
       leg.position.y = -0.22;
+      leg.castShadow = true;
+      legPivot.add(leg);
+      group.add(legPivot);
+    }
+  }
+
+  private buildTrollKingMesh(group: THREE.Group): void {
+    const bodyMat  = new THREE.MeshLambertMaterial({ color: 0x2a1a4a });
+    const headMat  = new THREE.MeshLambertMaterial({ color: 0x3a2a5a });
+    const armMat   = new THREE.MeshLambertMaterial({ color: 0x2a1a4a });
+    const legMat   = new THREE.MeshLambertMaterial({ color: 0x1a0a3a });
+    const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0xaa8800, emissiveIntensity: 0.4 });
+    const eyeMat   = new THREE.MeshLambertMaterial({ color: 0xff2200, emissive: 0xff0000, emissiveIntensity: 1.0 });
+    const warpaintMat = new THREE.MeshLambertMaterial({ color: 0xcc0000 });
+
+    // Broad torso
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.75, 0.40), bodyMat);
+    torso.position.y = 0.78;
+    torso.castShadow = true;
+    group.add(torso);
+
+    // Large head
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), headMat);
+    head.position.y = 1.42;
+    head.castShadow = true;
+    group.add(head);
+
+    // Glowing red eyes
+    for (const ex of [-0.13, 0.13]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.02), eyeMat);
+      eye.position.set(ex, 1.48, 0.30);
+      group.add(eye);
+    }
+
+    // War paint stripes on face
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.02), warpaintMat);
+    stripe.position.set(0, 1.40, 0.30);
+    group.add(stripe);
+
+    // Golden crown
+    for (let i = 0; i < 5; i++) {
+      const spike = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14 + (i % 2) * 0.08, 0.07), crownMat);
+      spike.position.set(-0.24 + i * 0.12, 1.79 + (i % 2) * 0.04, 0);
+      group.add(spike);
+    }
+    const crownBand = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.08, 0.62), crownMat);
+    crownBand.position.y = 1.73;
+    group.add(crownBand);
+
+    // Massive arms
+    for (const [ax, i] of [[-0.48, 0], [0.48, 1]] as [number, number][]) {
+      const armPivot = new THREE.Object3D();
+      armPivot.position.set(ax, 1.0, 0);
+      armPivot.name = `armpivot_${i}`;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.65, 0.28), armMat);
+      arm.position.y = -0.30;
+      arm.castShadow = true;
+      armPivot.add(arm);
+      group.add(armPivot);
+    }
+
+    // Shoulder pads
+    for (const sx of [-0.44, 0.44]) {
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.44), crownMat);
+      pad.position.set(sx, 1.08, 0);
+      group.add(pad);
+    }
+
+    // War club in right hand
+    const clubMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1a });
+    const club    = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.70, 0.12), clubMat);
+    club.position.set(0.56, 0.55, 0.20);
+    group.add(club);
+    const clubHead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), clubMat);
+    clubHead.position.set(0.56, 0.22, 0.20);
+    group.add(clubHead);
+
+    // Thick legs
+    for (const [lx, i] of [[-0.18, 0], [0.18, 1]] as [number, number][]) {
+      const legPivot = new THREE.Object3D();
+      legPivot.position.set(lx, 0.44, 0);
+      legPivot.name = `legpivot_${i}`;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.58, 0.30), legMat);
+      leg.position.y = -0.29;
       leg.castShadow = true;
       legPivot.add(leg);
       group.add(legPivot);

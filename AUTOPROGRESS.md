@@ -272,3 +272,25 @@
 - Passive mobs should drop leather → add leather armor tier
 - World save/load doesn't save placed blocks — implementing block serialization would hugely improve the game
 - Add a "flint and steel" item to activate TNT from range (more strategic use)
+
+## 2026-05-20 — Troll King Boss Mob
+
+**What was done:**
+- Added `troll_king` enemy type — a massive final boss (2500 HP, scale 2.2, dark purple coloring)
+- Custom `buildTrollKingMesh()`: broad torso, war-painted face, glowing red eyes, golden crown with 5 spikes, shoulder pads, war club weapon
+- Berserker rage: at 50% HP, boss doubles speed and glows red
+- Ground slam attack: every 5 seconds when within 7 units of player — deals 8 damage with screen shake + particle burst
+- Boss health bar UI: centered at top of screen showing "☠ TROLL KING ☠" with red-to-orange animated bar, hides automatically when boss is dead
+- "Kingslayer" achievement for slaying the Troll King
+- Wave 10 now spawns the Troll King as the lead attacker alongside golems and spiders (bonus gold 500)
+- Merged cleanly with upstream: both `uruk_captain` and `troll_king` boss types coexist
+
+**Ideas for next run:**
+- Add a pre-wave announcement banner ("THE TROLL KING APPROACHES") with dramatic fade-in
+- Boss war cry ability: roar that temporarily boosts nearby enemy speeds
+- Particle shockwave ring on ground slam (ring of sparks expanding outward)
+- Better boss entrance: slow travel from off-map edge with accompanying horn sound
+- Upgrade NPC merchants inside fortress walls (hire guards, buy siege cannons)
+- Potions / brewing stand mechanic
+- Add an "Ender-Dragon"-style death sequence for the Troll King (explodes into particles, shakes screen)
+- Improve day/night cycle: darker nights, mob torches, glowing enemy eyes at night

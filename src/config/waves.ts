@@ -81,17 +81,17 @@ export const WAVE_CONFIGS: WaveConfig[] = [
     { type: "spider",       count: 8,  spawnInterval: 2.2, gate: "south" },
   ]},
 
-  // Wave 10 — The final battle of Helm's Deep (Boss: Uruk-hai Captain)
-  { wave: 10, bonusGold: 250, groups: [
-    { type: "uruk_captain", count: 1,  spawnInterval: 0.0, gate: "north" },
+  // Wave 10 — The final battle of Helm's Deep: Troll King leads the siege
+  { wave: 10, bonusGold: 500, groups: [
+    { type: "troll_king",   count: 1,  spawnInterval: 0.0, gate: "north" },
     { type: "troll",        count: 3,  spawnInterval: 3.0, gate: "north" },
     { type: "goblin_miner", count: 8,  spawnInterval: 2.5, gate: "north" },
     { type: "orc",          count: 20, spawnInterval: 1.0, gate: "north" },
-    { type: "golem",        count: 3,  spawnInterval: 6.0, gate: "north" },
-    { type: "goblin",       count: 30, spawnInterval: 0.6, gate: "south" },
+    { type: "golem",        count: 2,  spawnInterval: 6.0, gate: "north" },
+    { type: "goblin",       count: 28, spawnInterval: 0.6, gate: "south" },
     { type: "goblin_miner", count: 6,  spawnInterval: 3.0, gate: "south" },
     { type: "troll",        count: 3,  spawnInterval: 4.0, gate: "south" },
-    { type: "orc",          count: 15, spawnInterval: 1.2, gate: "south" },
+    { type: "orc",          count: 12, spawnInterval: 1.2, gate: "south" },
     { type: "spider",       count: 10, spawnInterval: 2.0, gate: "south" },
   ]},
 ];

@@ -693,6 +693,11 @@ export class Game {
       }
 
       this.unlockAchievement("first_kill", "Monster Hunter", `Defeated your first ${state.config.name}`);
+      if (state.config.type === "troll_king") {
+        this.ui.hideBossHealthBar();
+        this.unlockAchievement("boss_slain", "Kingslayer", "Slew the Troll King");
+        this.scene.shake(0.30, 1.0);
+      }
       if (state.config.drops && pos) {
         // Elites always drop their loot (100% chance each drop)
         const activeWeapon = this.inventory.getActiveItem();
@@ -791,6 +796,21 @@ export class Game {
       this.ui.showBossWarCry();
       this.scene.shake(0.08, 0.4);
       this.audio.play("explosion", 0.25);
+    };
+
+    this.enemies.onBossSlam = (damage, bx, bz) => {
+      const pp = this.player.position;
+      const dx = pp.x - bx, dz = pp.z - bz;
+      if (Math.sqrt(dx * dx + dz * dz) <= 7.0) {
+        this.player.damage(damage);
+        this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+        this.ui.showDamageVignette();
+        this.scene.shake(0.20, 0.5);
+        this.audio.play("player_hurt", 0.6);
+      } else {
+        this.scene.shake(0.10, 0.3);
+      }
+      this.particles.spawnExplosion(bx, 6, bz);
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
@@ -1491,6 +1511,12 @@ export class Game {
     // Passive mobs
     this.passiveMobs.update(dt);
     this.enemies.setPlayerPosition(this.player.position.x, this.player.position.z, this.player.position.y);
+
+    // Troll King boss health bar (shown via the existing boss bar UI)
+    const boss = this.enemies.getBossState();
+    if (boss) {
+      this.ui.showBossHealthBar("☠ TROLL KING ☠", boss.state.health / boss.state.config.maxHealth);
+    }
 
     // Weather
     this.weather.update(dt, this.scene.camera);

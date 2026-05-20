@@ -4,7 +4,7 @@
 
 export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win" | "endless";
 
-export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton" | "uruk_captain";
+export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton" | "uruk_captain" | "troll_king";
 export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat
 export type ProjectileType = "arrow" | "cannonball" | "icebolt" | "crossbow_bolt";
 
@@ -91,28 +91,30 @@ export interface EnemyState {
   flashTimer?: number;
   // Skeleton-specific
   shootCooldown?: number;
-  strafeDir?: 1 | -1;       // +1 or -1 lateral strafe direction
-  strafeTimer?: number;     // seconds until next strafe direction flip
+  strafeDir?: 1 | -1;
+  strafeTimer?: number;
   // Spider-specific
-  webCooldown?: number;     // seconds until next web shot
-  // Spider wall-climbing state machine
+  webCooldown?: number;
   climbPhase?: "approach" | "up" | "across" | "down";
-  climbTargetX?: number;    // wall X column to climb
-  climbTargetZ?: number;    // wall Z row (outer face)
-  climbInnerZ?: number;     // Z at which to start descending (inner face)
-  climbDirZ?: number;       // +1 = toward south interior, -1 = toward north interior
-  climbTimer?: number;      // seconds spent in "across" phase
-  // Knockback / stagger (all melee enemy types)
-  knockbackTimer?: number;  // > 0: briefly staggered, can't attack
+  climbTargetX?: number;
+  climbTargetZ?: number;
+  climbInnerZ?: number;
+  climbDirZ?: number;
+  climbTimer?: number;
+  // Knockback / stagger
+  knockbackTimer?: number;
   // Elite variant
   elite?: boolean;
   // Troll / uruk_captain stomp attack
-  stompCooldown?: number;    // seconds until next stomp is available
-  stompCharging?: boolean;   // true during wind-up before stomp fires
-  stompChargeTimer?: number; // counts up to STOMP_CHARGE_TIME
-  // uruk_captain war cry (buffs nearby enemies)
-  warCryTimer?: number;      // counts down to next war cry
-  warCryFlash?: number;      // countdown for the boss visual flash
+  stompCooldown?: number;
+  stompCharging?: boolean;
+  stompChargeTimer?: number;
+  // uruk_captain war cry
+  warCryTimer?: number;
+  warCryFlash?: number;
+  // Troll King boss-specific
+  slamCooldown?: number;
+  berserking?: boolean;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

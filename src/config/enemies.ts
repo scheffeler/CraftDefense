@@ -173,4 +173,23 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
       { itemId: "flint",     chance: 0.3, count: 2 },
     ],
   },
+  troll_king: {
+    type: "troll_king",
+    name: "Troll King",
+    maxHealth: 2500,
+    speed: 0.7,
+    reward: 300,
+    damage: 8,
+    color: 0x2a1a4a,
+    headColor: 0x3a2a5a,
+    scale: 2.2,
+    canBreakWalls: true,
+    xpReward: 200,
+    drops: [
+      { itemId: "diamond",    chance: 1.0, count: 8 },
+      { itemId: "iron_ingot", chance: 1.0, count: 16 },
+      { itemId: "gold_ingot", chance: 1.0, count: 8 },
+      { itemId: "apple",      chance: 1.0, count: 4 },
+    ],
+  },
 };
