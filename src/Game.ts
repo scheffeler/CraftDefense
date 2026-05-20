@@ -86,6 +86,9 @@ export class Game {
   private readonly fireMeshes = new Map<string, THREE.Mesh>();
   private _fireDamageTimer = 0;
 
+  // Fall damage tracking
+  private _wasOnGround = true;
+
   // Hunger depletion timer
   private hungerTimer = 0;
   private _autoSaveTimer = 0;
@@ -603,13 +606,14 @@ export class Game {
         const behavior = BLOCK_BEHAVIORS[id];
         const drops    = behavior?.drops ?? [id];
         const activeTool = this.inventory.getActiveItem();
-        const hasFortune = activeTool?.enchantments?.includes("fortune_1") ?? false;
+        const hasFortune1 = activeTool?.enchantments?.includes("fortune_1") ?? false;
+        const hasFortune2 = activeTool?.enchantments?.includes("fortune_2") ?? false;
         const ORE_BLOCKS = new Set(["iron_ore", "coal_ore", "gold_ore", "diamond_ore"]);
-        const fortuneMult = (hasFortune && ORE_BLOCKS.has(id)) ? 2 : 1;
+        const isOre = ORE_BLOCKS.has(id);
+        const fortuneMult = hasFortune2 && isOre ? 3 : (hasFortune1 && isOre ? 2 : 1);
         for (const drop of drops) {
           if (ITEMS[drop]) {
-            const count = fortuneMult;
-            for (let i = 0; i < count; i++) {
+            for (let i = 0; i < fortuneMult; i++) {
               this.spawnItemEntity(
                 wx + 0.5 + (i > 0 ? (Math.random() - 0.5) * 0.3 : 0),
                 wy + 0.7,
@@ -619,7 +623,7 @@ export class Game {
             }
           }
         }
-        if (hasFortune && fortuneMult > 1)
+        if (fortuneMult > 1)
           this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
@@ -1178,8 +1182,30 @@ export class Game {
     // Recipe book doesn't pause gameplay, just a HUD overlay
 
     // Player movement + bow/crossbow charge accumulation
+    const velYBefore  = this.player.velocity.y;
+    const wasOnGround = this._wasOnGround;
     const input = this.input.getMovementInput();
     this.player.update(dt, input);
+
+    // Fall damage — triggered when landing after a significant drop
+    const justLanded = this.player.onGround && !wasOnGround && !this.player.inWater;
+    if (justLanded) {
+      const impactSpeed = -Math.min(velYBefore, 0); // m/s downward speed
+      const SAFE_FALL   = 10; // no damage below this
+      if (impactSpeed > SAFE_FALL) {
+        let dmg = Math.floor((impactSpeed - SAFE_FALL) * 1.5);
+        // Feather Falling I halves fall damage
+        if (this.inventory.hasEnchantment("feather_fall")) dmg = Math.floor(dmg * 0.5);
+        if (dmg > 0) {
+          this.player.damage(dmg);
+          this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+          this.ui.showDamageVignette();
+          this.scene.shake(0.1, 0.35);
+          this.audio.play("player_hurt", 0.7);
+        }
+      }
+    }
+    this._wasOnGround = this.player.onGround;
 
     // Update crossbow loading HUD
     this.ui.updateCrossbowProgress(
@@ -1648,6 +1674,7 @@ export class Game {
     { id: "protection_2", name: "Protection II",     cost: 2, categories: ["armor"] },
     { id: "unbreaking_1", name: "Unbreaking I",      cost: 1, categories: ["weapon", "tool", "armor"] },
     { id: "fortune_1",    name: "Fortune I",         cost: 2, categories: ["tool"] },
+    { id: "fortune_2",    name: "Fortune II",        cost: 3, categories: ["tool"] },
     { id: "power_1",      name: "Power I",           cost: 1, categories: ["weapon"] },
     { id: "fire_aspect",  name: "Fire Aspect I",     cost: 2, categories: ["weapon"] },
     { id: "looting_1",   name: "Looting I",         cost: 2, categories: ["weapon"] },
@@ -1756,6 +1783,11 @@ export class Game {
           this.ui.showDamageVignette();
           this.scene.shake(0.07, 0.3);
           this.audio.play("player_hurt", 0.65);
+          // Thorns I — reflect 2 damage back to attacker
+          if (this.inventory.hasEnchantment("thorns_1")) {
+            this.enemies.damage(state.id, 2);
+            this.particles.spawnBlockBreak(pos.x, pos.y + 1, pos.z, 0xff6600);
+          }
           this.enemyMeleeCooldown.set(state.id, 1.5);
         } else {
           this.enemyMeleeCooldown.set(state.id, cd - dt);
@@ -2440,8 +2472,11 @@ export class Game {
     }
     this.gameMap.world.rebuildDirtyChunks();
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
-    // Damage nearby enemies
-    this.enemies.damageInRadius(x, y, z, radius, playerDamage * 1.5);
+    // Damage nearby enemies — track kills for TNT Trap achievement
+    const killed = this.enemies.damageInRadius(x, y, z, radius, playerDamage * 1.5);
+    if (killed >= 3) {
+      this.unlockAchievement("tnt_trap", "TNT Trap!", `Killed ${killed} enemies with one blast`);
+    }
   }
 
   private _damageHeldTool(stack: import("./Inventory").ItemStack): void {

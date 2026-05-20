@@ -120,4 +120,9 @@ export class Inventory {
     if (area === "hotbar") this.hotbar[index] = stack;
     else this.backpack[index] = stack;
   }
+
+  /** Returns true if any equipped armor piece has the given enchantment. */
+  hasEnchantment(enchId: string): boolean {
+    return Object.values(this.armor).some(s => s?.enchantments?.includes(enchId));
+  }
 }

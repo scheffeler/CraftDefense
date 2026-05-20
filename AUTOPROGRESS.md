@@ -1,5 +1,25 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-20 — Fall damage, Thorns I, Feather Falling I, Fortune II, TNT Trap achievement
+
+**What was done:**
+- **Fall damage** system: player takes damage proportional to landing velocity above 10 m/s safe threshold. Formula: `floor((impact - 10) × 1.5)` HP. Tracked via `_wasOnGround` and `velYBefore` in Game.ts update loop.
+- **Feather Falling I** enchantment now functional: halves all fall damage when any equipped armor piece has the enchantment. Uses new `inventory.hasEnchantment(id)` helper method in Inventory.ts.
+- **Thorns I** enchantment now functional: when an enemy deals melee damage to the player, reflects 2 HP of damage back to the attacker (if any equipped armor has Thorns I). Orange particle burst on attacker shows the reflect.
+- **Fortune II** enchantment added to enchant pool (cost 3 XP levels) and implemented: gives ×3 drops from ore blocks (iron, coal, gold, diamond). Fortune I still gives ×2. Floating "×3" indicator shown. Logic consolidated into single `fortuneMult` check.
+- **TNT Trap achievement**: `_doExplosion()` now returns the kill count from `damageInRadius()`. When ≥3 enemies die in a single explosion, unlocks "TNT Trap!" achievement. `damageInRadius()` return type changed from `void` → `number` in Enemy.ts.
+- New `Inventory.hasEnchantment(enchId)` method checks all 4 equipped armor slots for a given enchantment ID.
+
+**Ideas for next time:**
+- Feather Falling II: fully negate fall damage (cost 2 XP)
+- Fall damage sound: distinct thud sound on hard landings
+- Lava flow/spread mechanic (Minecraft-like lava physics with limited range)
+- Brewing stand block for authentic Minecraft potion UI (currently at workbench)
+- Endless Score leaderboard: show personal best on main menu (already tracked in localStorage)
+- Haste potion: increases mining speed multiplier for 30s
+- Night vision potion: increases ambient light level for 30s
+- Fortune III enchantment: ×4 drops, very high XP cost
+
 ## 2026-05-20 — Wither DoT, Fortune, and Unbreaking enchantment effects
 
 **What was done:**
