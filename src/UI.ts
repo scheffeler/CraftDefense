@@ -300,6 +300,55 @@ export class UI {
     setTimeout(() => el.remove(), 2500);
   }
 
+  /** Dramatic boss entrance announcement. */
+  showBossAnnouncement(title: string, subtitle: string): void {
+    const el = document.createElement("div");
+    el.className = "boss-announce";
+    el.innerHTML = `<div class="boss-title">${title}</div><div class="boss-subtitle">${subtitle}</div>`;
+    this.container.appendChild(el);
+    setTimeout(() => el.classList.add("boss-hide"), 3500);
+    setTimeout(() => el.remove(), 4500);
+  }
+
+  private _bossBarEl: HTMLElement | null = null;
+  private _bossBarFill: HTMLElement | null = null;
+  private _bossBarLabel: HTMLElement | null = null;
+
+  updateBossBar(name: string, hp: number, maxHp: number): void {
+    if (!this._bossBarEl) {
+      const wrap = document.createElement("div");
+      wrap.className = "boss-bar-wrap";
+      const label = document.createElement("div");
+      label.className = "boss-bar-label";
+      label.textContent = name;
+      const track = document.createElement("div");
+      track.className = "boss-bar-track";
+      const fill = document.createElement("div");
+      fill.className = "boss-bar-fill";
+      track.appendChild(fill);
+      wrap.appendChild(label);
+      wrap.appendChild(track);
+      this.container.appendChild(wrap);
+      this._bossBarEl = wrap;
+      this._bossBarFill = fill;
+      this._bossBarLabel = label;
+    }
+    this._bossBarLabel!.textContent = `${name}  ❤ ${Math.ceil(hp)} / ${maxHp}`;
+    const pct = Math.max(0, hp / maxHp) * 100;
+    this._bossBarFill!.style.width = `${pct}%`;
+    const hue = Math.round(pct * 1.2); // red at 0%, green at 100%
+    this._bossBarFill!.style.background = `hsl(${hue}, 90%, 45%)`;
+  }
+
+  hideBossBar(): void {
+    if (this._bossBarEl) {
+      this._bossBarEl.remove();
+      this._bossBarEl = null;
+      this._bossBarFill = null;
+      this._bossBarLabel = null;
+    }
+  }
+
   showAchievement(title: string, desc: string): void {
     const el = document.createElement("div");
     el.className = "achievement-toast";
@@ -1817,6 +1866,76 @@ const FPS_CSS = `
   40%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.0) translateY(-20px); }
+}
+/* Boss entrance announcement */
+.boss-announce {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 55;
+  animation: bossAnnounce 4.5s ease-out forwards;
+}
+.boss-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 44px;
+  color: #ff2200;
+  text-shadow: 0 0 20px #ff6600, 3px 3px 0 #000, -1px -1px 0 #000;
+  letter-spacing: 4px;
+  white-space: nowrap;
+}
+.boss-subtitle {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: #ffaa44;
+  text-shadow: 2px 2px 0 #000;
+  margin-top: 10px;
+  white-space: nowrap;
+}
+.boss-announce.boss-hide { opacity: 0; transition: opacity 0.8s ease; }
+@keyframes bossAnnounce {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  15%  { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  30%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.0); }
+}
+/* Boss health bar */
+.boss-bar-wrap {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 520px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 45;
+}
+.boss-bar-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: #ff6622;
+  text-shadow: 1px 1px 0 #000;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+.boss-bar-track {
+  width: 100%;
+  height: 20px;
+  background: #220000;
+  border: 2px solid #ff2200;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 0 10px #ff440066;
+}
+.boss-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: hsl(0, 90%, 45%);
+  transition: width 0.15s linear, background 0.3s;
+  border-radius: 2px;
 }
 /* Minecraft-style achievement toast */
 .achievement-toast {

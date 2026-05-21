@@ -518,6 +518,21 @@ export class Game {
           }
         }
       }
+      if (state.config.type === "balrog") {
+        this.ui.hideBossBar();
+        this.scene.shake(0.6, 2.0);
+        // Extra death explosions for the boss
+        if (pos) {
+          for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+              const rx = pos.x + (Math.random() - 0.5) * 4;
+              const rz = pos.z + (Math.random() - 0.5) * 4;
+              this.particles.spawnExplosion(rx, pos.y + 0.5, rz);
+            }, i * 220);
+          }
+        }
+        this.ui.showAchievement("Demon Slayer", "You defeated The Balrog!");
+      }
       this.waves.onEnemyEliminated();
       this.ui.updateWaveInfo(
         this.waves.wave, this.waves.totalWaves, this.enemies.getAliveEnemies().length,
@@ -583,6 +598,29 @@ export class Game {
         this.gameMap.world.rebuildDirtyChunks();
       }
       this.waves.onEnemyEliminated();
+    };
+
+    this.enemies.onBalrogStomp = (x, _y, z, radius) => {
+      this.scene.shake(0.35, 0.9);
+      this.audio.play("explosion", 0.5); // deep boom
+      // Shockwave particles
+      for (let i = 0; i < 16; i++) {
+        const angle = (i / 16) * Math.PI * 2;
+        const r = radius * 0.7;
+        this.particles.spawnExplosion(x + Math.cos(angle) * r, 7.5, z + Math.sin(angle) * r);
+      }
+      // Damage player if close
+      const pp = this.player.position;
+      const dx = pp.x - x, dz = pp.z - z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist <= radius + 1.5) {
+        const dmg = Math.round(8 * (1 - dist / (radius + 1.5)));
+        if (dmg > 0) {
+          this.player.damage(dmg);
+          this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+          this.ui.showDamageVignette();
+        }
+      }
     };
 
     // Player death
@@ -887,7 +925,12 @@ export class Game {
     this.audio.play("wave_start");
     this.ui.setObjective(`Wave ${this.waves.wave} — Defend the fortress!`);
     this.ui.updateWaveInfo(this.waves.wave, this.waves.totalWaves, 0);
-    this.ui.showWaveAnnouncement(this.waves.wave);
+    if (this.waves.wave === 10) {
+      this.ui.showBossAnnouncement("THE BALROG COMES", "You shall not pass!");
+      setTimeout(() => this.scene.shake(0.5, 1.5), 1200);
+    } else {
+      this.ui.showWaveAnnouncement(this.waves.wave);
+    }
   }
 
   private spawnEnemy(type: EnemyTypeName, gate: "north" | "south"): void {
@@ -1120,6 +1163,14 @@ export class Game {
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.ui.updateDayClock(this.scene.dayTime);
     this.refreshHotbar();
+
+    // Boss health bar — update if Balrog is alive
+    if (this.waves.wave === 10 && this.phase === "playing") {
+      const balrog = this.enemies.getAliveEnemies().find(e => e.config.type === "balrog");
+      if (balrog) {
+        this.ui.updateBossBar("The Balrog", balrog.health, balrog.config.maxHealth);
+      }
+    }
 
     // Compass — extract yaw from camera quaternion
     const euler = new THREE.Euler().setFromQuaternion(this.scene.camera.quaternion, "YXZ");

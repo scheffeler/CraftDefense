@@ -12,10 +12,14 @@ const ENEMY_Y       = CFG_ENEMY_Y;
 const REACH_RADIUS  = 2.0; // distance to fortress center that counts as "reached base"
 const WALL_BREAK_TIME = 3.0; // seconds to break one wall block
 
+const BALROG_STOMP_INTERVAL = 6.0; // seconds between stomps
+const BALROG_STOMP_RADIUS   = 5.0; // shockwave radius
+const BALROG_CHARGE_TIME    = 1.2; // seconds before stomp fires
+
 // All types use flow-field AI — waypoint AI removed in Phase 12 cleanup
 const FLOW_FIELD_TYPES = new Set<EnemyTypeName>([
   "goblin", "orc", "troll", "goblin_miner",
-  "zombie", "spider", "golem", "creeper", "skeleton",
+  "zombie", "spider", "golem", "creeper", "skeleton", "balrog",
 ]);
 
 interface SkeletonArrow {
@@ -46,6 +50,9 @@ export class EnemyManager {
   onCreeperExplode: (x: number, y: number, z: number, radius: number) => void = () => {};
   onCreeperPrime: () => void = () => {};
   onSkeletonArrowHit: (damage: number) => void = () => {};
+  onBalrogStomp: (x: number, y: number, z: number, radius: number) => void = () => {};
+
+  private readonly balrogLights = new Map<number, THREE.PointLight>();
 
   private _playerX = 32;
   private _playerZ = 32;
@@ -116,6 +123,15 @@ export class EnemyManager {
 
     this.scene.add(group);
     this.meshes.set(id, group);
+
+    // Balrog gets an ambient fire light attached to it
+    if (type === "balrog") {
+      const light = new THREE.PointLight(0xff4400, 2.5, 10, 2);
+      light.position.set(0, 3, 0); // above center of balrog
+      group.add(light);
+      this.balrogLights.set(id, light);
+      state.stompTimer = BALROG_STOMP_INTERVAL;
+    }
 
     const hb = this.buildHealthBar();
     this.scene.add(hb.bg);
@@ -374,18 +390,63 @@ export class EnemyManager {
       }
     }
 
+    // Balrog stomp logic
+    if (state.config.type === "balrog") {
+      state.stompTimer = (state.stompTimer ?? BALROG_STOMP_INTERVAL) - dt;
+      const light = this.balrogLights.get(id);
+
+      if ((state.stompTimer ?? 0) <= 0) {
+        // Reset stomp timer and fire shockwave
+        state.stompTimer = BALROG_STOMP_INTERVAL;
+        this.onBalrogStomp(pos.x, pos.y, pos.z, BALROG_STOMP_RADIUS);
+        // Slam the balrog down briefly
+        pos.y = ENEMY_Y - 0.4;
+        // Flash the light bright
+        if (light) { light.intensity = 6; light.distance = 18; }
+      } else if ((state.stompTimer ?? 0) <= BALROG_CHARGE_TIME) {
+        // Charging — lift up
+        const t = 1 - (state.stompTimer ?? 0) / BALROG_CHARGE_TIME;
+        pos.y = ENEMY_Y + t * 0.6;
+        // Pulse light during charge
+        if (light) {
+          light.intensity = 2.5 + Math.sin(t * Math.PI * 6) * 1.5;
+        }
+      } else {
+        // Normal — fade light back to ambient
+        pos.y = ENEMY_Y;
+        if (light) {
+          light.intensity = Math.max(2.0, light.intensity - dt * 3);
+          light.distance = Math.max(10, light.distance - dt * 10);
+        }
+      }
+
+      // Balrog body pulse (breathing fire effect)
+      state.movePhase += dt;
+      const pulse = 0.85 + Math.sin(state.movePhase * 2.5) * 0.15;
+      group.traverse(c => {
+        const m = c as THREE.Mesh;
+        if (!m.isMesh) return;
+        const mat = m.material as THREE.MeshLambertMaterial;
+        if (mat.name === "balrog_fire") {
+          mat.emissiveIntensity = pulse;
+        }
+      });
+    }
+
     // Move in flow direction
     if (flow.dx !== 0 || flow.dz !== 0) {
       pos.x += flow.dx * state.speed * dt;
       pos.z += flow.dz * state.speed * dt;
-      pos.y  = ENEMY_Y;
+      if (state.config.type !== "balrog") pos.y = ENEMY_Y;
 
       const angle = Math.atan2(flow.dx, flow.dz);
       group.rotation.y = angle;
     }
 
-    state.movePhase += dt * state.speed * 4;
-    this.animateLegs(id, state.movePhase);
+    if (state.config.type !== "balrog") {
+      state.movePhase += dt * state.speed * 4;
+      this.animateLegs(id, state.movePhase);
+    }
   }
 
   private fireSkeletonArrow(from: THREE.Vector3, damage: number): void {
@@ -423,6 +484,8 @@ export class EnemyManager {
       this.buildCreeperMesh(group);
     } else if (type === "skeleton") {
       this.buildSkeletonMesh(group);
+    } else if (type === "balrog") {
+      this.buildBalrogMesh(group);
     } else {
       this.buildHumanoidMesh(group, type);
     }
@@ -574,6 +637,111 @@ export class EnemyManager {
     }
   }
 
+  private buildBalrogMesh(group: THREE.Group): void {
+    // Dark volcanic body
+    const bodyMat = new THREE.MeshLambertMaterial({
+      color: 0x0d0500, emissive: 0x440800, emissiveIntensity: 0.6, name: "balrog_body",
+    });
+    // Molten cracks — bright orange emissive
+    const fireMat = new THREE.MeshLambertMaterial({
+      color: 0xff5500, emissive: 0xff3300, emissiveIntensity: 1.0, name: "balrog_fire",
+    });
+    // Bone/horn material
+    const hornMat = new THREE.MeshLambertMaterial({
+      color: 0x1a0a00, emissive: 0x220500, emissiveIntensity: 0.3,
+    });
+
+    // Massive torso
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.82, 0.44), bodyMat);
+    torso.position.y = 0.95;
+    torso.castShadow = true;
+    group.add(torso);
+
+    // Molten chest crack stripes
+    for (const [cy, cw, ch] of [[1.0, 0.48, 0.06], [0.85, 0.35, 0.05]] as [number, number, number][]) {
+      const crack = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, 0.01), fireMat);
+      crack.position.set(0, cy, 0.225);
+      group.add(crack);
+    }
+
+    // Enormous head (squared, horned)
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.55, 0.52), bodyMat);
+    head.position.y = 1.68;
+    head.castShadow = true;
+    group.add(head);
+
+    // Burning eye sockets
+    const eyeMat = new THREE.MeshLambertMaterial({
+      color: 0xffaa00, emissive: 0xff6600, emissiveIntensity: 1.5, name: "balrog_fire",
+    });
+    for (const ex of [-0.13, 0.13]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.02), eyeMat);
+      eye.position.set(ex, 1.72, 0.275);
+      group.add(eye);
+    }
+
+    // Jagged horns
+    for (const [hx, hr] of [[-0.16, -0.4], [0.16, 0.4]] as [number, number][]) {
+      const horn = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.35, 0.1), hornMat);
+      horn.position.set(hx, 1.97, 0);
+      horn.rotation.z = hr;
+      group.add(horn);
+      // Second horn segment
+      const horn2 = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.07), hornMat);
+      horn2.position.set(hx + Math.sign(hx) * 0.12, 2.22, 0);
+      horn2.rotation.z = hr * 1.3;
+      group.add(horn2);
+    }
+
+    // Massive legs
+    for (const [lx] of [[-0.2], [0.2]] as [number][]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.65, 0.35), bodyMat);
+      leg.position.set(lx, 0.32, 0);
+      leg.castShadow = true;
+      group.add(leg);
+      // Lava on shins
+      const shin = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.01), fireMat);
+      shin.position.set(lx, 0.22, 0.18);
+      group.add(shin);
+    }
+
+    // Massive arms (no pivot — balrog just lumbers, doesn't animate legs)
+    for (const [ax] of [[-0.55], [0.55]] as [number][]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.78, 0.3), bodyMat);
+      arm.position.set(ax, 0.90, 0);
+      arm.castShadow = true;
+      group.add(arm);
+      // Fist glow
+      const fist = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.3), fireMat);
+      fist.position.set(ax, 0.5, 0);
+      group.add(fist);
+    }
+
+    // Swept-back wings (flat planes)
+    const wingMat = new THREE.MeshLambertMaterial({
+      color: 0x110400, emissive: 0x330800, emissiveIntensity: 0.4,
+      side: THREE.DoubleSide,
+    });
+    for (const [wx, wr] of [[-0.9, 0.5], [0.9, -0.5]] as [number, number][]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.04), wingMat);
+      wing.position.set(wx, 1.2, -0.3);
+      wing.rotation.z = wr;
+      wing.rotation.y = Math.sign(wx) * 0.3;
+      group.add(wing);
+      // Outer wing panel
+      const wingOuter = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.03), wingMat);
+      wingOuter.position.set(wx + Math.sign(wx) * 0.55, 1.0, -0.4);
+      wingOuter.rotation.z = wr * 1.4;
+      wingOuter.rotation.y = Math.sign(wx) * 0.5;
+      group.add(wingOuter);
+    }
+
+    // Glowing belly stripe
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 0.02), fireMat);
+    belly.position.set(0, 0.8, 0.225);
+    group.add(belly);
+  }
+
   private buildHumanoidMesh(group: THREE.Group, type: EnemyTypeName): void {
     const cfg = ENEMY_CONFIGS[type];
 
@@ -690,7 +858,9 @@ export class EnemyManager {
   private updateHealthBar(id: number, state: EnemyState, position: THREE.Vector3): void {
     const hb = this.healthBars.get(id);
     if (!hb) return;
-    const heightOffset = state.config.type === "spider" ? 0.6 : 1.7 * state.config.scale;
+    const heightOffset = state.config.type === "spider" ? 0.6
+      : state.config.type === "balrog" ? 7.0
+      : 1.7 * state.config.scale;
     const y = position.y + heightOffset;
 
     hb.bg.position.set(position.x, y, position.z);
@@ -764,6 +934,7 @@ export class EnemyManager {
       });
       this.meshes.delete(id);
     }
+    this.balrogLights.delete(id);
     const hb = this.healthBars.get(id);
     if (hb) {
       this.scene.remove(hb.bg);
