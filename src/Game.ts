@@ -131,6 +131,7 @@ export class Game {
   private _burnTickTimer   = 0;
   private _witherTickTimer = 0;
 
+
   // Enemy melee cooldown per enemy id
   private readonly enemyMeleeCooldown = new Map<number, number>();
 
@@ -460,6 +461,25 @@ export class Game {
       if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "enchanting_table") {
         this._openEnchantingTable();
         return;
+      }
+
+      // Right-click TNT with flint_and_steel to ignite it
+      if (tb && this.gameMap.world.getBlock(tb.wx, tb.wy, tb.wz) === "tnt") {
+        if (stack?.itemId === "flint_and_steel" || stack?.itemId === "flint_steel") {
+          const key = `${tb.wx},${tb.wy},${tb.wz}`;
+          if (!this.tntFuses.has(key)) {
+            this.tntFuses.set(key, { x: tb.wx, y: tb.wy, z: tb.wz, timer: 3.5, flashTimer: 0 });
+            this.audio.play("creeper_hiss", 0.6);
+            this.ui.showAchievement("Boom!", "You lit a TNT block");
+          }
+          // Reduce flint_and_steel durability
+          if (stack.durability !== undefined) {
+            stack.durability = Math.max(0, stack.durability - 1);
+            if (stack.durability <= 0) this.inventory.removeItem(stack.itemId, 1);
+          }
+          this.refreshHotbar();
+          return;
+        }
       }
 
       // Check if looking at a bed — sleep to skip night

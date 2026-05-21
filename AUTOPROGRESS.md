@@ -1,5 +1,31 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-21 — TNT Explosive Trap System
+
+**What was done:**
+- Added `tnt` as a new block type (bright red sides, white top — classic Minecraft TNT look)
+- Added `gunpowder` material (drops from creepers at 80% chance, 2x)
+- Added `flint_and_steel` tool (crafted: iron ingot + flint diagonal)
+- Added TNT crafting recipe: 4 gunpowder + 5 sand in checkerboard (3×3)
+- TNT primes when enemies walk over it (pressure-plate trigger)
+- TNT also ignitable by right-clicking with flint_and_steel (4-second fuse + hiss audio)
+- TNT explosion: damages nearby enemies (up to 20 HP falloff by distance), breaks blocks, chain-detonates adjacent primed TNT
+- Refactored creeper explosion to share `triggerExplosion()` helper method (DRY)
+- Updated recipe book UI with TNT and Flint & Steel entries
+- TNT fuse timer ticks outside the pointer-lock guard so it works even in menus
+
+**Files changed:** `src/types.ts`, `src/Map.ts`, `src/config/blocks.ts`, `src/config/items.ts`, `src/config/recipes.ts`, `src/config/enemies.ts`, `src/Game.ts`, `src/UI.ts`
+
+**Ideas for next run:**
+- Visual TNT fuse flash (blink block red/white while primed, like creeper) — use a scene overlay or point light pulse
+- More boss-tier enemy: a "Berserker" troll that charges at walls and ignores slow effects
+- Iron golem as a placeable defensive ally (crafted with iron blocks + carved pumpkin)
+- Ranged tower blocks the player can craft and place (arrow dispenser block)
+- More sound variety: TNT explosion should be louder/distinct from creeper
+- Potion system: brewing stand + potions (health, speed, strength) using gathered ingredients
+- Better end-game reward: wave 10 drop a special item or unlock a creative mode
+- World persistence: save placed blocks so the fortress survives reloads
+
 ## 2026-05-21 — Night Vision + Haste potions
 
 **What was done:**

@@ -1329,6 +1329,8 @@ export class UI {
       { name: "Regen Potion", ingredients: "1 Glass Bottle + 1 Wheat → Heal over 20s", key: "regen_potion" },
       { name: "Night Vision", ingredients: "1 Glass Bottle + 1 Gold Ingot + 1 Torch → See in the dark 30s", key: "night_vision_potion" },
       { name: "Haste Potion", ingredients: "1 Glass Bottle + 1 Coal + 1 Iron Ingot → +1.8× mining speed 30s", key: "haste_potion" },
+      { name: "Flint & Steel", ingredients: "1 Iron Ingot + 1 Flint (diagonal) — ignite TNT!", key: "flint_and_steel" },
+      { name: "TNT", ingredients: "4 Gunpowder + 5 Sand (checkerboard) — creepers drop gunpowder!", key: "tnt" },
     ];
 
     const list = div("fps-rb-list");

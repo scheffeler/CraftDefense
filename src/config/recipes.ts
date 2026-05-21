@@ -542,7 +542,7 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "raygun", count: 1 },
   },
 
-  // --- TNT (5 gunpowder + 4 sand, checkerboard) ---
+  // --- TNT (gunpowder + sand checkerboard) ---
   {
     id: "tnt",
     pattern: [
