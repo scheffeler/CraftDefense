@@ -80,6 +80,11 @@ export class Game {
   private _lavaParticleTimer = 0;
   private _lavaDamageTimer   = 0;
 
+  // Lava spread: player-placed "source" blocks that periodically flow outward
+  private readonly lavaSourceBlocks = new Set<string>();
+  private _lavaSpreadTimer = 0;
+  static readonly MAX_LAVA_BLOCKS = 80;
+
   // Fire spread: key = "wx,wy,wz", value = { burnTimer (remaining burn time), spreadTimer (time until next spread attempt) }
   private readonly activeFire = new Map<string, { burnTimer: number; spreadTimer: number }>();
   private readonly fireLights = new Map<string, THREE.PointLight>();
@@ -562,6 +567,7 @@ export class Game {
           this.gameMap.world.setBlock(tb.wx, tb.wy, tb.wz, "air");
           this.gameMap.world.rebuildDirtyChunks();
           this.removeLavaLight(tb.wx, tb.wy, tb.wz);
+          this.lavaSourceBlocks.delete(`${tb.wx},${tb.wy},${tb.wz}`);
           this.inventory.removeItem("iron_bucket", 1);
           this.inventory.addItem("lava_bucket", 1);
           this.audio.play("block_place", 0.5);
@@ -640,7 +646,7 @@ export class Game {
           this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
       if (id === "torch") this.removeTorchLight(wx, wy, wz);
-      if (id === "lava")  this.removeLavaLight(wx, wy, wz);
+      if (id === "lava")  { this.removeLavaLight(wx, wy, wz); this.lavaSourceBlocks.delete(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.delete(`${wx},${wy},${wz}`);
       // TNT: re-place and start fuse instead of dropping item
       if (id === "tnt") {
@@ -664,7 +670,7 @@ export class Game {
     this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
       this.audio.play("block_place", 0.5);
       if (id === "torch") this.addTorchLight(wx, wy, wz);
-      if (id === "lava")  this.addLavaLight(wx, wy, wz);
+      if (id === "lava")  { this.addLavaLight(wx, wy, wz); this.lavaSourceBlocks.add(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.set(`${wx},${wy},${wz}`, { x: wx, y: wy, z: wz, timer: 0.5 });
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
       this.refreshHotbar();
@@ -1175,6 +1181,7 @@ export class Game {
     this.waves.reset();
     this.dispenserBlocks.clear();
     this.tntFuses.clear();
+    this.lavaSourceBlocks.clear();
     this.player.health    = this.player.maxHealth;
     this.player.xp        = 0;
     this.player.level     = 0;
@@ -1286,6 +1293,13 @@ export class Game {
       }
     } else {
       this._lavaDamageTimer = 0;
+    }
+
+    // Lava spread — source blocks flow outward every ~7 seconds
+    this._lavaSpreadTimer += dt;
+    if (this._lavaSpreadTimer >= 7.0) {
+      this._lavaSpreadTimer = 0;
+      this._spreadLava();
     }
 
     // Lava embers — spawn particles periodically from nearby lava blocks
@@ -2342,6 +2356,59 @@ export class Game {
       light.dispose();
       this.torchLights.delete(key);
     }
+  }
+
+  private _spreadLava(): void {
+    if (this.lavaSourceBlocks.size === 0) return;
+    const totalLava = this.lavaLights.size;
+    if (totalLava >= Game.MAX_LAVA_BLOCKS) return;
+
+    const toAdd: Array<[number, number, number]> = [];
+    const DIRS = [[1,0],[-1,0],[0,1],[0,-1]] as const;
+
+    for (const key of this.lavaSourceBlocks) {
+      if (toAdd.length + totalLava >= Game.MAX_LAVA_BLOCKS) break;
+      const [x, y, z] = key.split(",").map(Number);
+
+      // Try horizontal neighbors at same level
+      for (const [dx, dz] of DIRS) {
+        const nx = x + dx, nz = z + dz;
+        if (nx < 1 || nx > 62 || nz < 1 || nz > 62) continue;
+        if (this.gameMap.world.getBlock(nx, y, nz) === "air") {
+          toAdd.push([nx, y, nz]);
+          break; // at most 1 spread per source per cycle
+        }
+        // If horizontal is blocked, try flowing down from it
+        const below = y - 1;
+        if (below >= 1 && this.gameMap.world.getBlock(nx, y, nz) !== "air"
+            && this.gameMap.world.getBlock(nx, below, nz) === "air") {
+          toAdd.push([nx, below, nz]);
+          break;
+        }
+      }
+
+      // Also try straight down
+      const below = y - 1;
+      if (below >= 1 && this.gameMap.world.getBlock(x, below, z) === "air") {
+        if (!toAdd.some(([bx, by, bz]) => bx === x && by === below && bz === z)) {
+          toAdd.push([x, below, z]);
+        }
+      }
+    }
+
+    // Apply all new lava blocks
+    let added = 0;
+    for (const [nx, ny, nz] of toAdd) {
+      const nk = `${nx},${ny},${nz}`;
+      if (this.gameMap.world.getBlock(nx, ny, nz) !== "air") continue;
+      if (this.lavaLights.has(nk)) continue;
+      this.gameMap.world.setBlock(nx, ny, nz, "lava");
+      this.addLavaLight(nx, ny, nz);
+      // Spawn a brief burst of lava ember particles at the new flow point
+      this.particles.spawnLavaEmbers(nx, ny, nz);
+      added++;
+    }
+    if (added > 0) this.gameMap.world.rebuildDirtyChunks();
   }
 
   private addLavaLight(wx: number, wy: number, wz: number): void {
