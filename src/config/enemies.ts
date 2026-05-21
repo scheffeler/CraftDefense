@@ -48,6 +48,7 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
     drops: [
       { itemId: "cobblestone", chance: 0.9, count: 8 },
       { itemId: "iron_ingot",  chance: 0.6, count: 3 },
+      { itemId: "blaze_rod",   chance: 0.4, count: 1 },
     ],
   },
 
@@ -100,6 +101,8 @@ export const ENEMY_CONFIGS: Record<EnemyTypeName, EnemyConfig> = {
       { itemId: "iron_block",  chance: 0.3, count: 1 },
       { itemId: "apple",       chance: 0.5, count: 2 },
       { itemId: "energy_cell", chance: 0.2, count: 1 },
+      { itemId: "blaze_rod",   chance: 0.5, count: 2 },
+      { itemId: "nether_wart", chance: 0.3, count: 2 },
     ],
   },
   goblin_miner: {

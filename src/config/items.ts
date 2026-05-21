@@ -31,11 +31,11 @@ export interface ItemDef {
   armorSlot?:    ArmorSlot;
   // Placeable block
   placesBlock?:  BlockId;
-  // Potion
-  potionEffect?:    string;   // "heal" | "speed" | "strength" | "slowness"
-  potionDuration?:  number;   // seconds (0 = instant)
-  potionMagnitude?: number;   // effect strength
-  potionSplash?:    boolean;  // true = throwable splash potion
+  // Potion effect
+  potionEffect?: string;   // effect id: "healing" | "speed" | "strength" | "fire_resistance" | "regeneration"
+  potionDuration?: number; // seconds (0 for instant)
+  potionPower?: number;    // effect magnitude (e.g. heal amount or speed multiplier)
+  potionSplash?: boolean;  // true = throwable splash potion
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -181,22 +181,23 @@ export const ITEMS: Record<string, ItemDef> = {
     weaponType:"gun", ammoType:"energy_cell", gunRange:50, gunCooldown:2.0,
   },
 
-  // --- Potions & ingredients ---
-  glass_bottle:    { id:"glass_bottle",    name:"Glass Bottle",         category:"material", stackSize:64, color:0x88ccee },
-  healing_potion:  { id:"healing_potion",  name:"Potion of Healing",    category:"potion",   stackSize:16, color:0xff6688,
-    potionEffect:"heal",     potionDuration:0,  potionMagnitude:8  },
-  speed_potion:    { id:"speed_potion",    name:"Potion of Speed",      category:"potion",   stackSize:16, color:0xffdd44,
-    potionEffect:"speed",    potionDuration:30, potionMagnitude:1.5 },
-  strength_potion: { id:"strength_potion", name:"Potion of Strength",   category:"potion",   stackSize:16, color:0xcc2222,
-    potionEffect:"strength", potionDuration:30, potionMagnitude:4  },
-  splash_slowness: { id:"splash_slowness", name:"Splash of Slowness",   category:"potion",   stackSize:16, color:0x44aaff,
-    potionEffect:"slowness", potionDuration:8,  potionMagnitude:0.4, potionSplash:true },
-  regen_potion:      { id:"regen_potion",      name:"Potion of Regeneration", category:"potion", stackSize:16, color:0xff88cc,
-    potionEffect:"regen",       potionDuration:20, potionMagnitude:1  },
-  night_vision_potion: { id:"night_vision_potion", name:"Potion of Night Vision", category:"potion", stackSize:16, color:0x3366ff,
-    potionEffect:"night_vision", potionDuration:30, potionMagnitude:1  },
-  haste_potion:      { id:"haste_potion",      name:"Potion of Haste",        category:"potion", stackSize:16, color:0xffaa00,
-    potionEffect:"haste",       potionDuration:30, potionMagnitude:1.8 },
+  // --- Potion ingredients ---
+  glass_bottle:     { id:"glass_bottle",     name:"Glass Bottle",     category:"material", stackSize:16, color:0x88ccee },
+  blaze_rod:        { id:"blaze_rod",        name:"Blaze Rod",        category:"material", stackSize:64, color:0xffaa22 },
+  nether_wart:      { id:"nether_wart",      name:"Nether Wart",      category:"material", stackSize:64, color:0xaa1111 },
+  sugar:            { id:"sugar",            name:"Sugar",            category:"material", stackSize:64, color:0xffffff },
+  magma_cream:      { id:"magma_cream",      name:"Magma Cream",      category:"material", stackSize:64, color:0xff6600 },
+  glistering_melon: { id:"glistering_melon", name:"Glistering Melon", category:"material", stackSize:64, color:0xff4444 },
+
+  // --- Potions ---
+  potion_healing:         { id:"potion_healing",         name:"Potion of Healing",         category:"potion", stackSize:4,  color:0xff4466, potionEffect:"healing",         potionDuration:0,   potionPower:8   },
+  potion_regeneration:    { id:"potion_regeneration",    name:"Potion of Regeneration",    category:"potion", stackSize:4,  color:0xff6699, potionEffect:"regeneration",    potionDuration:30,  potionPower:1   },
+  potion_speed:           { id:"potion_speed",           name:"Potion of Swiftness",       category:"potion", stackSize:4,  color:0x88ccff, potionEffect:"speed",           potionDuration:60,  potionPower:1.5 },
+  potion_strength:        { id:"potion_strength",        name:"Potion of Strength",        category:"potion", stackSize:4,  color:0xff4400, potionEffect:"strength",        potionDuration:30,  potionPower:2.0 },
+  potion_fire_resistance: { id:"potion_fire_resistance", name:"Potion of Fire Resistance", category:"potion", stackSize:4,  color:0xff8800, potionEffect:"fire_resistance",  potionDuration:180, potionPower:1   },
+  potion_slowness:        { id:"potion_slowness",        name:"Splash of Slowness",        category:"potion", stackSize:4,  color:0x44aaff, potionEffect:"slowness",        potionDuration:8,   potionPower:0.4, potionSplash:true },
+  potion_night_vision:    { id:"potion_night_vision",    name:"Potion of Night Vision",    category:"potion", stackSize:4,  color:0x3366ff, potionEffect:"night_vision",    potionDuration:30,  potionPower:1   },
+  potion_haste:           { id:"potion_haste",           name:"Potion of Haste",           category:"potion", stackSize:4,  color:0xffaa00, potionEffect:"haste",           potionDuration:30,  potionPower:1.8 },
 
   // --- Buckets ---
   iron_bucket: { id:"iron_bucket", name:"Iron Bucket",    category:"material", stackSize:16, color:0xaaaaaa },

@@ -211,6 +211,10 @@ export class Game {
     this.inventory.addItem("iron_bucket", 1);
     this.inventory.addItem("gunpowder", 10);
     this.inventory.addItem("sand", 8);
+    // Starter potion ingredients so players can discover the system
+    this.inventory.addItem("glass_bottle", 3);
+    this.inventory.addItem("blaze_rod", 2);
+    this.inventory.addItem("nether_wart", 4);
 
     this.enemies     = new EnemyManager(this.scene.scene, this.scene.camera);
     this.enemies.setFlowField(this.flowField);
@@ -272,15 +276,15 @@ export class Game {
     const dungeonLoots: Array<Array<{itemId:string;count:number}|null>> = [
       [{ itemId:"iron_pickaxe", count:1 }, { itemId:"iron_ingot", count:4 }, { itemId:"coal_ore", count:6 }, { itemId:"bread", count:3 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
+      [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"nether_wart", count:4 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
       [{ itemId:"crossbow",     count:1 }, { itemId:"arrow_item", count:24 }, { itemId:"sniper_rifle", count:1 }, { itemId:"sniper_ammo", count:16 },
        { itemId:"pistol", count:1 }, { itemId:"bullet", count:16 }, { itemId:"shotgun", count:1 }, { itemId:"shotgun_shell", count:12 },
-       { itemId:"raygun", count:1 }, { itemId:"energy_cell", count:6 },
+       { itemId:"raygun", count:1 }, { itemId:"energy_cell", count:6 }, { itemId:"blaze_rod", count:2 }, { itemId:"nether_wart", count:4 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
+      [{ itemId:"iron_sword",   count:1 }, { itemId:"glass_bottle", count:3 }, { itemId:"nether_wart", count:6 }, { itemId:"torch", count:8 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
+      [{ itemId:"book",         count:2 }, { itemId:"blaze_rod", count:3 }, { itemId:"nether_wart", count:8 }, { itemId:"potion_healing", count:2 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
     ];
     for (let i = 0; i < DUNGEON_CHEST_POSITIONS.length; i++) {
@@ -571,8 +575,8 @@ export class Game {
       } else if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
-      } else if (itemDef?.category === "potion" && stack) {
-        this.usePotion(stack.itemId, itemDef);
+      } else if (itemDef?.category === "potion" && itemDef.potionEffect && stack) {
+        this._drinkPotion(stack.itemId, itemDef);
       } else if (itemDef?.category === "food" && itemDef.foodPoints && this.player.hunger < 20) {
         this.inventory.removeItem(stack!.itemId, 1);
         this.player.hunger = Math.min(20, this.player.hunger + itemDef.foodPoints);
@@ -840,7 +844,22 @@ export class Game {
     };
 
     this.enemies.onCreeperExplode = (x, y, z, radius) => {
-      this._doExplosion(x, y, z, radius, 6);
+      this._doExplosion(x, y, z, radius, this.player.fireResistant ? 0 : 6);
+      // Break nearby blocks
+      if (this.gameMap) {
+        for (let bx = Math.floor(x - radius); bx <= Math.ceil(x + radius); bx++) {
+          for (let by = Math.floor(y); by <= Math.ceil(y + radius); by++) {
+            for (let bz = Math.floor(z - radius); bz <= Math.ceil(z + radius); bz++) {
+              const ddx = bx - x, ddy = by - y, ddz = bz - z;
+              if (ddx*ddx + ddy*ddy + ddz*ddz > radius*radius) continue;
+              const block = this.gameMap.world.getBlock(bx, by, bz);
+              if (block === "air" || block === "bedrock") continue;
+              if (Math.random() < 0.45) this.gameMap.world.setBlock(bx, by, bz, "air");
+            }
+          }
+        }
+        this.gameMap.world.rebuildDirtyChunks();
+      }
       this.waves.onEnemyEliminated();
     };
 
@@ -1460,7 +1479,7 @@ export class Game {
 
     // Regen potion effect — 1 HP every 2 seconds
     const regenEff = this.player.activeEffects.get("regen");
-    if (regenEff && regenEff.timer > 0 && this.player.health < this.player.maxHealth) {
+    if (regenEff && regenEff.duration > 0 && this.player.health < this.player.maxHealth) {
       this._regenTimer -= dt * 0.5; // heal 2x faster
     }
 
@@ -1494,7 +1513,7 @@ export class Game {
 
     // Wither DoT — 1 HP every 0.5s while active
     const witherEff = this.player.activeEffects.get("wither");
-    if (witherEff && witherEff.timer > 0) {
+    if (witherEff && witherEff.duration > 0) {
       this._witherTickTimer += dt;
       if (this._witherTickTimer >= 0.5) {
         this._witherTickTimer -= 0.5;
@@ -2027,7 +2046,7 @@ export class Game {
     if (this.phase !== "playing" && this.phase !== "endless" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
-    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack) + Math.round(this.player.getStrengthBonus());
+    const damage  = Math.ceil(((itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack)) * this.player.strengthMult);
 
     const result = this.player.tryMeleeAttack();
     if (!result) return;
@@ -2258,27 +2277,25 @@ export class Game {
     }
   }
 
-  private usePotion(itemId: string, itemDef: import("./config/items").ItemDef): void {
+  private _drinkPotion(itemId: string, itemDef: import("./config/items").ItemDef): void {
     if (!itemDef.potionEffect) return;
+    const effect = itemDef.potionEffect;
+    const duration = itemDef.potionDuration ?? 0;
+    const power = itemDef.potionPower ?? 1;
     if (itemDef.potionSplash) {
-      this.throwSplashPotion(itemDef.potionEffect, itemDef.potionDuration ?? 8, itemDef.potionMagnitude ?? 0.5);
+      this.throwSplashPotion(effect, duration, power);
       this.inventory.removeItem(itemId, 1);
       this.refreshHotbar();
       return;
     }
-    const effect = itemDef.potionEffect;
-    const duration = itemDef.potionDuration ?? 0;
-    const magnitude = itemDef.potionMagnitude ?? 1;
-    if (effect === "heal") {
-      this.player.heal(magnitude);
+    this.player.applyPotionEffect(effect, duration, power);
+    if (effect === "healing") {
       this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
       this.particles.spawnHealEffect(
         this.player.position.x,
         this.player.position.y + 1,
         this.player.position.z,
       );
-    } else {
-      this.player.applyEffect(effect, duration, magnitude);
     }
     this.inventory.removeItem(itemId, 1);
     this.audio.play("eat", 0.7);

@@ -7,7 +7,7 @@ import { ITEMS } from "./config/items";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "crossbow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "crossbow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel" | "potion"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -55,6 +55,14 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
       path = `<rect x="13" y="4" width="6" height="22" fill="#5c3a1a"/>
                <rect x="10" y="4" width="12" height="12" rx="3" fill="${color}"/>`;
       break;
+    case "potion":
+      // Bottle with liquid
+      path = `<rect x="12" y="2" width="8" height="5" fill="#5c3a1a"/>
+               <rect x="10" y="7" width="12" height="2" fill="${color}88"/>
+               <rect x="8" y="9" width="16" height="14" rx="6" fill="${color}"/>
+               <rect x="10" y="9" width="6" height="8" fill="${color}cc"/>
+               <rect x="10" y="23" width="12" height="4" rx="2" fill="${color}88"/>`;
+      break;
     default: // material / block
       path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
                <rect x="4" y="4" width="24" height="4" fill="${color}cc"/>`;
@@ -91,6 +99,7 @@ function getItemIcon(itemId: string): string {
   else if (def.id.endsWith("_hoe")) shape = "hoe";
   else if (def.id === "bow") shape = "bow";
   else if (def.id === "crossbow") shape = "crossbow";
+  else if (def.category === "potion") shape = "potion";
   else if (def.category === "food") shape = "food";
   else if (def.category === "armor") shape = "armor";
   else if (def.category === "block") shape = "block";
@@ -192,7 +201,7 @@ export class UI {
 
   private _personalGrid: (string | null)[][] = [[null, null], [null, null]];
   private _inventoryOpen = false;
-  private effectsPanel!: HTMLElement;
+  private effectsContainer!: HTMLElement;
 
   private readonly container: HTMLElement;
 
@@ -265,35 +274,23 @@ export class UI {
     if (!def) { this.itemTooltip.style.display = "none"; return; }
     const durStr = (durability != null && def.durability != null)
       ? ` <span style="color:#aaa;font-size:7px">(${durability}/${def.durability})</span>` : "";
-    this.itemTooltip.innerHTML = def.name + durStr;
+    let extra = "";
+    if (def.category === "potion" && def.potionEffect) {
+      const desc: Record<string, string> = {
+        healing: "Instantly restores HP",
+        regeneration: "Regenerates HP over time",
+        speed: "Increases movement speed",
+        strength: "Doubles melee damage",
+        fire_resistance: "Immune to explosion damage",
+      };
+      const d = desc[def.potionEffect] ?? "";
+      const t = def.potionDuration ? ` (${def.potionDuration}s)` : "";
+      extra = d ? ` <span style="color:#88ccff;font-size:7px">— ${d}${t}</span>` : "";
+    }
+    this.itemTooltip.innerHTML = def.name + durStr + extra;
     this.itemTooltip.style.display = "block";
   }
 
-  updateActiveEffects(effects: Map<string, { timer: number; magnitude: number }>): void {
-    const EFFECT_META: Record<string, { label: string; icon: string; color: string }> = {
-      speed:        { label: "Speed",        icon: "⚡", color: "#ffdd44" },
-      strength:     { label: "Strength",     icon: "⚔",  color: "#cc2222" },
-      regen:        { label: "Regen",        icon: "✚",  color: "#ff88cc" },
-      wither:       { label: "Wither",       icon: "☠",  color: "#7700aa" },
-      night_vision: { label: "Night Vision", icon: "◉",  color: "#3366ff" },
-      haste:        { label: "Haste",        icon: "⛏",  color: "#ffaa00" },
-    };
-    const active = [...effects.entries()].filter(([, e]) => e.timer > 0);
-    if (active.length === 0) {
-      this.effectsPanel.style.display = "none";
-      return;
-    }
-    this.effectsPanel.style.display = "flex";
-    this.effectsPanel.innerHTML = active.map(([id, eff]) => {
-      const meta = EFFECT_META[id] ?? { label: id, icon: "●", color: "#ffffff" };
-      const secs = Math.ceil(eff.timer);
-      return `<div class="fps-effect-pill" style="border-color:${meta.color}">
-        <span style="color:${meta.color}">${meta.icon}</span>
-        <span class="fps-effect-name">${meta.label}</span>
-        <span class="fps-effect-timer">${secs}s</span>
-      </div>`;
-    }).join("");
-  }
 
   updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean, endless?: boolean): void {
     const dayStr = dayNum != null
@@ -473,6 +470,28 @@ export class UI {
 
   hideEnd(): void { this.endOverlay.style.display = "none"; }
 
+  updateActiveEffects(effects: Map<string, { duration: number; power: number }>): void {
+    this.effectsContainer.innerHTML = "";
+    const effectMeta: Record<string, { label: string; color: string; icon: string }> = {
+      healing:        { label: "Healing",         color: "#ff4466", icon: "♥" },
+      regeneration:   { label: "Regeneration",    color: "#ff66aa", icon: "✚" },
+      speed:          { label: "Swiftness",        color: "#88ccff", icon: "⚡" },
+      strength:       { label: "Strength",         color: "#ff6600", icon: "⚔" },
+      fire_resistance:{ label: "Fire Resistance",  color: "#ff8800", icon: "🔥" },
+    };
+    for (const [id, eff] of effects) {
+      const meta = effectMeta[id];
+      if (!meta) continue;
+      const el = div("fps-effect-icon");
+      el.style.borderColor = meta.color;
+      el.style.color = meta.color;
+      const secs = Math.ceil(eff.duration);
+      const timeStr = secs >= 60 ? `${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}` : `${secs}s`;
+      el.innerHTML = `<span class="fps-effect-glyph">${meta.icon}</span><span class="fps-effect-label">${meta.label}</span><span class="fps-effect-time">${timeStr}</span>`;
+      this.effectsContainer.appendChild(el);
+    }
+  }
+
   showDamageVignette(): void {
     const el = document.createElement("div");
     el.className = "damage-vignette";
@@ -586,12 +605,12 @@ export class UI {
     this.buildHearts();
     this.buildHungerBar();
     this.buildXPBar();
+    this.buildEffectsBar();
     this.buildHotbar();
     this.buildItemTooltip();
     this.buildDayClock();
     this.buildMinimap();
     this.buildCompass();
-    this.buildEffectsPanel();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -680,6 +699,11 @@ export class UI {
       this.hungerEls.push(h);
     }
     this.container.appendChild(wrap);
+  }
+
+  private buildEffectsBar(): void {
+    this.effectsContainer = div("fps-effects-bar");
+    this.container.appendChild(this.effectsContainer);
   }
 
   private buildXPBar(): void {
@@ -825,13 +849,6 @@ export class UI {
     this.compassEl.textContent = DIRS[idx];
   }
 
-  private buildEffectsPanel(): void {
-    const panel = document.createElement("div");
-    panel.className = "fps-effects-panel";
-    panel.style.display = "none";
-    this.effectsPanel = panel;
-    this.container.appendChild(panel);
-  }
 
   private buildHotbar(): void {
     const bar = div("fps-hotbar");
@@ -1321,16 +1338,18 @@ export class UI {
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
       { name: "Crossbow", ingredients: "3 Iron Ingots + 2 Sticks (3×3 grid) — right-click to load, right-click to fire", key: "crossbow" },
-      { name: "Glass Bottle", ingredients: "3 Glass (V-shape) → 3 Bottles", key: "glass_bottle" },
-      { name: "Healing Potion", ingredients: "1 Glass Bottle + 1 Apple → +8 HP", key: "healing_potion" },
-      { name: "Speed Potion", ingredients: "1 Glass Bottle + 1 Bread → Speed 30s", key: "speed_potion" },
-      { name: "Strength Potion", ingredients: "1 Glass Bottle + 1 Iron Ingot → +4 Dmg 30s", key: "strength_potion" },
-      { name: "Splash of Slowness", ingredients: "1 Glass Bottle + 1 Gunpowder → Throw to slow", key: "splash_slowness" },
-      { name: "Regen Potion", ingredients: "1 Glass Bottle + 1 Wheat → Heal over 20s", key: "regen_potion" },
-      { name: "Night Vision", ingredients: "1 Glass Bottle + 1 Gold Ingot + 1 Torch → See in the dark 30s", key: "night_vision_potion" },
-      { name: "Haste Potion", ingredients: "1 Glass Bottle + 1 Coal + 1 Iron Ingot → +1.8× mining speed 30s", key: "haste_potion" },
       { name: "Flint & Steel", ingredients: "1 Iron Ingot + 1 Flint (diagonal) — ignite TNT!", key: "flint_and_steel" },
       { name: "TNT", ingredients: "4 Gunpowder + 5 Sand (checkerboard) — creepers drop gunpowder!", key: "tnt" },
+      // Potions
+      { name: "⚗ Glass Bottle", ingredients: "3 Glass (V-shape) → 3 Bottles", key: "glass_bottle" },
+      { name: "⚗ Sugar", ingredients: "1 Wheat → 2 Sugar", key: "sugar_from_wheat" },
+      { name: "⚗ Glistering Melon", ingredients: "1 Gold Ingot + 1 Apple", key: "glistering_melon" },
+      { name: "⚗ Magma Cream", ingredients: "1 Blaze Rod + 1 Coal (vertical)", key: "magma_cream" },
+      { name: "🧪 Potion of Healing", ingredients: "Blaze Rod + Glistering Melon + Glass Bottle → heals 8 HP", key: "potion_healing" },
+      { name: "🧪 Potion of Regeneration", ingredients: "Blaze Rod + Nether Wart + Glass Bottle → regen 30s", key: "potion_regeneration" },
+      { name: "🧪 Potion of Swiftness", ingredients: "Blaze Rod + Sugar + Glass Bottle → speed 60s", key: "potion_speed" },
+      { name: "🧪 Potion of Strength", ingredients: "Blaze Rod + Magma Cream + Glass Bottle → 2× dmg 30s", key: "potion_strength" },
+      { name: "🧪 Potion of Fire Resistance", ingredients: "Nether Wart + Magma Cream + Glass Bottle → resist explosions 3min", key: "potion_fire_resistance" },
     ];
 
     const list = div("fps-rb-list");
@@ -2331,28 +2350,23 @@ const FPS_CSS = `
   transition: width 0.15s ease-out;
 }
 
-/* Active potion effects panel */
-.fps-effects-panel {
+/* Active potion effects bar — top-right */
+.fps-effects-bar {
   position: absolute;
-  bottom: 80px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  pointer-events: none;
-  z-index: 30;
+  top: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  pointer-events: none; z-index: 20;
 }
-.fps-effect-pill {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.fps-effect-icon {
+  display: flex; align-items: center; gap: 5px;
   background: rgba(0,0,0,0.65);
-  border: 1px solid #666;
+  border: 1px solid #888;
+  border-radius: 4px;
   padding: 3px 7px;
-  border-radius: 3px;
   font-family: 'Press Start 2P', monospace;
   font-size: 8px;
 }
-.fps-effect-name { color: #ddd; }
-.fps-effect-timer { color: #aaa; font-size: 7px; margin-left: 2px; }
+.fps-effect-glyph { font-size: 13px; line-height: 1; }
+.fps-effect-label { flex: 1; }
+.fps-effect-time  { opacity: 0.75; min-width: 28px; text-align: right; }
 `;

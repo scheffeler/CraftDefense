@@ -563,7 +563,10 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "flint_steel", count: 1 },
   },
 
-  // --- Potions & ingredients ---
+
+  // ── Potion ingredients ──────────────────────────────────────────────────────
+
+  // Glass bottle (3 glass in V-shape)
   {
     id: "glass_bottle",
     pattern: [
@@ -572,54 +575,81 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "glass_bottle", count: 3 },
   },
+
+  // Sugar (from wheat)
   {
-    id: "healing_potion",
-    pattern: [
-      [r("glass_bottle"), r("apple")],
-    ],
-    result: { itemId: "healing_potion", count: 1 },
+    id: "sugar_from_wheat",
+    pattern: [[r("wheat")]],
+    result: { itemId: "sugar", count: 2 },
   },
+
+  // Glistering melon (apple + gold ingot)
   {
-    id: "speed_potion",
+    id: "glistering_melon",
     pattern: [
-      [r("glass_bottle"), r("bread")],
+      [r("gold_ingot"), r("apple")],
     ],
-    result: { itemId: "speed_potion", count: 1 },
+    result: { itemId: "glistering_melon", count: 1 },
   },
+
+  // Magma cream (from blaze_rod + coal)
   {
-    id: "strength_potion",
+    id: "magma_cream",
     pattern: [
-      [r("glass_bottle"), r("iron_ingot")],
+      [r("blaze_rod")],
+      [r("coal_ore") ],
     ],
-    result: { itemId: "strength_potion", count: 1 },
+    result: { itemId: "magma_cream", count: 2 },
   },
+
+  // Potion of Healing (glass_bottle + glistering_melon + blaze_rod)
   {
-    id: "splash_slowness",
+    id: "potion_healing",
     pattern: [
-      [r("glass_bottle"), r("gunpowder")],
+      [r("blaze_rod"),    r("glistering_melon"), null],
+      [r("glass_bottle"), null,                  null],
     ],
-    result: { itemId: "splash_slowness", count: 1 },
+    result: { itemId: "potion_healing", count: 1 },
   },
+
+  // Potion of Regeneration (glass_bottle + nether_wart + blaze_rod)
   {
-    id: "regen_potion",
+    id: "potion_regeneration",
     pattern: [
-      [r("glass_bottle"), r("wheat")],
+      [r("blaze_rod"),    r("nether_wart"), null],
+      [r("glass_bottle"), null,             null],
     ],
-    result: { itemId: "regen_potion", count: 1 },
+    result: { itemId: "potion_regeneration", count: 1 },
   },
+
+  // Potion of Swiftness (glass_bottle + sugar + blaze_rod)
   {
-    id: "night_vision_potion",
+    id: "potion_speed",
     pattern: [
-      [r("glass_bottle"), r("gold_ingot"), r("torch")],
+      [r("blaze_rod"),    r("sugar"),  null],
+      [r("glass_bottle"), null,        null],
     ],
-    result: { itemId: "night_vision_potion", count: 1 },
+    result: { itemId: "potion_speed", count: 1 },
   },
+
+  // Potion of Strength (glass_bottle + magma_cream + blaze_rod)
   {
-    id: "haste_potion",
+    id: "potion_strength",
     pattern: [
-      [r("glass_bottle"), r("coal_ore"), r("iron_ingot")],
+      [r("blaze_rod"),    r("magma_cream"), null],
+      [r("glass_bottle"), null,             null],
     ],
-    result: { itemId: "haste_potion", count: 1 },
+    result: { itemId: "potion_strength", count: 1 },
+  },
+
+  // Potion of Fire Resistance (glass_bottle + magma_cream + nether_wart)
+  {
+    id: "potion_fire_resistance",
+    pattern: [
+      [r("nether_wart"),  r("magma_cream"), null],
+      [r("glass_bottle"), null,             null],
+    ],
+    result: { itemId: "potion_fire_resistance", count: 1 },
   },
 
   // --- Iron bucket (3 iron ingots in V-shape) ---
