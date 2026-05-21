@@ -208,15 +208,15 @@ export class Game {
 
     // Dungeon chests — varied loot per dungeon
     const dungeonLoots: Array<Array<{itemId:string;count:number}|null>> = [
-      [{ itemId:"iron_pickaxe", count:1 }, { itemId:"iron_ingot", count:4 }, { itemId:"coal_ore", count:6 }, { itemId:"bread", count:3 },
+      [{ itemId:"iron_pickaxe",    count:1 }, { itemId:"iron_ingot",    count:4 }, { itemId:"coal_ore",      count:6 }, { itemId:"bread",             count:3 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"diamond_ore",  count:2 }, { itemId:"iron_ingot", count:8 }, { itemId:"gold_ore", count:3 }, { itemId:"apple", count:5 },
+      [{ itemId:"diamond_ore",     count:2 }, { itemId:"iron_ingot",    count:8 }, { itemId:"gold_ore",      count:3 }, { itemId:"potion_healing",    count:2 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"bow",          count:1 }, { itemId:"arrow_item", count:16 }, { itemId:"cooked_beef", count:4 }, { itemId:"flint", count:4 },
+      [{ itemId:"bow",             count:1 }, { itemId:"arrow_item",    count:16}, { itemId:"cooked_beef",   count:4 }, { itemId:"glass_bottle",      count:4 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"iron_sword",   count:1 }, { itemId:"iron_boots", count:1 }, { itemId:"cobblestone", count:32 }, { itemId:"torch", count:8 },
+      [{ itemId:"iron_sword",      count:1 }, { itemId:"iron_boots",    count:1 }, { itemId:"potion_strength",count:1}, { itemId:"splash_harming",    count:2 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
-      [{ itemId:"book",         count:2 }, { itemId:"diamond",    count:1 }, { itemId:"iron_ingot",  count:6 }, { itemId:"wheat", count:6 },
+      [{ itemId:"potion_speed",    count:2 }, { itemId:"splash_slowness",count:2}, { itemId:"iron_ingot",    count:6 }, { itemId:"potion_regeneration",count:1 },
        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
     ];
     for (let i = 0; i < DUNGEON_CHEST_POSITIONS.length; i++) {
@@ -418,7 +418,10 @@ export class Game {
         return;
       }
 
-      if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
+      if (itemDef?.category === "potion") {
+        this.usePotionItem(stack!.itemId);
+        return;
+      } else if (itemDef?.id === "bow" && this.inventory.hasItem("arrow_item", 1)) {
         this.player.startBowCharge();
         this.audio.play("bow_charge", 0.4);
       } else if (itemDef?.category === "food" && itemDef.foodPoints && this.player.hunger < 20) {
@@ -877,6 +880,34 @@ export class Game {
 
     // UI restart
     this.ui.onRestart = () => this.resetGame();
+
+    // Splash potion landing
+    this.projectiles.onSplashLand = (pos, potionId) => {
+      const aliveEnemies = this.enemies.getAliveEnemies();
+      if (potionId === "splash_slowness") {
+        const radius = 4.5;
+        for (const state of aliveEnemies) {
+          const epos = this.enemies.getEnemyPosition(state.id);
+          if (epos && epos.distanceTo(pos) <= radius) {
+            this.enemies.damage(state.id, 0, 0.3, 6); // slow to 30% for 6s
+          }
+        }
+        this.particles.spawnBlockBreak(pos.x, pos.y + 0.5, pos.z, 0x4466cc);
+        this.audio.play("block_place", 0.6);
+      } else if (potionId === "splash_harming") {
+        const radius = 3.5;
+        for (const state of aliveEnemies) {
+          const epos = this.enemies.getEnemyPosition(state.id);
+          if (epos && epos.distanceTo(pos) <= radius) {
+            const dmg = Math.round(6 * this.player.getDamageMult());
+            this.enemies.damage(state.id, dmg, 1, 0);
+            this.showDamageNumber(dmg, epos.x, epos.y + 1.8, epos.z);
+          }
+        }
+        this.particles.spawnBlockBreak(pos.x, pos.y + 0.5, pos.z, 0xcc2200);
+        this.audio.play("explosion", 0.3);
+      }
+    };
   }
 
   // ─── Wave control ──────────────────────────────────────────────────────────
@@ -1119,6 +1150,7 @@ export class Game {
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.ui.updateDayClock(this.scene.dayTime);
+    this.ui.updateEffects(this.player.activeEffects);
     this.refreshHotbar();
 
     // Compass — extract yaw from camera quaternion
@@ -1444,11 +1476,48 @@ export class Game {
     this.enemies.spawn(type, sx, sz);
   }
 
+  private usePotionItem(itemId: string): void {
+    const isSplash = itemId.startsWith("splash_");
+    if (isSplash) {
+      const from = this.player.getCameraPosition();
+      const dir  = this.player.getLookDirection();
+      this.projectiles.throwPotion(from, dir, itemId);
+      this.inventory.removeItem(itemId, 1);
+      this.audio.play("block_place", 0.8);
+      this.refreshHotbar();
+      return;
+    }
+
+    // Drinkable potions
+    switch (itemId) {
+      case "potion_healing":
+        this.player.heal(6);
+        this.ui.showAchievement("Healing Potion!", "+6 HP restored");
+        break;
+      case "potion_regeneration":
+        this.player.applyEffect("regeneration", 30, 0.5);
+        this.ui.showAchievement("Regeneration!", "Slowly healing for 30s");
+        break;
+      case "potion_strength":
+        this.player.applyEffect("strength", 30, 0.5);
+        this.ui.showAchievement("Strength!", "+50% melee damage for 30s");
+        break;
+      case "potion_speed":
+        this.player.applyEffect("speed", 30, 0.5);
+        this.ui.showAchievement("Swiftness!", "+50% speed for 30s");
+        break;
+    }
+    this.inventory.removeItem(itemId, 1);
+    this.audio.play("eat", 0.7);
+    this.refreshHotbar();
+    this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
+  }
+
   private tryMeleeAttack(): void {
     if (this.phase !== "playing" && this.mode !== "freeplay") return;
     const stack   = this.inventory.getActiveItem();
     const itemDef = stack ? ITEMS[stack.itemId] : null;
-    const damage  = (itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack);
+    const damage  = Math.round(((itemDef?.damage ?? 1) + this.getEnchantDamageBonus(stack)) * this.player.getDamageMult());
 
     const result = this.player.tryMeleeAttack();
     if (!result) return;

@@ -4,6 +4,18 @@
 
 export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win";
 
+// ---------------------------------------------------------------------------
+// Status effects (potions)
+// ---------------------------------------------------------------------------
+
+export type StatusEffectType = "strength" | "speed" | "regeneration";
+
+export interface ActiveEffect {
+  type: StatusEffectType;
+  duration: number;   // remaining seconds
+  magnitude: number;  // e.g. 0.5 = +50% strength or speed, 0.5 hp/s for regen
+}
+
 export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton";
 export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat
 export type ProjectileType = "arrow" | "cannonball" | "icebolt";

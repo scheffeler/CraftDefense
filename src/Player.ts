@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { VoxelWorld } from "./Map";
 import { sweepAABBWorld } from "./Physics";
 import type { MovementInput } from "./InputManager";
+import type { StatusEffectType, ActiveEffect } from "./types";
 
 const WALK_SPEED      = 5.0;
 const SPRINT_MULT     = 1.6;
@@ -33,6 +34,9 @@ export class Player {
   bowCharge      = 0;
   isBowCharging  = false;
 
+  activeEffects: Map<StatusEffectType, ActiveEffect> = new Map();
+  private _regenAccum = 0;
+
   onDeath: () => void = () => {};
 
   // Look direction extracted from camera quaternion
@@ -52,6 +56,20 @@ export class Player {
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
+    }
+
+    // Tick active effects
+    for (const [type, eff] of this.activeEffects) {
+      eff.duration -= dt;
+      if (type === "regeneration") {
+        this._regenAccum += eff.magnitude * dt;
+        if (this._regenAccum >= 1) {
+          const amount = Math.floor(this._regenAccum);
+          this.heal(amount);
+          this._regenAccum -= amount;
+        }
+      }
+      if (eff.duration <= 0) this.activeEffects.delete(type);
     }
     this.applyMovement(dt, input);
     this.camera.position.copy(this.getCameraPosition());
@@ -117,6 +135,26 @@ export class Player {
     this.health = Math.min(this.maxHealth, this.health + amount);
   }
 
+  applyEffect(type: StatusEffectType, duration: number, magnitude: number): void {
+    const existing = this.activeEffects.get(type);
+    if (existing) {
+      existing.duration = Math.max(existing.duration, duration);
+      existing.magnitude = Math.max(existing.magnitude, magnitude);
+    } else {
+      this.activeEffects.set(type, { type, duration, magnitude });
+    }
+  }
+
+  getSpeedMult(): number {
+    const eff = this.activeEffects.get("speed");
+    return eff ? 1.0 + eff.magnitude : 1.0;
+  }
+
+  getDamageMult(): number {
+    const eff = this.activeEffects.get("strength");
+    return eff ? 1.0 + eff.magnitude : 1.0;
+  }
+
   addXP(amount: number): void {
     this.xp += amount;
     const thresholds = [0, 50, 150, 350, 700, 1200];
@@ -132,6 +170,7 @@ export class Player {
 
     let speed = WALK_SPEED;
     if (input.sprint) speed *= SPRINT_MULT;
+    speed *= this.getSpeedMult();
     if (this.inWater) speed *= WATER_SPEED;
 
     // Build horizontal move vector relative to camera yaw

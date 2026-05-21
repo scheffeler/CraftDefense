@@ -23,22 +23,37 @@ interface PlayerArrow {
   life: number;
 }
 
-const POOL_SIZE       = 200;
-const PLAYER_POOL     = 20;
-const HIT_DIST        = 0.6;
-const ARROW_HIT_DIST  = 0.9;
-const GRAVITY         = 20;
-const ARROW_MAX_LIFE  = 6;
+interface ThrownPotion {
+  active: boolean;
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  potionId: string;
+  life: number;
+}
+
+const POOL_SIZE        = 200;
+const PLAYER_POOL      = 20;
+const POTION_POOL      = 10;
+const HIT_DIST         = 0.6;
+const ARROW_HIT_DIST   = 0.9;
+const GRAVITY          = 20;
+const ARROW_MAX_LIFE   = 6;
 const ARROW_BASE_SPEED = 18;
 const ARROW_POWER_MULT = 22;
+const POTION_SPLASH_Y  = 7.2;  // splash when potion drops to approximately ground level
+const POTION_MAX_LIFE  = 3.0;
 
 export class ProjectileManager {
   private readonly pool: ProjectileData[] = [];
   private readonly playerArrows: PlayerArrow[] = [];
+  private readonly thrownPotions: ThrownPotion[] = [];
+
+  onSplashLand: (pos: THREE.Vector3, potionId: string) => void = () => {};
 
   constructor(private readonly scene: THREE.Scene) {
     this.buildPool();
     this.buildPlayerArrowPool();
+    this.buildThrownPotionPool();
   }
 
   private buildPlayerArrowPool(): void {
@@ -69,6 +84,35 @@ export class ProjectileManager {
     arrow.mesh.visible = true;
     const speed = ARROW_BASE_SPEED + power * ARROW_POWER_MULT;
     arrow.velocity.copy(direction).multiplyScalar(speed);
+  }
+
+  private buildThrownPotionPool(): void {
+    const geo = new THREE.SphereGeometry(0.18, 6, 6);
+    for (let i = 0; i < POTION_POOL; i++) {
+      const mat = new THREE.MeshLambertMaterial({ color: 0x8844ff, transparent: true, opacity: 0.9 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.thrownPotions.push({
+        active: false, mesh, velocity: new THREE.Vector3(),
+        potionId: "", life: 0,
+      });
+    }
+  }
+
+  throwPotion(from: THREE.Vector3, direction: THREE.Vector3, potionId: string): void {
+    const p = this.thrownPotions.find(t => !t.active);
+    if (!p) return;
+    const color = potionId === "splash_harming" ? 0xcc2200 : 0x4466cc;
+    (p.mesh.material as THREE.MeshLambertMaterial).color.setHex(color);
+    p.active = true;
+    p.potionId = potionId;
+    p.life = 0;
+    p.mesh.position.copy(from);
+    p.mesh.visible = true;
+    const speed = 14;
+    p.velocity.copy(direction).multiplyScalar(speed);
+    p.velocity.y += 3; // slight upward arc
   }
 
   private buildPool(): void {
@@ -194,11 +238,29 @@ export class ProjectileManager {
         }
       }
     }
+
+    // Thrown potions (arc + splash)
+    for (const t of this.thrownPotions) {
+      if (!t.active) continue;
+      t.life += dt;
+      t.velocity.y -= GRAVITY * dt;
+      t.mesh.position.addScaledVector(t.velocity, dt);
+      t.mesh.rotation.x += dt * 4;
+
+      const shouldSplash = t.mesh.position.y <= POTION_SPLASH_Y || t.life >= POTION_MAX_LIFE;
+      if (shouldSplash) {
+        const splashPos = t.mesh.position.clone();
+        this.showPotionSplash(splashPos, t.potionId);
+        this.onSplashLand(splashPos, t.potionId);
+        this.deactivatePotion(t);
+      }
+    }
   }
 
   reset(): void {
     for (const p of this.pool) this.deactivate(p);
     for (const a of this.playerArrows) this.deactivateArrow(a);
+    for (const t of this.thrownPotions) this.deactivatePotion(t);
   }
 
   private deactivate(p: ProjectileData): void {
@@ -209,6 +271,30 @@ export class ProjectileManager {
   private deactivateArrow(a: PlayerArrow): void {
     a.active = false;
     a.mesh.visible = false;
+  }
+
+  private deactivatePotion(t: ThrownPotion): void {
+    t.active = false;
+    t.mesh.visible = false;
+  }
+
+  private showPotionSplash(center: THREE.Vector3, potionId: string): void {
+    const color = potionId === "splash_harming" ? 0xcc2200 : 0x4466cc;
+    const geo = new THREE.SphereGeometry(2.5, 8, 6);
+    const mat = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.4, depthWrite: false,
+    });
+    const flash = new THREE.Mesh(geo, mat);
+    flash.position.copy(center);
+    this.scene.add(flash);
+    let t = 0;
+    const fade = () => {
+      t += 0.016;
+      mat.opacity = Math.max(0, 0.4 - t * 1.5);
+      if (mat.opacity > 0) requestAnimationFrame(fade);
+      else { this.scene.remove(flash); geo.dispose(); mat.dispose(); }
+    };
+    requestAnimationFrame(fade);
   }
 
   private showAoeFlash(center: THREE.Vector3, radius: number): void {

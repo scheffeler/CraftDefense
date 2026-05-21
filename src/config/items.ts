@@ -1,7 +1,7 @@
 import type { BlockId } from "../types";
 import type { ToolCategory } from "./blocks";
 
-export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material";
+export type ItemCategory = "block" | "tool" | "weapon" | "armor" | "food" | "material" | "potion";
 export type ToolTier     = "wood" | "stone" | "iron" | "diamond";
 export type ArmorSlot    = "head" | "chest" | "legs" | "feet";
 
@@ -116,4 +116,13 @@ export const ITEMS: Record<string, ItemDef> = {
   iron_chestplate: { id:"iron_chestplate", name:"Iron Chestplate", category:"armor", stackSize:1, color:0xbbbbbb, armorValue:5, armorSlot:"chest" },
   iron_leggings:   { id:"iron_leggings",   name:"Iron Leggings",   category:"armor", stackSize:1, color:0xbbbbbb, armorValue:4, armorSlot:"legs"  },
   iron_boots:      { id:"iron_boots",      name:"Iron Boots",      category:"armor", stackSize:1, color:0xbbbbbb, armorValue:2, armorSlot:"feet"  },
+
+  // --- Potions ---
+  glass_bottle:        { id:"glass_bottle",        name:"Glass Bottle",            category:"material", stackSize:64, color:0x88ccee },
+  potion_healing:      { id:"potion_healing",       name:"Potion of Healing",       category:"potion",   stackSize:64, color:0xff4466 },
+  potion_regeneration: { id:"potion_regeneration",  name:"Potion of Regeneration",  category:"potion",   stackSize:64, color:0xff8888 },
+  potion_strength:     { id:"potion_strength",      name:"Potion of Strength",      category:"potion",   stackSize:64, color:0xcc2222 },
+  potion_speed:        { id:"potion_speed",         name:"Potion of Swiftness",     category:"potion",   stackSize:64, color:0x44aaff },
+  splash_slowness:     { id:"splash_slowness",      name:"Splash of Slowness",      category:"potion",   stackSize:64, color:0x6688cc },
+  splash_harming:      { id:"splash_harming",       name:"Splash of Harming",       category:"potion",   stackSize:64, color:0x882200 },
 };

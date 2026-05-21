@@ -1,4 +1,4 @@
-import type { TowerTypeName, TowerState } from "./types";
+import type { TowerTypeName, TowerState, StatusEffectType, ActiveEffect } from "./types";
 import type { Inventory, ItemStack } from "./Inventory";
 import { ITEMS } from "./config/items";
 
@@ -7,7 +7,7 @@ import { ITEMS } from "./config/items";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel" | "potion"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -49,6 +49,12 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
       path = `<rect x="13" y="4" width="6" height="22" fill="#5c3a1a"/>
                <rect x="10" y="4" width="12" height="12" rx="3" fill="${color}"/>`;
       break;
+    case "potion":
+      path = `<rect x="12" y="2" width="8" height="4" fill="${color}cc"/>
+               <rect x="13" y="6" width="6" height="4" fill="${color}"/>
+               <rect x="9" y="10" width="14" height="12" rx="3" fill="${color}"/>
+               <rect x="10" y="12" width="4" height="4" fill="rgba(255,255,255,0.35)"/>`;
+      break;
     default: // material / block
       path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
                <rect x="4" y="4" width="24" height="4" fill="${color}cc"/>`;
@@ -71,6 +77,12 @@ const FOOD_FULL  = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18
 const FOOD_HALF  = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="8" y="2" width="6" height="4" fill="#886040"/><rect x="10" y="4" width="6" height="6" fill="#886040"/><rect x="8" y="8" width="8" height="4" fill="#664020"/><rect x="4" y="10" width="8" height="4" fill="#664020"/><rect x="2" y="12" width="8" height="2" fill="#4a3010"/><rect x="2" y="14" width="4" height="2" fill="#4a3010"/></svg>`);
 const FOOD_EMPTY = makeSvgUri(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="8" y="2" width="6" height="4" fill="#333"/><rect x="10" y="4" width="6" height="6" fill="#333"/><rect x="8" y="8" width="8" height="4" fill="#2a2a2a"/><rect x="4" y="10" width="8" height="4" fill="#2a2a2a"/><rect x="2" y="12" width="8" height="2" fill="#222"/><rect x="2" y="14" width="4" height="2" fill="#222"/></svg>`);
 
+const EFFECT_INFO: Record<string, { symbol: string; label: string; color: string }> = {
+  strength:     { symbol: "⚔",  label: "Strength",    color: "rgba(180,20,20,0.85)"  },
+  speed:        { symbol: "⚡",  label: "Swiftness",   color: "rgba(30,120,220,0.85)" },
+  regeneration: { symbol: "♥",  label: "Regen",       color: "rgba(200,80,100,0.85)" },
+};
+
 const ITEM_ICONS: Record<string, string> = {};
 function getItemIcon(itemId: string): string {
   if (ITEM_ICONS[itemId]) return ITEM_ICONS[itemId];
@@ -84,6 +96,7 @@ function getItemIcon(itemId: string): string {
   else if (def.toolCategory === "shovel") shape = "shovel";
   else if (def.id.endsWith("_hoe")) shape = "hoe";
   else if (def.id === "bow") shape = "bow";
+  else if (def.category === "potion") shape = "potion";
   else if (def.category === "food") shape = "food";
   else if (def.category === "armor") shape = "armor";
   else if (def.category === "block") shape = "block";
@@ -135,6 +148,7 @@ export class UI {
   private minimapCanvas!: HTMLCanvasElement;
   private minimapTerrain: ImageData | null = null;
   private compassEl!: HTMLElement;
+  private effectsPanel!: HTMLElement;
   private lockPrompt!: HTMLElement;
   private continueBtn!: HTMLElement;
   private pauseOverlay!: HTMLElement;
@@ -441,6 +455,7 @@ export class UI {
     this.buildDayClock();
     this.buildMinimap();
     this.buildCompass();
+    this.buildEffectsPanel();
 
     this.floatingContainer = div("floating-container");
     this.container.appendChild(this.floatingContainer);
@@ -508,6 +523,29 @@ export class UI {
       this.heartEls.push(h);
     }
     this.container.appendChild(wrap);
+  }
+
+  private buildEffectsPanel(): void {
+    this.effectsPanel = div("fps-effects-panel");
+    this.container.appendChild(this.effectsPanel);
+  }
+
+  updateEffects(effects: Map<StatusEffectType, ActiveEffect>): void {
+    if (effects.size === 0) {
+      this.effectsPanel.innerHTML = "";
+      return;
+    }
+    let html = "";
+    for (const [, eff] of effects) {
+      const secs = Math.ceil(eff.duration);
+      const info = EFFECT_INFO[eff.type];
+      html += `<div class="fps-effect-icon" style="background:${info.color}">
+        <span class="fps-effect-sym">${info.symbol}</span>
+        <span class="fps-effect-timer">${secs}s</span>
+        <span class="fps-effect-name">${info.label}</span>
+      </div>`;
+    }
+    this.effectsPanel.innerHTML = html;
   }
 
   private buildItemTooltip(): void {
@@ -1099,6 +1137,13 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "Glass Bottle", ingredients: "2 Glass (side by side) → 2 Bottles", key: "glass_bottle" },
+      { name: "Potion of Healing", ingredients: "Glass Bottle + Apple → +6 HP", key: "potion_healing" },
+      { name: "Potion of Regen", ingredients: "Glass Bottle + Cooked Beef → Regen 30s", key: "potion_regen" },
+      { name: "Potion of Strength", ingredients: "Glass Bottle + Iron Ingot → +50% DMG 30s", key: "potion_strength" },
+      { name: "Potion of Speed", ingredients: "Glass Bottle + Gold Ingot → +50% SPD 30s", key: "potion_speed" },
+      { name: "Splash of Slowness", ingredients: "Bottle + Gravel + Cobblestone (L) → Throw to slow", key: "splash_slow" },
+      { name: "Splash of Harming", ingredients: "Bottle + Flint + Coal (L) → Throw to damage", key: "splash_harm" },
     ];
 
     const list = div("fps-rb-list");
@@ -1899,4 +1944,32 @@ const FPS_CSS = `
 .fps-rb-name { font-size: 9px; color: #fff; margin-bottom: 2px; }
 .fps-rb-ing  { font-size: 7px; color: #aaa; }
 .fps-rb-hint { font-size: 7px; color: #666; text-align: center; margin-top: 8px; }
+
+/* Active effects panel */
+.fps-effects-panel {
+  position: absolute;
+  top: 72px; right: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  pointer-events: none; z-index: 16;
+}
+.fps-effect-icon {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 3px;
+  min-width: 80px;
+}
+.fps-effect-sym {
+  font-size: 14px; line-height: 1;
+  flex-shrink: 0;
+}
+.fps-effect-timer {
+  font-size: 9px; color: #fff;
+  font-family: 'Press Start 2P', monospace;
+  min-width: 26px; text-align: right;
+}
+.fps-effect-name {
+  font-size: 7px; color: rgba(255,255,255,0.8);
+  font-family: 'Press Start 2P', monospace;
+}
 `;

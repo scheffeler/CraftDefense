@@ -373,6 +373,49 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "enchanting_table", count: 1 },
   },
+
+  // --- Potions (all craft at 2×2 or workbench) ---
+  {
+    id: "glass_bottle",
+    pattern: [[r("glass"), r("glass")]],
+    result: { itemId: "glass_bottle", count: 2 },
+  },
+  {
+    id: "potion_healing",
+    pattern: [[r("glass_bottle"), r("apple")]],
+    result: { itemId: "potion_healing", count: 1 },
+  },
+  {
+    id: "potion_regeneration",
+    pattern: [[r("glass_bottle"), r("cooked_beef")]],
+    result: { itemId: "potion_regeneration", count: 1 },
+  },
+  {
+    id: "potion_strength",
+    pattern: [[r("glass_bottle"), r("iron_ingot")]],
+    result: { itemId: "potion_strength", count: 1 },
+  },
+  {
+    id: "potion_speed",
+    pattern: [[r("glass_bottle"), r("gold_ingot")]],
+    result: { itemId: "potion_speed", count: 1 },
+  },
+  {
+    id: "splash_slowness",
+    pattern: [
+      [r("glass_bottle"), r("gravel")],
+      [null,              r("cobblestone")],
+    ],
+    result: { itemId: "splash_slowness", count: 1 },
+  },
+  {
+    id: "splash_harming",
+    pattern: [
+      [r("glass_bottle"), r("flint")],
+      [null,              r("coal_ore")],
+    ],
+    result: { itemId: "splash_harming", count: 1 },
+  },
 ];
 
 // Silence unused helper warning
