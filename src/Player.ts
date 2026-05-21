@@ -106,6 +106,16 @@ export class Player {
     return e ? e.magnitude : 0;
   }
 
+  getHasteMult(): number {
+    const e = this.activeEffects.get("haste");
+    return e ? e.magnitude : 1.0;
+  }
+
+  getNightVisionActive(): boolean {
+    const e = this.activeEffects.get("night_vision");
+    return !!(e && e.timer > 0);
+  }
+
   /** Returns melee sphere params if attack was successful, null if on cooldown. */
   tryMeleeAttack(): { center: THREE.Vector3; radius: number } | null {
     if (this.attackCooldown > 0) return null;

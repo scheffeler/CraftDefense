@@ -191,8 +191,12 @@ export const ITEMS: Record<string, ItemDef> = {
     potionEffect:"strength", potionDuration:30, potionMagnitude:4  },
   splash_slowness: { id:"splash_slowness", name:"Splash of Slowness",   category:"potion",   stackSize:16, color:0x44aaff,
     potionEffect:"slowness", potionDuration:8,  potionMagnitude:0.4, potionSplash:true },
-  regen_potion:    { id:"regen_potion",    name:"Potion of Regeneration",category:"potion",  stackSize:16, color:0xff88cc,
-    potionEffect:"regen",    potionDuration:20, potionMagnitude:1  },
+  regen_potion:      { id:"regen_potion",      name:"Potion of Regeneration", category:"potion", stackSize:16, color:0xff88cc,
+    potionEffect:"regen",       potionDuration:20, potionMagnitude:1  },
+  night_vision_potion: { id:"night_vision_potion", name:"Potion of Night Vision", category:"potion", stackSize:16, color:0x3366ff,
+    potionEffect:"night_vision", potionDuration:30, potionMagnitude:1  },
+  haste_potion:      { id:"haste_potion",      name:"Potion of Haste",        category:"potion", stackSize:16, color:0xffaa00,
+    potionEffect:"haste",       potionDuration:30, potionMagnitude:1.8 },
 
   // --- Buckets ---
   iron_bucket: { id:"iron_bucket", name:"Iron Bucket",    category:"material", stackSize:16, color:0xaaaaaa },

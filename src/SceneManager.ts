@@ -74,7 +74,8 @@ export class SceneManager {
   private cloudMat!: THREE.MeshLambertMaterial;
 
   // Underwater effect
-  private _underwaterEffect = false;
+  private _underwaterEffect  = false;
+  private _nightVisionEffect = false;
 
 
   // Screen shake
@@ -173,7 +174,9 @@ export class SceneManager {
     }
 
     this.ambientLight.color.setHex(frame.ambientColor);
-    this.ambientLight.intensity = frame.ambientInt;
+    this.ambientLight.intensity = this._nightVisionEffect
+      ? Math.max(frame.ambientInt, 0.85)
+      : frame.ambientInt;
 
     this.sunLight.intensity = frame.sunInt;
     this.sunLight.color.setHex(frame.sunColor);
@@ -236,6 +239,10 @@ export class SceneManager {
   /** Enable/disable the in-lava orange fog effect. */
   setInLavaEffect(inLava: boolean): void {
     this._inLavaEffect = inLava;
+  }
+
+  setNightVisionEffect(active: boolean): void {
+    this._nightVisionEffect = active;
   }
 
   /** 0 = clear, 1 = heavy rain — darkens sky, tightens fog. */

@@ -1,5 +1,24 @@
 # CraftDefense Auto-Progress Log
 
+## 2026-05-21 — Night Vision + Haste potions
+
+**What was done:**
+- Added **Night Vision Potion** (glass bottle + gold ingot + torch → 30s effect): boosts ambient light to ≥0.85 intensity regardless of time of day, enabling clear vision at night or underground. Implemented via new `_nightVisionEffect` flag and `setNightVisionEffect()` on SceneManager; wired from `player.getNightVisionActive()` each update frame.
+- Added **Haste Potion** (glass bottle + coal + iron ingot → 30s effect): multiplies mining speed by 1.8×. Applied via new `hasteMultiplier` field on BlockInteraction; updated each frame from `player.getHasteMult()`. Stacks multiplicatively with Efficiency enchantments.
+- Both effects show in the active-effects HUD: Night Vision as "◉ Night Vision" in blue, Haste as "⛏ Haste" in orange.
+- Recipe book updated with both entries.
+- TypeScript: exit 0; all integration tests pass.
+
+**Ideas for next time:**
+- Water-lava interaction: water touching lava creates obsidian (multiple entries in notes suggest this)
+- Pre-wave boss announcement: "☠ THE TROLL KING APPROACHES ☠" full-screen banner when wave 10 starts
+- Fortune III enchantment: ×4 ore drops at cost 4 XP levels (already have Fortune I/II)
+- Feather Falling II: fully negate fall damage when all 4 armor pieces have it
+- Fall damage thud sound cue  
+- Brewing stand block for more authentic potion UI
+- Potions: fire resistance (15s), night vision II (60s extended)
+- Endless Score leaderboard: best wave reached shown on main menu (already tracked in localStorage)
+
 ## 2026-05-20 — Fall damage, Thorns I, Feather Falling I, Fortune II, TNT Trap achievement
 
 **What was done:**

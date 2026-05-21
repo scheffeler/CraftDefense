@@ -607,6 +607,20 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "regen_potion", count: 1 },
   },
+  {
+    id: "night_vision_potion",
+    pattern: [
+      [r("glass_bottle"), r("gold_ingot"), r("torch")],
+    ],
+    result: { itemId: "night_vision_potion", count: 1 },
+  },
+  {
+    id: "haste_potion",
+    pattern: [
+      [r("glass_bottle"), r("coal_ore"), r("iron_ingot")],
+    ],
+    result: { itemId: "haste_potion", count: 1 },
+  },
 
   // --- Iron bucket (3 iron ingots in V-shape) ---
   {

@@ -1358,9 +1358,11 @@ export class Game {
     const bobAmt    = 0.035 * this._headBob;
     this.scene.camera.position.y += Math.sin(performance.now() * 0.001 * bobSpeed) * bobAmt;
 
-    // Block interaction (mining)
+    // Block interaction (mining) + haste/night-vision potion effects
     const activeStack = this.inventory.getActiveItem();
     this.blockInteraction.setActiveItem(activeStack);
+    this.blockInteraction.hasteMultiplier = this.player.getHasteMult();
+    this.scene.setNightVisionEffect(this.player.getNightVisionActive());
     if (this.input.isLeftMouseDown() && this.blockInteraction.getTargetBlock()) {
       this.blockInteraction.startBreaking();
     } else {

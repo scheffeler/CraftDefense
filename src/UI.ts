@@ -271,10 +271,12 @@ export class UI {
 
   updateActiveEffects(effects: Map<string, { timer: number; magnitude: number }>): void {
     const EFFECT_META: Record<string, { label: string; icon: string; color: string }> = {
-      speed:    { label: "Speed",     icon: "⚡", color: "#ffdd44" },
-      strength: { label: "Strength",  icon: "⚔",  color: "#cc2222" },
-      regen:    { label: "Regen",     icon: "✚",  color: "#ff88cc" },
-      wither:   { label: "Wither",    icon: "☠",  color: "#7700aa" },
+      speed:        { label: "Speed",        icon: "⚡", color: "#ffdd44" },
+      strength:     { label: "Strength",     icon: "⚔",  color: "#cc2222" },
+      regen:        { label: "Regen",        icon: "✚",  color: "#ff88cc" },
+      wither:       { label: "Wither",       icon: "☠",  color: "#7700aa" },
+      night_vision: { label: "Night Vision", icon: "◉",  color: "#3366ff" },
+      haste:        { label: "Haste",        icon: "⛏",  color: "#ffaa00" },
     };
     const active = [...effects.entries()].filter(([, e]) => e.timer > 0);
     if (active.length === 0) {
@@ -1325,6 +1327,8 @@ export class UI {
       { name: "Strength Potion", ingredients: "1 Glass Bottle + 1 Iron Ingot → +4 Dmg 30s", key: "strength_potion" },
       { name: "Splash of Slowness", ingredients: "1 Glass Bottle + 1 Gunpowder → Throw to slow", key: "splash_slowness" },
       { name: "Regen Potion", ingredients: "1 Glass Bottle + 1 Wheat → Heal over 20s", key: "regen_potion" },
+      { name: "Night Vision", ingredients: "1 Glass Bottle + 1 Gold Ingot + 1 Torch → See in the dark 30s", key: "night_vision_potion" },
+      { name: "Haste Potion", ingredients: "1 Glass Bottle + 1 Coal + 1 Iron Ingot → +1.8× mining speed 30s", key: "haste_potion" },
     ];
 
     const list = div("fps-rb-list");

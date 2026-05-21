@@ -32,6 +32,8 @@ export class BlockInteraction {
 
   private activeItem: ItemStack | null = null;
 
+  hasteMultiplier = 1.0;
+
   onBlockBroken: (wx: number, wy: number, wz: number, id: BlockId, yieldsDrops: boolean) => void = () => {};
   onBlockPlaced: (wx: number, wy: number, wz: number, id: BlockId) => void = () => {};
 
@@ -193,6 +195,8 @@ export class BlockInteraction {
     // Efficiency enchantment bonus
     if (this.activeItem?.enchantments?.includes("efficiency_2")) speedMult *= 2.0;
     else if (this.activeItem?.enchantments?.includes("efficiency_1")) speedMult *= 1.5;
+    // Haste potion bonus
+    speedMult *= this.hasteMultiplier;
     this.breakHardness = hardness / speedMult;
     this.willYieldDrops = true;
   }
