@@ -294,3 +294,24 @@
 - Potions / brewing stand mechanic
 - Add an "Ender-Dragon"-style death sequence for the Troll King (explodes into particles, shakes screen)
 - Improve day/night cycle: darker nights, mob torches, glowing enemy eyes at night
+
+## 2026-05-21 — Lava spread mechanic (source blocks flow into adjacent air)
+
+**What was done:**
+- Added `_spreadLava()` method: every 7 seconds, each player-placed lava "source" block tries to flow into one adjacent air block (horizontal first, then downward) — enabling lava waterfall/moat construction
+- `lavaSourceBlocks` Set tracks player-placed sources (added in `onBlockPlaced`, cleared when iron_bucket picks up lava or on game reset)
+- Spread lava inherits all existing behaviors: enemy damage 2 HP/s, fire ignition, ember particles, orange PointLight
+- Capped at `MAX_LAVA_BLOCKS = 80` for performance safety
+- New lava blocks from spreading also emit a burst of ember particles so the flow is visually obvious
+- Verified: placing lava at y=8, triggering spread manually → 2 adjacent blocks become lava within one cycle
+
+**Ideas for next time:**
+- Water-lava interaction: water touching lava creates obsidian (or cobblestone at edges)
+- Lava bucket tooltip showing "source block" vs "spread block" (or just "places lava")
+- Brewing stand block for authentic potion crafting UI (potions currently made at workbench)
+- Pre-wave boss announcement: "THE TROLL KING APPROACHES" banner when wave 10 starts
+- Fortune III enchantment (×4 drops, 4 XP cost)
+- Feather Falling II: fully negate fall damage (requires all 4 armor pieces)
+- Fall damage sound: distinct "thud" audio cue on hard landing
+- Night vision potion: increases ambient light for 30s
+- Haste potion: increases mining speedMult for 30s
