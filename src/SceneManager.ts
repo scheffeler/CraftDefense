@@ -181,13 +181,13 @@ export class SceneManager {
     this.sunLight.intensity = frame.sunInt;
     this.sunLight.color.setHex(frame.sunColor);
 
-    // Animate sun position around world center
+    // Animate sun position around world center (offset by 32 so target=world center works)
     const angle = this._dayTime * Math.PI * 2;
     const r = 100;
     this.sunLight.position.set(
-      Math.cos(angle) * r,
+      32 + Math.cos(angle) * r,
       Math.sin(angle) * r,
-      20,
+      32,
     );
 
     // Tone mapping exposure: brighter at noon, dimmer at night
@@ -214,9 +214,9 @@ export class SceneManager {
     const sunColor = lerpHex(0xff8833, 0xffee88, Math.min(1, (frame.ambientInt - 0.4) * 5));
     (this.sun.material as THREE.MeshBasicMaterial).color.setHex(sunColor);
     this.sun.position.set(
-      Math.cos(angle) * 130 + 32,
+      32 + Math.cos(angle) * 130,
       Math.abs(Math.sin(angle)) * 130,
-      20,
+      32,
     );
 
     // Drift clouds and tint them with day cycle
@@ -535,16 +535,19 @@ export class SceneManager {
     this.scene.add(this.ambientLight);
 
     this.sunLight = new THREE.DirectionalLight(0xffe8b0, 1.6);
-    this.sunLight.position.set(60, 100, 20);
+    this.sunLight.position.set(60, 100, 52);
+    this.sunLight.target.position.set(32, 0, 32); // world center
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
+    this.sunLight.shadow.bias = -0.001;           // prevent shadow acne on blocks
     this.sunLight.shadow.camera.near = 1;
-    this.sunLight.shadow.camera.far = 220;
-    this.sunLight.shadow.camera.left  = -90;
-    this.sunLight.shadow.camera.right =  90;
-    this.sunLight.shadow.camera.top   =  90;
-    this.sunLight.shadow.camera.bottom = -90;
+    this.sunLight.shadow.camera.far = 250;
+    this.sunLight.shadow.camera.left  = -80;
+    this.sunLight.shadow.camera.right =  80;
+    this.sunLight.shadow.camera.top   =  80;
+    this.sunLight.shadow.camera.bottom = -80;
     this.scene.add(this.sunLight);
+    this.scene.add(this.sunLight.target);
 
     const fill1 = new THREE.DirectionalLight(0x88aacc, 0.5);
     fill1.position.set(-30, 20, -20);

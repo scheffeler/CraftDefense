@@ -43,7 +43,26 @@
 
 **Ideas for next time:**
 - Animated water / lava: advance a frame counter in Game.ts and call `blockTex.needsUpdate` to cycle animated tiles.
-- Lava glow: in rebuildChunkMesh, emit a vertex color boost (>1.0 with HDR) for lava faces so they glow independently of day/night lighting.
 - Torch billboard: instead of a full cube face, render torch as a tiny cross of two quads (X shape) for the 3D torch look.
 - Biome-tinted grass/leaves: pass biome info into getBlockTexIndex and return alternate palette tiles.
 - Mob face canvas textures: draw zombie/orc/skeleton faces onto a canvas, use as material map on mob head meshes.
+
+---
+
+## 2026-05-22 — Chunk Shadow Casting + Lava HDR Glow
+
+**What was done:**
+- Enabled `chunk.mesh.castShadow = true` in `Map.ts` — terrain, trees, and fortress walls now cast proper directional shadows on the world. Visible improvement in depth and realism.
+- Fixed sun light target to point at world center (32, 0, 32) instead of default (0, 0, 0), ensuring shadow coverage correctly covers the 64×64 block world.
+- Updated shadow bias to -0.001 to prevent shadow acne artifacts on block surfaces.
+- Adjusted shadow camera frustum (±80 units) to tightly fit the world bounds, improving shadow map texel density.
+- Added lava/fire HDR glow: vertex colors set to (2.8, 1.1, 0.1) — values > 1.0 blow out through ACES filmic tone mapping, making lava visually self-luminous orange even at night.
+- Lava/fire/torch blocks skip AO calculation so glow intensity isn't diminished by corner shadowing.
+
+**Ideas for next time:**
+- Animated water/lava: cycle UV offset per frame by storing a `frameOffset` uniform on the chunk material.
+- Torch: render as a small cross-shaped billboard (two quads in X formation) with an emissive tip, plus a PointLight that contributes to nearby block lighting.
+- Shadow quality: PCFSoftShadowMap is already set; cascaded shadow maps for larger view distances.
+- Chunk shadow LOD: only cast shadows from chunks within N units of the camera for performance.
+- Fog quality: add height-based fog for a ground mist effect at dawn/dusk.
+- Biome grass tinting: sample a color LUT based on getBiome() and tint grass/leaf vertex colors.

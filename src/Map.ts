@@ -812,18 +812,22 @@ export class VoxelWorld {
             // For textured blocks, use white vertex color so atlas texture defines color
             let fr = f.cr, fg = f.cg, fb = f.cb;
             if (fTexIdx !== 13) fr = fg = fb = 1.0;
+            // Lava and fire self-illuminate: boost HDR above 1.0 so ACES tone mapping glows
+            if (id === "lava" || id === "fire") { fr = 2.8; fg = 1.1; fb = 0.1; }
 
             // Per-vertex AO: check adjacent blocks in tangent directions only
+            // Emissive blocks skip AO so glow doesn't get darkened by corners
+            const skipAO = (id === "lava" || id === "fire" || id === "torch");
             const [tax, tay, taz] = f.a;
             const [tbx, tby, tbz] = f.b;
-            const s1n = isSolidAO(wx - tax, wy - tay, wz - taz);
-            const s1p = isSolidAO(wx + tax, wy + tay, wz + taz);
-            const s2n = isSolidAO(wx - tbx, wy - tby, wz - tbz);
-            const s2p = isSolidAO(wx + tbx, wy + tby, wz + tbz);
-            const ao0 = vertAO(s1n, s2n, isSolidAO(wx - tax - tbx, wy - tay - tby, wz - taz - tbz));
-            const ao1 = vertAO(s1p, s2n, isSolidAO(wx + tax - tbx, wy + tay - tby, wz + taz - tbz));
-            const ao2 = vertAO(s1n, s2p, isSolidAO(wx - tax + tbx, wy - tay + tby, wz - taz + tbz));
-            const ao3 = vertAO(s1p, s2p, isSolidAO(wx + tax + tbx, wy + tay + tby, wz + taz + tbz));
+            const s1n = skipAO ? false : isSolidAO(wx - tax, wy - tay, wz - taz);
+            const s1p = skipAO ? false : isSolidAO(wx + tax, wy + tay, wz + taz);
+            const s2n = skipAO ? false : isSolidAO(wx - tbx, wy - tby, wz - tbz);
+            const s2p = skipAO ? false : isSolidAO(wx + tbx, wy + tby, wz + tbz);
+            const ao0 = vertAO(s1n, s2n, skipAO ? false : isSolidAO(wx - tax - tbx, wy - tay - tby, wz - taz - tbz));
+            const ao1 = vertAO(s1p, s2n, skipAO ? false : isSolidAO(wx + tax - tbx, wy + tay - tby, wz + taz - tbz));
+            const ao2 = vertAO(s1n, s2p, skipAO ? false : isSolidAO(wx - tax + tbx, wy - tay + tby, wz - taz + tbz));
+            const ao3 = vertAO(s1p, s2p, skipAO ? false : isSolidAO(wx + tax + tbx, wy + tay + tby, wz + taz + tbz));
 
             addFace(
               wx + (f.n[0] < 0 ? 0 : f.n[0] > 0 ? 1 : 0),
@@ -858,7 +862,7 @@ export class VoxelWorld {
     });
     chunk.mesh = new THREE.Mesh(geo, mat);
     chunk.mesh.receiveShadow = true;
-    chunk.mesh.castShadow = false;
+    chunk.mesh.castShadow = true;
     this.chunkMeshGroup.add(chunk.mesh);
   }
 
