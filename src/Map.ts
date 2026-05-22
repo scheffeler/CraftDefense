@@ -100,6 +100,7 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     // Row 0 — original tiles
     case "stone":          return 0;
     case "cobblestone":    return 1;
+    case "dirt":
     case "farmland":       return 2;
     case "grass":          return isTop ? 3 : (isBot ? 2 : 4);
     case "sand":           return 5;
