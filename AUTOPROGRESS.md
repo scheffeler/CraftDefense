@@ -24,3 +24,27 @@
 - Better arm/hand mesh: wider, slightly tapered geometry instead of a plain box
 - Enemy and mob visual improvements (geometry, arm animations)
 - Sky: volumetric-style layered clouds (semi-transparent stacked planes)
+
+## 2026-05-22 — Stone cracks, grass-side, sand ripples, leaves palette
+
+**What was done:**
+- Stone (tile 0): added 3 seeded 2-segment crack lines with faint pixel
+  highlights — looks more like natural rock instead of uniform gray noise.
+- Grass-side (tile 4): widened green band to 4px, added alternating 1–2px
+  grass blade highlights at the top edge, and a fading transition zone (y=4–6).
+- Sand (tile 5): added horizontal dune ripple lines every 3px (dark shadow +
+  light highlight pair) for subtle wave texture.
+- Leaves (tile 9): replaced single brightness-varied green with a 5-color
+  palette sampled per pixel — trees now show visible multi-shade variation.
+  Added 3 soft highlight blobs for leaf cluster accents.
+
+**Files changed:** `src/Map.ts`
+
+**Ideas for next run:**
+- Better arm/hand mesh: wider geometry with a pixel-art skin canvas texture
+  (per-face UV on BoxGeometry, 16×16 skin with shading bands)
+- Enemy visual improvements: zombie face markings, goblin details
+- Animated water: separate water mesh layer with scrolling UV offset
+- Dirt texture (tile 2): add subtle pebble/root specks for more ground detail
+- Wood side (tile 6): slightly higher contrast grain, maybe a knot detail
+- Better torch mesh: billboard flame quad with emissive orange glow particle
