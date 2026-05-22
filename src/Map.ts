@@ -100,7 +100,6 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     // Row 0 — original tiles
     case "stone":          return 0;
     case "cobblestone":    return 1;
-    case "dirt":
     case "farmland":       return 2;
     case "grass":          return isTop ? 3 : (isBot ? 2 : 4);
     case "sand":           return 5;
@@ -113,14 +112,14 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "gold_ore":       return 14;
     case "diamond_ore":    return 15;
     // Row 1 — new distinct textures
-    case "furnace":        return isTop ? 0 : 16;        // stone top, fire-grate sides
+    case "furnace":        return isTop ? 0 : 16;
     case "chest":          return 17;
-    case "crafting_table": return isTop ? 18 : 8;        // 3×3 grid top, planks sides
+    case "crafting_table": return isTop ? 18 : 8;
     case "obsidian":       return 19;
     case "iron_block":     return 20;
     case "glass":          return 21;
     case "water":          return 22;
-    case "bookshelf":      return isTop ? 8 : 23;        // planks top, book-spines sides
+    case "bookshelf":      return isTop ? 8 : 23;
     case "snow":             return 24;
     case "cactus":           return 25;
     case "tnt":              return 26;
@@ -206,23 +205,43 @@ export class VoxelWorld {
     noise(0 * S, 136, 136, 136, 0.08, 1001);
     border(0 * S);
 
-    // 1: cobblestone — gray with stone shapes
-    noise(1 * S, 136, 128, 112, 0.1, 1002);
+    // 1: cobblestone — dark mortar with defined stone blocks
+    fill(1 * S, "#6e6658");
     { const r = rng(2002);
-      for (let i = 0; i < 6; i++) {
-        const bx = (r() * 12 + 1) | 0, by = (r() * 12 + 1) | 0, bw = (r() * 3 + 2) | 0, bh = (r() * 2 + 2) | 0;
-        ctx.fillStyle = "rgba(80,72,60,0.35)"; ctx.fillRect(1 * S + bx, by, bw, bh);
-        ctx.fillStyle = "rgba(180,172,155,0.3)"; ctx.fillRect(1 * S + bx + 1, by + 1, bw, bh);
+      const stones: [number,number,number,number,number,number,number][] = [
+        [1,0,6,5,138,130,114], [8,0,7,4,124,118,102],
+        [0,6,5,8,144,136,118], [7,5,8,9,130,122,106],
+        [1,13,5,3,136,128,112], [8,14,7,2,126,120,104],
+      ];
+      for (const [sx,sy,sw,sh,br,bg,bb] of stones) {
+        for (let py = 1; py < sh-1; py++) for (let px = 1; px < sw-1; px++) {
+          const v = (r() - 0.5) * 0.1;
+          pixel(1*S + sx+px, sy+py,
+            `rgb(${Math.max(0,Math.min(255,(br + v*255)|0))},${Math.max(0,Math.min(255,(bg + v*255)|0))},${Math.max(0,Math.min(255,(bb + v*255)|0))})`);
+        }
+        ctx.fillStyle = "rgba(255,255,255,0.14)";
+        ctx.fillRect(1*S + sx+1, sy+1, sw-2, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillRect(1*S + sx+1, sy+sh-2, sw-2, 1);
       }
     }
-    border(1 * S);
 
     // 2: dirt — brown with noise
     noise(2 * S, 139, 92, 42, 0.1, 1003);
     border(2 * S);
 
-    // 3: grass top — bright green
-    noise(3 * S, 93, 158, 58, 0.1, 1004);
+    // 3: grass top — bright green with varied tufts
+    noise(3 * S, 90, 155, 55, 0.12, 1004);
+    { const r = rng(2004);
+      for (let i = 0; i < 5; i++) {
+        const px2 = (r() * 12 + 2) | 0, py2 = (r() * 12 + 2) | 0;
+        ctx.fillStyle = "rgba(55,105,25,0.45)"; ctx.fillRect(3 * S + px2, py2, 2, 2);
+      }
+      for (let i = 0; i < 5; i++) {
+        const px2 = (r() * 12 + 2) | 0, py2 = (r() * 12 + 2) | 0;
+        ctx.fillStyle = "rgba(140,215,85,0.35)"; ctx.fillRect(3 * S + px2, py2, 2, 1);
+      }
+    }
     border(3 * S);
 
     // 4: grass side — green strip top 3px, dirt below
