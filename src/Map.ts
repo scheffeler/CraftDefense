@@ -89,27 +89,42 @@ class Chunk {
 
 // ---------------------------------------------------------------------------
 // Block texture atlas index
+// Atlas is 16 tiles wide × 2 rows tall (32 total tiles).
+// Row 0 = tiles 0–15 (v = 0.0–0.5), Row 1 = tiles 16–31 (v = 0.5–1.0).
+// Tile 13 = generic white (lets vertex color control appearance).
 // ---------------------------------------------------------------------------
 function getBlockTexIndex(id: BlockId, normalY: number): number {
   const isTop = normalY > 0;
   const isBot = normalY < 0;
   switch (id as string) {
-    case "stone":        return 0;
-    case "cobblestone":  return 1;
+    // Row 0 — original tiles
+    case "stone":          return 0;
+    case "cobblestone":    return 1;
     case "dirt":
-    case "farmland":     return 2;
-    case "grass":        return isTop ? 3 : (isBot ? 2 : 4);
-    case "sand":         return 5;
-    case "wood":         return (isTop || isBot) ? 7 : 6;
-    case "planks":       return 8;
-    case "leaves":       return 9;
-    case "iron_ore":     return 10;
-    case "coal_ore":     return 11;
-    case "bedrock":      return 12;
-    case "gold_ore":     return 14;
-    case "diamond_ore":  return 15;
-    case "tnt":          return 16;
-    default:             return 13;
+    case "farmland":       return 2;
+    case "grass":          return isTop ? 3 : (isBot ? 2 : 4);
+    case "sand":           return 5;
+    case "wood":           return (isTop || isBot) ? 7 : 6;
+    case "planks":         return 8;
+    case "leaves":         return 9;
+    case "iron_ore":       return 10;
+    case "coal_ore":       return 11;
+    case "bedrock":        return 12;
+    case "gold_ore":       return 14;
+    case "diamond_ore":    return 15;
+    // Row 1 — new distinct textures
+    case "furnace":        return isTop ? 0 : 16;        // stone top, fire-grate sides
+    case "chest":          return 17;
+    case "crafting_table": return isTop ? 18 : 8;        // 3×3 grid top, planks sides
+    case "obsidian":       return 19;
+    case "iron_block":     return 20;
+    case "glass":          return 21;
+    case "water":          return 22;
+    case "bookshelf":      return isTop ? 8 : 23;        // planks top, book-spines sides
+    case "snow":           return 24;
+    case "cactus":         return 25;
+    case "tnt":            return 26;
+    default:               return 13;
   }
 }
 
@@ -130,16 +145,17 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 17 textures × 16px wide = 272px atlas, 16px tall
-    const ATLAS_TILES = 17;
+    // 16 textures × 16px wide = 256px atlas, 32px tall (2 rows of 16 tiles each).
+    const ATLAS_TILES = 16;
     const S = 16;
     const canvas = document.createElement("canvas");
-    canvas.width = ATLAS_TILES * S; canvas.height = S;
+    canvas.width = ATLAS_TILES * S; canvas.height = S * 2;
     const ctx = canvas.getContext("2d")!;
 
     // Seeded RNG per tile for deterministic pixel art
     const rng = (seed: number) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; }; };
 
+    // Row-0 helpers (y offset = 0)
     const pixel = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
     const border = (ox: number) => {
       ctx.fillStyle = "rgba(0,0,0,0.25)";
@@ -155,6 +171,29 @@ export class VoxelWorld {
         const cg = Math.max(0, Math.min(255, baseG + v * 255)) | 0;
         const cb = Math.max(0, Math.min(255, baseB + v * 255)) | 0;
         pixel(ox + x, y, `rgb(${cr},${cg},${cb})`);
+      }
+    };
+
+    // Row-1 helpers (y offset = S — tiles 16–31)
+    const pixel1 = (tx: number, x: number, y: number, col: string) => {
+      ctx.fillStyle = col; ctx.fillRect(tx + x, S + y, 1, 1);
+    };
+    const fill1 = (tx: number, col: string) => {
+      ctx.fillStyle = col; ctx.fillRect(tx, S, S, S);
+    };
+    const border1 = (tx: number) => {
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(tx, S, S, 1); ctx.fillRect(tx, S + S-1, S, 1);
+      ctx.fillRect(tx, S, 1, S); ctx.fillRect(tx+S-1, S, 1, S);
+    };
+    const noise1 = (tx: number, baseR: number, baseG: number, baseB: number, variance: number, seed: number) => {
+      const r = rng(seed);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * variance;
+        const cr = Math.max(0, Math.min(255, baseR + v * 255)) | 0;
+        const cg = Math.max(0, Math.min(255, baseG + v * 255)) | 0;
+        const cb = Math.max(0, Math.min(255, baseB + v * 255)) | 0;
+        pixel1(tx, x, y, `rgb(${cr},${cg},${cb})`);
       }
     };
 
@@ -310,20 +349,226 @@ export class VoxelWorld {
     }
     border(15 * S);
 
-    // 16: TNT — red body with dark cross (classic Minecraft look)
-    fill(16 * S, "#cc2222");
-    { ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(16 * S + 0, 5, S, 6);   // horizontal dark band
-      ctx.fillRect(16 * S + 5, 0, 6, S);   // vertical dark band
-      ctx.fillStyle = "#ee4444";
-      ctx.fillRect(16 * S + 6, 6, 4, 4);   // bright center highlight
-      ctx.fillStyle = "rgba(255,255,255,0.1)";
-      for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++)
-        ctx.fillRect(16 * S + x, y, 1, 1);
-      for (let y = 11; y < S; y++) for (let x = 11; x < S; x++)
-        ctx.fillRect(16 * S + x, y, 1, 1);
+    // ── Row 1: tiles 16–31 ───────────────────────────────────────────────────
+
+    // Tile 16: furnace side — stone with fire opening
+    noise1(0 * S, 108, 108, 108, 0.09, 3016);
+    { // Stone block pattern
+      const r = rng(4016);
+      for (let i = 0; i < 4; i++) {
+        const bx = (r() * 10 + 2) | 0, by = (r() * 10 + 2) | 0, bw = (r() * 3 + 2) | 0, bh = (r() * 2 + 1) | 0;
+        ctx.fillStyle = "rgba(60,60,60,0.3)"; ctx.fillRect(0 * S + bx, S + by, bw, bh);
+      }
+      // Dark surround for fire opening (centered, lower half)
+      ctx.fillStyle = "#222222"; ctx.fillRect(0 * S + 4, S + 5, 8, 8);
+      // Orange fire
+      ctx.fillStyle = "#cc5500"; ctx.fillRect(0 * S + 5, S + 7, 6, 5);
+      ctx.fillStyle = "#ff7700"; ctx.fillRect(0 * S + 6, S + 8, 4, 3);
+      ctx.fillStyle = "#ffcc00"; ctx.fillRect(0 * S + 7, S + 9, 2, 2);
+      // Top decorative bar
+      ctx.fillStyle = "rgba(60,60,60,0.4)"; ctx.fillRect(0 * S + 3, S + 3, 10, 1);
     }
-    border(16 * S);
+    border1(0 * S);
+
+    // Tile 17: chest — wood with metal trim and clasp
+    fill1(1 * S, "#7a4a22");
+    { const r = rng(3017);
+      // Wood grain noise
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel1(1 * S, x, y, `rgb(${(122 + v) | 0},${(74 + v * 0.7) | 0},${(34 + v * 0.4) | 0})`);
+      }
+      // Metal trim frame (1px inner border)
+      ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + 1, S + 1, S - 2, 1);
+      ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + 1, S + S-2, S - 2, 1);
+      ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + 1, S + 1, 1, S - 2);
+      ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + S-2, S + 1, 1, S - 2);
+      // Horizontal seam (lid line at y=6)
+      ctx.fillStyle = "#553311"; ctx.fillRect(1 * S + 1, S + 6, S-2, 1);
+      ctx.fillStyle = "#aa7733"; ctx.fillRect(1 * S + 1, S + 7, S-2, 1);
+      // Clasp (gold, center)
+      ctx.fillStyle = "#ddaa00"; ctx.fillRect(1 * S + 6, S + 5, 4, 5);
+      ctx.fillStyle = "#ffdd44"; ctx.fillRect(1 * S + 7, S + 6, 2, 2);
+      ctx.fillStyle = "#aa8800"; ctx.fillRect(1 * S + 7, S + 8, 2, 2);
+    }
+    border1(1 * S);
+
+    // Tile 18: crafting table top — plank base with 3×3 grid marks
+    { const r = rng(3018);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 18;
+        pixel1(2 * S, x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
+      }
+      // 3×3 cell grid lines (every 5px, offset by 1)
+      for (let i = 0; i < 3; i++) {
+        const gx = 1 + i * 5, gz = 1 + i * 5;
+        ctx.fillStyle = "rgba(80,50,20,0.4)";
+        ctx.fillRect(2 * S + gx, S, 1, S); // vertical
+        ctx.fillRect(2 * S, S + gz, S, 1); // horizontal
+      }
+      // Slight highlight offset lines
+      ctx.fillStyle = "rgba(255,220,150,0.2)";
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(2 * S + 2 + i * 5, S, 1, S);
+        ctx.fillRect(2 * S, S + 2 + i * 5, S, 1);
+      }
+    }
+    border1(2 * S);
+
+    // Tile 19: obsidian — deep purple-black with faint crystal shimmer
+    { const r = rng(3019);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 0.15;
+        const cr = Math.max(0, Math.min(255, 18  + v * 255)) | 0;
+        const cg = Math.max(0, Math.min(255,  8  + v * 255)) | 0;
+        const cb = Math.max(0, Math.min(255, 28  + v * 255)) | 0;
+        pixel1(3 * S, x, y, `rgb(${cr},${cg},${cb})`);
+      }
+      // Faint purple crystal inclusions
+      const r2 = rng(4019);
+      for (let i = 0; i < 6; i++) {
+        const px2 = (r2() * 12 + 2) | 0, py2 = (r2() * 12 + 2) | 0;
+        ctx.fillStyle = `rgba(${(80 + r2() * 60) | 0},${(20 + r2() * 20) | 0},${(100 + r2() * 80) | 0},0.5)`;
+        ctx.fillRect(3 * S + px2, S + py2, 2, 1);
+      }
+    }
+    border1(3 * S);
+
+    // Tile 20: iron block — smooth silver with subtle grid seams
+    noise1(4 * S, 172, 172, 176, 0.06, 3020);
+    { // Subtle seams every 4px
+      ctx.fillStyle = "rgba(100,100,110,0.25)";
+      for (let i = 4; i < S; i += 4) {
+        ctx.fillRect(4 * S, S + i, S, 1);
+        ctx.fillRect(4 * S + i, S, 1, S);
+      }
+      // Highlight on seam corners
+      ctx.fillStyle = "rgba(220,220,230,0.3)";
+      for (let i = 4; i < S; i += 4) {
+        ctx.fillRect(4 * S + i + 1, S + i + 1, 2, 2);
+      }
+    }
+    border1(4 * S);
+
+    // Tile 21: glass — light blue with frosted border frame
+    fill1(5 * S, "rgba(160,210,240,0.7)");
+    { const r = rng(3021);
+      // Slight inner variation
+      for (let y = 2; y < S-2; y++) for (let x = 2; x < S-2; x++) {
+        const v = r() * 0.12;
+        pixel1(5 * S, x, y, `rgba(${(150 + v * 100) | 0},${(200 + v * 80) | 0},${(235 + v * 20) | 0},0.6)`);
+      }
+      // White border frame (2px)
+      ctx.fillStyle = "rgba(220,235,245,0.9)";
+      ctx.fillRect(5 * S,     S,     S, 2);
+      ctx.fillRect(5 * S,     S+S-2, S, 2);
+      ctx.fillRect(5 * S,     S,     2, S);
+      ctx.fillRect(5 * S+S-2, S,     2, S);
+      // Corner highlights
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillRect(5 * S + 1, S + 1, 2, 2);
+      ctx.fillRect(5 * S + S-3, S + 1, 2, 2);
+      ctx.fillRect(5 * S + 1, S + S-3, 2, 2);
+      ctx.fillRect(5 * S + S-3, S + S-3, 2, 2);
+    }
+
+    // Tile 22: water top — blue with darker ripple lines
+    { const r = rng(3022);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const ripple = Math.sin((x + y * 0.7) * 0.9) * 0.12 + Math.sin((x * 0.6 - y) * 1.2) * 0.08;
+        const brightness = 0.85 + ripple;
+        const cr = Math.min(255, (50  * brightness + (r() - 0.5) * 10)) | 0;
+        const cg = Math.min(255, (130 * brightness + (r() - 0.5) * 10)) | 0;
+        const cb = Math.min(255, (220 * brightness + (r() - 0.5) * 10)) | 0;
+        pixel1(6 * S, x, y, `rgb(${cr},${cg},${cb})`);
+      }
+      // Subtle foam/highlight streaks
+      ctx.fillStyle = "rgba(180,220,255,0.3)";
+      for (let i = 0; i < 3; i++) {
+        const lx = (i * 5 + 2), ly = (i * 4 + 1);
+        ctx.fillRect(6 * S + lx, S + ly, 4, 1);
+      }
+    }
+
+    // Tile 23: bookshelf side — two rows of coloured book spines on wood
+    { const r = rng(3023);
+      // Wood background
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 18;
+        pixel1(7 * S, x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
+      }
+      // Top and bottom plank rails (2px)
+      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S,     S, 2);
+      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S+S-2, S, 2);
+      // Middle rail
+      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S + 7, S, 2);
+      // Book spines — top row (y 2–6)
+      const bookColors = ["#cc2222","#2244cc","#228833","#cc9900","#882299","#cc4411","#116688","#554422"];
+      for (let i = 0; i < 8; i++) {
+        const bx = i * 2;
+        ctx.fillStyle = bookColors[i % bookColors.length];
+        ctx.fillRect(7 * S + bx, S + 2, 2, 5);
+        // Lighter spine highlight
+        ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(7 * S + bx, S + 2, 1, 5);
+      }
+      // Book spines — bottom row (y 9–13)
+      for (let i = 0; i < 8; i++) {
+        const bx = i * 2;
+        ctx.fillStyle = bookColors[(i + 3) % bookColors.length];
+        ctx.fillRect(7 * S + bx, S + 9, 2, 5);
+        ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(7 * S + bx, S + 9, 1, 5);
+      }
+    }
+    border1(7 * S);
+
+    // Tile 24: snow — white with subtle cold blue-white noise
+    noise1(8 * S, 230, 235, 245, 0.05, 3024);
+    { const r = rng(4024);
+      // Occasional sparkle pixel
+      for (let i = 0; i < 8; i++) {
+        const sx = (r() * 14 + 1) | 0, sy = (r() * 14 + 1) | 0;
+        pixel1(8 * S, sx, sy, "#ffffff");
+      }
+    }
+    border1(8 * S);
+
+    // Tile 25: cactus — green with lighter stripe and spine dots
+    fill1(9 * S, "#2d7a2d");
+    { const r = rng(3025);
+      // Green noise base
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel1(9 * S, x, y, `rgb(${(45 + v) | 0},${(122 + v) | 0},${(45 + v) | 0})`);
+      }
+      // Lighter vertical stripe in center (the rib)
+      ctx.fillStyle = "rgba(100,180,100,0.4)";
+      ctx.fillRect(9 * S + 6, S, 4, S);
+      // Even lighter highlight on stripe
+      ctx.fillStyle = "rgba(150,210,150,0.3)";
+      ctx.fillRect(9 * S + 7, S, 2, S);
+      // Spine dots on edges (every 4px)
+      ctx.fillStyle = "#e0e8b0";
+      for (let sy = 2; sy < S; sy += 4) {
+        ctx.fillRect(9 * S + 1, S + sy, 1, 1);
+        ctx.fillRect(9 * S + S-2, S + sy, 1, 1);
+      }
+    }
+    border1(9 * S);
+
+    // Tile 26: TNT — red body with dark cross (classic Minecraft look)
+    fill1(10 * S, "#cc2222");
+    { ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(10 * S, S + 5, S, 6);     // horizontal dark band
+      ctx.fillRect(10 * S + 5, S, 6, S);     // vertical dark band
+      ctx.fillStyle = "#ee4444";
+      ctx.fillRect(10 * S + 6, S + 6, 4, 4); // bright center highlight
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++)
+        ctx.fillRect(10 * S + x, S + y, 1, 1);
+      for (let y = 11; y < S; y++) for (let x = 11; x < S; x++)
+        ctx.fillRect(10 * S + x, S + y, 1, 1);
+    }
+    border1(10 * S);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
@@ -410,8 +655,11 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 17, u1 = (texIdx + 1) / 17;
-      uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
+      const col = texIdx % 16;
+      const row = Math.floor(texIdx / 16);
+      const u0 = col / 16, u1 = (col + 1) / 16;
+      const v0 = row * 0.5, v1 = v0 + 0.5;
+      uvs.push(u0, v0, u1, v0, u0, v1, u1, v1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {
         indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2);
