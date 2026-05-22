@@ -21,10 +21,29 @@
 
 **Ideas for next time:**
 - Animated water: ping-pong between two water frame textures, or animate UV offset per frame.
-- Lava texture (tile 27): glowing orange/red with irregular molten texture and self-emissive vertex color.
 - Transparent water/glass: separate transparent block meshes into a second draw pass.
 - Torch rendering: cross-shaped billboard sprite with a dynamic point light.
 - Sky dome: replace flat background Color with a sphere-gradient shader for dramatic sunrises.
 - Mob face textures: canvas-drawn face details per mob type (zombie, orc, goblin) rather than plain vertex colors.
 - Chunk shadow casting: enable castShadow on chunk meshes for real terrain shadows.
-- Dispenser front face texture showing arrow slot.
+- Lava self-emission: vertex color override so lava glows brighter independent of scene lighting.
+
+---
+
+## 2026-05-22 — Fill remaining generic block textures (tiles 27-31)
+
+**What was done:**
+- Added 5 new pixel-art textures in row 1 of the block atlas (tiles 27–31) for blocks that still used the flat generic white tile:
+  - **Gravel** (tile 27): 9 rounded gray pebbles with shadow/highlight contrast
+  - **Enchanting Table top** (tile 28): dark purple base with glowing red & cyan rune marks
+  - **Lava top** (tile 29): molten orange-red sine-wave heat pattern with yellow/white hotspots
+  - **Dispenser front** (tile 30): stone with dark arrow-slot opening and arrow head hint
+  - **Bed top** (tile 31): tan pillow top + red blanket bottom with visible seam
+- Updated `getBlockTexIndex()` for all five: gravel→27, enchanting_table→28 (top) / obsidian-style sides, lava→29, dispenser front→30, bed top→31 / planks sides
+
+**Ideas for next time:**
+- Animated water / lava: advance a frame counter in Game.ts and call `blockTex.needsUpdate` to cycle animated tiles.
+- Lava glow: in rebuildChunkMesh, emit a vertex color boost (>1.0 with HDR) for lava faces so they glow independently of day/night lighting.
+- Torch billboard: instead of a full cube face, render torch as a tiny cross of two quads (X shape) for the 3D torch look.
+- Biome-tinted grass/leaves: pass biome info into getBlockTexIndex and return alternate palette tiles.
+- Mob face canvas textures: draw zombie/orc/skeleton faces onto a canvas, use as material map on mob head meshes.

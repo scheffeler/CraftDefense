@@ -121,10 +121,15 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "glass":          return 21;
     case "water":          return 22;
     case "bookshelf":      return isTop ? 8 : 23;        // planks top, book-spines sides
-    case "snow":           return 24;
-    case "cactus":         return 25;
-    case "tnt":            return 26;
-    default:               return 13;
+    case "snow":             return 24;
+    case "cactus":           return 25;
+    case "tnt":              return 26;
+    case "gravel":           return 27;
+    case "enchanting_table": return isTop ? 28 : 19;
+    case "lava":             return 29;
+    case "dispenser":        return isTop ? 0 : 30;
+    case "bed":              return isTop ? 31 : 8;
+    default:                 return 13;
   }
 }
 
@@ -569,6 +574,90 @@ export class VoxelWorld {
         ctx.fillRect(10 * S + x, S + y, 1, 1);
     }
     border1(10 * S);
+
+    // Tile 27: gravel — rounded pebble shapes on gray base
+    noise1(11 * S, 112, 110, 106, 0.12, 3027);
+    { const r = rng(4027);
+      for (let i = 0; i < 9; i++) {
+        const px2 = (r() * 11 + 1) | 0, py2 = (r() * 11 + 1) | 0;
+        const pw = (r() * 3 + 2) | 0,  ph = (r() * 2 + 2) | 0;
+        ctx.fillStyle = "rgba(65,62,58,0.55)";  ctx.fillRect(11 * S + px2, S + py2, pw, ph);
+        ctx.fillStyle = "rgba(155,150,144,0.4)"; ctx.fillRect(11 * S + px2 - 1, S + py2 - 1, pw, ph);
+      }
+    }
+    border1(11 * S);
+
+    // Tile 28: enchanting table top — dark purple with glowing rune marks
+    { const r = rng(3028);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 0.2;
+        pixel1(12 * S, x, y, `rgb(${(22 + v * 255 * 0.5) | 0},${(8 + v * 255 * 0.3) | 0},${(40 + v * 255) | 0})`);
+      }
+      // Glowing rune marks — red and cyan
+      const runeColors = ["#cc0033","#ee1144","#00aacc","#0088aa","#ff2266","#22ccee"];
+      const r2 = rng(4028);
+      for (let i = 0; i < 9; i++) {
+        const rx = (r2() * 12 + 2) | 0, ry = (r2() * 10 + 3) | 0;
+        const rw = (r2() * 3 + 1) | 0;
+        ctx.fillStyle = runeColors[i % runeColors.length];
+        ctx.fillRect(12 * S + rx, S + ry, rw, 1);
+        if (r2() > 0.5) ctx.fillRect(12 * S + rx, S + ry + 1, 1, 1);
+      }
+      // Bright center glow
+      pixel1(12 * S, 7, 7, "#ff3366");
+      pixel1(12 * S, 8, 8, "#33ddff");
+    }
+    border1(12 * S);
+
+    // Tile 29: lava top — molten orange with hot-spot glow
+    { const r = rng(3029);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const heat = Math.sin((x * 0.6 + y * 0.4) * 0.9) * 0.18 + Math.cos((x * 0.4 - y * 0.7) * 1.1) * 0.12;
+        const v = (r() - 0.5) * 0.12 + heat;
+        const cr = Math.min(255, (220 + v * 255 * 0.3)) | 0;
+        const cg = Math.min(255, (80  + v * 255 * 0.6)) | 0;
+        const cb = Math.max(0,   (5   + v * 255 * 0.1)) | 0;
+        pixel1(13 * S, x, y, `rgb(${cr},${cg},${cb})`);
+      }
+      // Bright yellow hotspots
+      const r2 = rng(4029);
+      for (let i = 0; i < 5; i++) {
+        const hx = (r2() * 12 + 2) | 0, hy = (r2() * 12 + 2) | 0;
+        ctx.fillStyle = "#ffee00"; ctx.fillRect(13 * S + hx, S + hy, 2, 1);
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(13 * S + hx, S + hy, 1, 1);
+      }
+    }
+
+    // Tile 30: dispenser front — stone with arrow slot opening
+    noise1(14 * S, 115, 113, 110, 0.09, 3030);
+    { // Dark arrow slot (narrow rectangle center)
+      ctx.fillStyle = "#1a1a1a"; ctx.fillRect(14 * S + 5, S + 4, 6, 8);
+      // Arrow tip pointing forward (outward)
+      ctx.fillStyle = "#888870"; ctx.fillRect(14 * S + 7, S + 6, 2, 4);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(14 * S + 8, S + 7, 1, 2);
+      // Arrow head v-shape
+      ctx.fillStyle = "#ccccaa"; ctx.fillRect(14 * S + 6, S + 5, 4, 1);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(14 * S + 7, S + 4, 2, 1);
+    }
+    border1(14 * S);
+
+    // Tile 31: bed top — red blanket with tan pillow
+    { const r = rng(3031);
+      // Red blanket noise (lower 2/3)
+      for (let y = 5; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel1(15 * S, x, y, `rgb(${(180 + v) | 0},${(35 + v * 0.3) | 0},${(35 + v * 0.3) | 0})`);
+      }
+      // Tan pillow (top ~1/3)
+      for (let y = 0; y < 5; y++) for (let x = 1; x < S - 1; x++) {
+        const v = (r() - 0.5) * 15;
+        pixel1(15 * S, x, y, `rgb(${(215 + v) | 0},${(195 + v * 0.8) | 0},${(165 + v * 0.6) | 0})`);
+      }
+      // Dividing seam
+      ctx.fillStyle = "#701515"; ctx.fillRect(15 * S, S + 5, S, 1);
+      ctx.fillStyle = "#c04040"; ctx.fillRect(15 * S, S + 4, S, 1);
+    }
+    border1(15 * S);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
