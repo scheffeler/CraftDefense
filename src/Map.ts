@@ -201,8 +201,23 @@ export class VoxelWorld {
       }
     };
 
-    // 0: stone — gray with subtle noise
+    // 0: stone — gray noise with subtle crack detail lines
     noise(0 * S, 136, 136, 136, 0.08, 1001);
+    { const rc = rng(2001);
+      ctx.strokeStyle = "rgba(80,80,80,0.55)"; ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const sx = (rc() * 10 + 3) | 0, sy = (rc() * 8 + 2) | 0;
+        const mx = (rc() * 4 + sx + 14) % 16 | 0, my = Math.min(14, sy + 2 + (rc() * 3) | 0);
+        const ex = (rc() * 3 + mx + 15) % 16 | 0, ey = Math.min(15, my + 1 + (rc() * 2) | 0);
+        ctx.beginPath();
+        ctx.moveTo(0 * S + sx + 0.5, sy + 0.5);
+        ctx.lineTo(0 * S + mx + 0.5, my + 0.5);
+        ctx.lineTo(0 * S + ex + 0.5, ey + 0.5);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(175,175,175,0.28)";
+        ctx.fillRect(0 * S + sx, Math.max(0, sy - 1), 1, 1);
+      }
+    }
     border(0 * S);
 
     // 1: cobblestone — dark mortar with defined stone blocks
@@ -244,17 +259,27 @@ export class VoxelWorld {
     }
     border(3 * S);
 
-    // 4: grass side — green strip top 3px, dirt below
+    // 4: grass side — 4px green band with blade highlights and fading transition
     noise(4 * S, 139, 92, 42, 0.08, 1005);
-    { ctx.fillStyle = "rgba(93,158,58,0.9)"; ctx.fillRect(4 * S, 0, S, 3); }
-    { const r = rng(2005);
-      for (let x = 0; x < S; x++) for (let y = 3; y < 5; y++)
-        if (r() > 0.5) { ctx.fillStyle = `rgba(93,158,58,${0.4 + r() * 0.3})`; ctx.fillRect(4 * S + x, y, 1, 1); }
+    { const rg = rng(2005);
+      ctx.fillStyle = "rgba(88,155,50,0.94)"; ctx.fillRect(4 * S, 0, S, 4);
+      for (let x = 0; x < S; x++) {
+        if (rg() > 0.48) { ctx.fillStyle = "rgba(115,192,65,0.72)"; ctx.fillRect(4 * S + x, 0, 1, rg() > 0.6 ? 2 : 1); }
+      }
+      for (let x = 0; x < S; x++) for (let y = 4; y < 7; y++) {
+        const f = (7 - y) / 3.5;
+        if (rg() < f * 0.55) { ctx.fillStyle = `rgba(88,155,50,${(0.28 + rg() * 0.42).toFixed(2)})`; ctx.fillRect(4 * S + x, y, 1, 1); }
+      }
     }
     border(4 * S);
 
-    // 5: sand — sandy with noise
-    noise(5 * S, 212, 196, 132, 0.08, 1006);
+    // 5: sand — sandy with subtle horizontal dune ripple lines
+    noise(5 * S, 212, 196, 132, 0.07, 1006);
+    { for (let y = 1; y < S; y += 3) {
+        ctx.fillStyle = "rgba(175,160,100,0.14)"; ctx.fillRect(5 * S, y, S, 1);
+        ctx.fillStyle = "rgba(235,220,162,0.18)"; ctx.fillRect(5 * S, y + 1, S, 1);
+      }
+    }
     border(5 * S);
 
     // 6: wood side — brown with vertical grain
@@ -302,14 +327,21 @@ export class VoxelWorld {
     }
     border(8 * S);
 
-    // 9: leaves — dark green mottled
+    // 9: leaves — mottled green with varied palette and highlight accents
     fill(9 * S, "transparent");
-    { const r = rng(2009);
+    { const rl = rng(2009);
+      const lp: [number,number,number][] = [
+        [46, 104, 28], [60, 128, 40], [72, 150, 52], [40, 92, 22], [85, 165, 54],
+      ];
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const v = r();
-        if (v < 0.15) { pixel(9 * S + x, y, "rgba(0,0,0,0)"); continue; }
-        const brightness = 0.6 + r() * 0.5;
-        pixel(9 * S + x, y, `rgb(${(58 * brightness) | 0},${(122 * brightness) | 0},${(37 * brightness) | 0})`);
+        if (rl() < 0.12) { pixel(9 * S + x, y, "rgba(0,0,0,0)"); continue; }
+        const [lr, lg, lb] = lp[(rl() * lp.length) | 0];
+        const bright = 0.74 + rl() * 0.36;
+        pixel(9 * S + x, y, `rgb(${(lr * bright)|0},${(lg * bright)|0},${(lb * bright)|0})`);
+      }
+      for (let i = 0; i < 3; i++) {
+        const hx = (rl() * 12 + 2) | 0, hy = (rl() * 12 + 2) | 0;
+        ctx.fillStyle = "rgba(100,192,62,0.30)"; ctx.fillRect(9 * S + hx, hy, 2, 1);
       }
     }
     border(9 * S);
