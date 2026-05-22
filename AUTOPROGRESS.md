@@ -1,33 +1,30 @@
 # CraftDefense Auto-Iteration Progress
 
-## 2026-05-21 — Potions System
+## 2026-05-22 — Block Texture Atlas Expansion (2-Row, 32 Tiles)
 
 **What was done:**
-- Added full potions system with 5 craftable potion types:
-  - **Potion of Healing** (instant +8 HP): blaze_rod + glistering_melon + glass_bottle
-  - **Potion of Regeneration** (regen 1 HP/2s for 30s): blaze_rod + nether_wart + glass_bottle
-  - **Potion of Swiftness** (+50% speed for 60s): blaze_rod + sugar + glass_bottle
-  - **Potion of Strength** (2x melee damage for 30s): blaze_rod + magma_cream + glass_bottle
-  - **Potion of Fire Resistance** (immune to creeper explosions for 3min): nether_wart + magma_cream + glass_bottle
-- New ingredients: glass_bottle, blaze_rod, nether_wart, sugar, magma_cream, glistering_melon
-- Player.activeEffects Map with tick-based duration/power system
-- Speed multiplier applied to walk speed; strength multiplier to melee damage
-- Fire resistance blocks creeper explosion damage via player.fireResistant
-- Active effects HUD bar in top-right corner: icon + label + countdown timer
-- Potion icon (bottle shape) in hotbar SVG renderer
-- Item tooltip shows potion effect description on hover
-- Dungeon chests seeded with blaze_rods, nether_wart, glass_bottles, and pre-made potions
-- Starter kit includes 3 glass_bottles, 2 blaze_rods, 4 nether_wart
-- blaze_rod drops from golems (40%) and trolls (50%); nether_wart from trolls (30%)
-- Unified old potionMagnitude/timer fields (remote code) with new potionPower/duration naming
-- Integrated with the remote's existing splash potion system and gun/crossbow features
+- Expanded the block texture atlas from a single row of 16 tiles (256×16 px) to 2 rows of 16 tiles (256×32 px), adding 16 new tile slots.
+- Added hand-crafted 16×16 pixel-art textures for 10 blocks that previously showed as flat vertex-colored generic tiles:
+  - **Furnace** (tile 16): Stone base with orange fire grate opening
+  - **Chest** (tile 17): Dark wood grain with gold metal trim, lid seam, and clasp
+  - **Crafting Table top** (tile 18): Plank base with 3×3 engraved grid
+  - **Obsidian** (tile 19): Deep purple-black with faint crystal shimmer inclusions
+  - **Iron Block** (tile 20): Smooth silver with subtle grid seams and corner highlights
+  - **Glass** (tile 21): Light blue with white frosted border frame and corner glints
+  - **Water top** (tile 22): Blue with sine-wave ripple pattern and foam streaks
+  - **Bookshelf side** (tile 23): Two rows of 8 colored book spines on a wood frame
+  - **Snow** (tile 24): White with subtle cold blue-white noise and sparkle pixels
+  - **Cactus** (tile 25): Green with lighter central rib stripe and edge spine dots
+  - **TNT** (tile 26): Red with dark cross pattern (preserving previous run's TNT block)
+- Updated UV generation in rebuildChunkMesh for proper 2-row atlas sampling.
+- Merged with previous run's TNT block addition (was tile 16 in single-row 17-tile atlas).
 
 **Ideas for next time:**
-- Night vision effect modifying ambient light in SceneManager
-- Haste effect increasing mining speed in BlockInteraction
-- Slowness splash potion throwable at enemies (infrastructure exists)
-- Nether dimension portal (obsidian frame + flint&steel)
-- Potion particle effects when drunk or active
-- Arrow dispenser turret mechanics (infrastructure exists, needs wiring)
-- Boss fights: Troll King and Uruk Captain defined in enemies.ts - need proper boss arenas
-- More potion types: Invisibility, Poison, Water Breathing
+- Animated water: ping-pong between two water frame textures, or animate UV offset per frame.
+- Lava texture (tile 27): glowing orange/red with irregular molten texture and self-emissive vertex color.
+- Transparent water/glass: separate transparent block meshes into a second draw pass.
+- Torch rendering: cross-shaped billboard sprite with a dynamic point light.
+- Sky dome: replace flat background Color with a sphere-gradient shader for dramatic sunrises.
+- Mob face textures: canvas-drawn face details per mob type (zombie, orc, goblin) rather than plain vertex colors.
+- Chunk shadow casting: enable castShadow on chunk meshes for real terrain shadows.
+- Dispenser front face texture showing arrow slot.
