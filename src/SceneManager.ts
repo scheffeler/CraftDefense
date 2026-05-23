@@ -68,6 +68,9 @@ export class SceneManager {
   private readonly stars: THREE.Points;
   private readonly moon: THREE.Mesh;
   private readonly sun:  THREE.Mesh;
+  private readonly skyDome: THREE.Mesh;
+  private readonly skyZenith  = new THREE.Color(0x5ab3dd);
+  private readonly skyHorizon = new THREE.Color(0x80ccee);
 
   // Clouds
   private readonly cloudMeshes: THREE.Object3D[] = [];
@@ -115,6 +118,7 @@ export class SceneManager {
     this.controls.addEventListener("unlock", () => this.onPointerLockChange(false));
 
     this.setupLighting();
+    this.skyDome = this.buildSkyDome();
     this.buildClouds();
     this.stars = this.buildStars();
     this.moon  = this.buildMoon();
@@ -156,21 +160,24 @@ export class SceneManager {
 
     // Lava overrides sky/fog with orange
     if (this._inLavaEffect) {
-      (this.scene.background as THREE.Color).setHex(0x8b2200);
       (this.scene.fog as THREE.Fog).color.setHex(0x8b2200);
       (this.scene.fog as THREE.Fog).near = 0.5;
       (this.scene.fog as THREE.Fog).far  = 3;
+      this.skyZenith.setHex(0x8b2200);
+      this.skyHorizon.setHex(0x8b2200);
     // Underwater overrides sky/fog
     } else if (this._underwaterEffect) {
-      (this.scene.background as THREE.Color).setHex(0x083560);
       (this.scene.fog as THREE.Fog).color.setHex(0x083560);
       (this.scene.fog as THREE.Fog).near = 1;
       (this.scene.fog as THREE.Fog).far  = 6;
+      this.skyZenith.setHex(0x083560);
+      this.skyHorizon.setHex(0x083560);
     } else {
-      (this.scene.background as THREE.Color).setHex(frame.sky);
       (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
       (this.scene.fog as THREE.Fog).near = 48;
       (this.scene.fog as THREE.Fog).far  = 130;
+      this.skyZenith.setHex(frame.sky);
+      this.skyHorizon.setHex(frame.fog);
     }
 
     this.ambientLight.color.setHex(frame.ambientColor);
@@ -252,11 +259,14 @@ export class SceneManager {
     const rainy = 0x556677;
     const fogRainy = 0x445566;
     const t = intensity;
-    (this.scene.background as THREE.Color).setHex(lerpHex(frame.sky, rainy, t * 0.7));
-    (this.scene.fog as THREE.Fog).color.setHex(lerpHex(frame.fog, fogRainy, t * 0.7));
+    const skyHex = lerpHex(frame.sky, rainy, t * 0.7);
+    const fogHex = lerpHex(frame.fog, fogRainy, t * 0.7);
+    (this.scene.fog as THREE.Fog).color.setHex(fogHex);
     (this.scene.fog as THREE.Fog).far = 130 - t * 70; // rain reduces visibility
     this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
     this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
+    this.skyZenith.setHex(skyHex);
+    this.skyHorizon.setHex(fogHex);
   }
 
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
@@ -463,6 +473,40 @@ export class SceneManager {
     this.armGroup.add(container);
   }
 
+  private buildSkyDome(): THREE.Mesh {
+    const geo = new THREE.SphereGeometry(185, 24, 12);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        zenith:  { value: this.skyZenith },
+        horizon: { value: this.skyHorizon },
+      },
+      vertexShader: `
+        varying float vH;
+        void main() {
+          vH = normalize(position).y;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 zenith;
+        uniform vec3 horizon;
+        varying float vH;
+        void main() {
+          float t = smoothstep(-0.08, 0.38, vH);
+          gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
+        }
+      `,
+      side: THREE.BackSide,
+      fog: false,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.renderOrder = -1;
+    this.scene.background = null;
+    this.scene.add(mesh);
+    return mesh;
+  }
+
   private buildStars(): THREE.Points {
     const count = 800;
     const positions = new Float32Array(count * 3);
@@ -538,6 +582,7 @@ export class SceneManager {
   }
 
   render(dt = 0): void {
+    this.skyDome.position.copy(this.camera.position);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     this.renderer.clearDepth();
