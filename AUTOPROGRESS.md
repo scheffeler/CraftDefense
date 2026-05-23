@@ -1,5 +1,32 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-23 — Gradient sky dome via ShaderMaterial
+
+**What was done:**
+- Added a large inverted sphere (radius 185, BackSide, depthWrite=false, renderOrder=-1)
+  as the sky background, replacing the flat scene.background solid color.
+- ShaderMaterial with two uniforms: `zenith` (sky-blue at top) and `horizon` (haze/fog
+  color at the horizon line). smoothstep(-0.08, 0.38, vH) creates a natural gradient.
+- The dome follows the camera every frame; scene.background set to null.
+- All sky state branches (normal day/night cycle, underwater, lava, rain weather) update
+  the zenith/horizon uniforms so the gradient transitions correctly through all conditions.
+
+**Files changed:** `src/SceneManager.ts`
+
+**Ideas for next run:**
+- Block texture atlas resolution upgrade: increase S from 16 to 32 in makeBlockTexture()
+  BUT also scale all hardcoded pixel art coordinates × 2. Key tiles: cobblestone stones
+  (fill larger area), stone cracks (extend length), wood top (center at S/2=16 not 8),
+  planks seams (already auto-scales), ore flecks (larger clusters). Row-1 tiles need
+  similar coordinate scaling.
+- Torch mesh overhaul: instead of a cube, use a thin box stick + a billboard
+  flame quad (PlaneGeometry facing camera) with alpha-blended animated texture
+  and a small warm PointLight at the flame tip for localized glow.
+- Stars twinkle: animate PointsMaterial.size each frame with a slow per-star sine wave.
+- Biome boundary smoothing: noise-dither vertex colors at forest/desert/taiga edges.
+- Sun disk improvement: replace the sphere with a flat PlaneGeometry facing the camera
+  (like the moon) with a glow halo ring for a more cinematic sunrise/sunset.
+
 ## 2026-05-23 — Zombie/goblin canvas face textures + goblin ear protrusions
 
 **What was done:**
