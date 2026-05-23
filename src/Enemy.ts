@@ -1112,22 +1112,51 @@ export class EnemyManager {
     body.castShadow = true;
     group.add(body);
 
-    const headMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), headMat);
+    // Head — use canvas face texture for zombie and goblin; flat color + eye boxes for others
+    const headGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+    let head: THREE.Mesh;
+    if (type === "zombie") {
+      const faceTex = EnemyManager.buildZombieFaceTex();
+      const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      head = new THREE.Mesh(headGeo, [
+        side, side, side, side,
+        new THREE.MeshLambertMaterial({ map: faceTex }), // +Z front face
+        side,
+      ]);
+    } else if (type === "goblin" || type === "goblin_miner") {
+      const faceTex = EnemyManager.buildGoblinFaceTex();
+      const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      head = new THREE.Mesh(headGeo, [
+        side, side, side, side,
+        new THREE.MeshLambertMaterial({ map: faceTex }), // +Z front face
+        side,
+      ]);
+      // Pointed ears — small angled boxes on each side
+      const earMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      for (const [ex, dir] of [[-0.25, -1], [0.25, 1]] as [number, number][]) {
+        const ear = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.17, 0.06), earMat);
+        ear.position.set(ex, 1.36, 0.02);
+        ear.rotation.z = dir * 0.45;
+        group.add(ear);
+      }
+    } else {
+      const headMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      head = new THREE.Mesh(headGeo, headMat);
+      // Eye boxes for non-textured heads
+      const eyeColor   = type === "golem" ? 0xff4400 : 0xffffff;
+      const eyeEmissive = type === "golem" ? 0xff4400 : 0x888888;
+      const eyeMat = new THREE.MeshLambertMaterial({
+        color: eyeColor, emissive: eyeEmissive, emissiveIntensity: 0.5,
+      });
+      for (const ex of [-0.1, 0.1]) {
+        const eye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.01), eyeMat);
+        eye.position.set(ex, 1.3, 0.22);
+        group.add(eye);
+      }
+    }
     head.position.y = 1.25;
     head.castShadow = true;
     group.add(head);
-
-    const eyeColor = type === "golem" ? 0xff4400 : 0xffffff;
-    const eyeEmissive = type === "golem" ? 0xff4400 : 0x888888;
-    const eyeMat = new THREE.MeshLambertMaterial({
-      color: eyeColor, emissive: eyeEmissive, emissiveIntensity: 0.5,
-    });
-    for (const ex of [-0.1, 0.1]) {
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.01), eyeMat);
-      eye.position.set(ex, 1.3, 0.22);
-      group.add(eye);
-    }
 
     const legMat = new THREE.MeshLambertMaterial({ color: cfg.color });
     for (const [lx, i] of [[-0.14, 0], [0.14, 1]] as [number, number][]) {
@@ -1410,6 +1439,84 @@ export class EnemyManager {
       mat.emissive.setHex(0xcc6600);
       mat.emissiveIntensity = 0.45;
     });
+  }
+
+  // ─── Face canvas textures ──────────────────────────────────────────────────
+
+  /** 16×16 zombie face: mottled green skin, dark rectangular eyes, grim mouth. */
+  private static buildZombieFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Mottled green-gray skin base using sine noise
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 2.3 + y * 1.7 + 5.1) * Math.cos(x * 0.9 + y * 2.8 + 3.7);
+      const v = (n * 16) | 0;
+      const r = Math.max(0, Math.min(255, 85 + v));
+      const g = Math.max(0, Math.min(255, 140 + v));
+      const b = Math.max(0, Math.min(255, 72 + v));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Dark eye sockets (rectangular, Minecraft-style)
+    ctx.fillStyle = "#1a1008";
+    ctx.fillRect(2, 5, 4, 3);   // left socket
+    ctx.fillRect(10, 5, 4, 3);  // right socket
+    // White pupils inside sockets
+    ctx.fillStyle = "#ddddcc";
+    ctx.fillRect(3, 6, 2, 1);
+    ctx.fillRect(11, 6, 2, 1);
+    // Downturned grim mouth
+    ctx.fillStyle = "#1a1008";
+    ctx.fillRect(4, 11, 8, 1);
+    ctx.fillRect(4, 10, 1, 1);   // left corner up
+    ctx.fillRect(11, 10, 1, 1);  // right corner up
+    // Dark chin crease below mouth
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(3, 13, 10, 1);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 goblin face: bright green, beady glowing eyes, jagged toothy grin. */
+  private static buildGoblinFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Bright lime-green base with subtle noise
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 3.1 + y * 2.2 + 1.3) * 0.5;
+      const v = (n * 14) | 0;
+      const r = Math.max(0, Math.min(255, 68 + v));
+      const g = Math.max(0, Math.min(255, 148 + v));
+      const b = Math.max(0, Math.min(255, 30 + v));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Beady yellow-orange eyes
+    ctx.fillStyle = "#ff8800";
+    ctx.fillRect(3, 5, 3, 3);   // left eye
+    ctx.fillRect(10, 5, 3, 3);  // right eye
+    // Dark pupil dots
+    ctx.fillStyle = "#1a0800";
+    ctx.fillRect(4, 6, 1, 1);
+    ctx.fillRect(11, 6, 1, 1);
+    // Wide jagged grin — alternating tooth-and-gap pattern
+    ctx.fillStyle = "#eeeedd"; // white teeth
+    for (let tx = 3; tx < 13; tx += 2) { ctx.fillRect(tx, 10, 1, 2); }
+    ctx.fillStyle = "#1a0a00"; // dark gum base
+    ctx.fillRect(3, 12, 10, 1);
+    // Nose — tiny raised bump between eyes and mouth
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(7, 8, 2, 1);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
   }
 
   // ─── Despawn ───────────────────────────────────────────────────────────────
