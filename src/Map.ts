@@ -57,6 +57,7 @@ BLOCK_ID_INDEX.forEach((id, i) => { BLOCK_TO_IDX[id] = i; });
 const CHUNK_SIZE = 16;
 const WORLD_HEIGHT = 32;
 const BLOCK_SIZE = 1.0;
+const ATLAS_TILES = 32;
 
 class Chunk {
   readonly cx: number;
@@ -90,21 +91,31 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
   const isTop = normalY > 0;
   const isBot = normalY < 0;
   switch (id as string) {
-    case "stone":        return 0;
-    case "cobblestone":  return 1;
+    case "stone":          return 0;
+    case "cobblestone":    return 1;
     case "dirt":
-    case "farmland":     return 2;
-    case "grass":        return isTop ? 3 : (isBot ? 2 : 4);
-    case "sand":         return 5;
-    case "wood":         return (isTop || isBot) ? 7 : 6;
-    case "planks":       return 8;
-    case "leaves":       return 9;
-    case "iron_ore":     return 10;
-    case "coal_ore":     return 11;
-    case "bedrock":      return 12;
-    case "gold_ore":     return 14;
-    case "diamond_ore":  return 15;
-    default:             return 13;
+    case "farmland":       return 2;
+    case "grass":          return isTop ? 3 : (isBot ? 2 : 4);
+    case "sand":           return 5;
+    case "wood":           return (isTop || isBot) ? 7 : 6;
+    case "planks":         return 8;
+    case "leaves":         return 9;
+    case "iron_ore":       return 10;
+    case "coal_ore":       return 11;
+    case "bedrock":        return 12;
+    case "gold_ore":       return 14;
+    case "diamond_ore":    return 15;
+    case "water":          return 16;
+    case "gravel":         return 17;
+    case "glass":          return 18;
+    case "obsidian":       return 19;
+    case "iron_block":     return 20;
+    case "crafting_table": return isTop ? 21 : 22;
+    case "furnace":        return isTop ? 0 : 23;
+    case "chest":          return 24;
+    case "snow":           return 25;
+    case "cactus":         return 26;
+    default:               return 13;
   }
 }
 
@@ -125,8 +136,7 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    // 32 textures × 16px wide = 512px atlas, 16px tall
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -305,6 +315,176 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // 16: water — rippled blue surface
+    fill(16 * S, "#2678c8");
+    { const r = rng(3016);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const wave = Math.sin((x + y) * 0.85 + 1.2) * 0.18 + Math.sin((x - y * 0.6) * 1.3) * 0.08;
+        const jitter = (r() - 0.5) * 0.08;
+        const br = 0.85 + wave + jitter;
+        const cr = Math.max(0, Math.min(255, Math.round(38  * br * 0.6))) | 0;
+        const cg = Math.max(0, Math.min(255, Math.round(120 * br))) | 0;
+        const cb = Math.max(0, Math.min(255, Math.round(200 * br))) | 0;
+        pixel(16 * S + x, y, `rgb(${cr},${cg},${cb})`);
+      }
+    }
+
+    // 17: gravel — gray with scattered pebble shapes
+    noise(17 * S, 118, 116, 108, 0.12, 1017);
+    { const r = rng(2017);
+      for (let i = 0; i < 9; i++) {
+        const px = (r() * 12 + 1) | 0, py = (r() * 12 + 1) | 0;
+        const ry = r() * 1.5 + 1.2, rx2 = ry * (r() * 0.6 + 0.8);
+        const dark = r() > 0.5;
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+          if ((dx * dx) / (rx2 * rx2) + (dy * dy) / (ry * ry) < 1) {
+            const nx2 = px + dx, ny2 = py + dy;
+            if (nx2 >= 0 && nx2 < S && ny2 >= 0 && ny2 < S) {
+              ctx.fillStyle = dark ? "rgba(60,58,52,0.4)" : "rgba(168,165,156,0.38)";
+              ctx.fillRect(17 * S + nx2, ny2, 1, 1);
+            }
+          }
+        }
+      }
+    }
+    border(17 * S);
+
+    // 18: glass — pale frame with bright interior
+    fill(18 * S, "#c8e8f4");
+    { // bright center
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.fillRect(18 * S + 3, 3, S - 6, S - 6);
+      // frame lines
+      ctx.fillStyle = "#7ab8d0";
+      ctx.fillRect(18 * S, 0, S, 2); ctx.fillRect(18 * S, S - 2, S, 2);
+      ctx.fillRect(18 * S, 0, 2, S); ctx.fillRect(18 * S + S - 2, 0, 2, S);
+      // corner highlights
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillRect(18 * S + 2, 2, 2, 2); ctx.fillRect(18 * S + S - 4, 2, 2, 2);
+    }
+
+    // 19: obsidian — near-black with purple crystalline flecks
+    fill(19 * S, "#120818");
+    { const r = rng(2019);
+      for (let i = 0; i < 22; i++) {
+        const fx = (r() * 14 + 1) | 0, fy = (r() * 14 + 1) | 0;
+        const col = r() > 0.5 ? "#6622aa" : "#3311cc";
+        ctx.fillStyle = col; ctx.fillRect(19 * S + fx, fy, 1, 1);
+        if (r() > 0.6) { ctx.fillStyle = "#aa44ff"; ctx.fillRect(19 * S + fx, fy, 1, 1); }
+      }
+      // subtle lighter cracks
+      for (let i = 0; i < 3; i++) {
+        const cx2 = (r() * 14 + 1) | 0, cy2 = (r() * 14 + 1) | 0;
+        ctx.fillStyle = "rgba(100,50,150,0.25)";
+        ctx.fillRect(19 * S + cx2, cy2, (r() * 4 + 1) | 0, 1);
+      }
+    }
+
+    // 20: iron block — gray with square panel grid
+    noise(20 * S, 198, 198, 200, 0.04, 1020);
+    { // grid seams every 5px
+      ctx.fillStyle = "rgba(120,120,125,0.5)";
+      for (let v = 4; v < S; v += 5) { ctx.fillRect(20 * S, v, S, 1); ctx.fillRect(20 * S + v, 0, 1, S); }
+      // panel highlights
+      ctx.fillStyle = "rgba(230,232,235,0.45)";
+      for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++)
+        ctx.fillRect(20 * S + col * 5 + 1, row * 5 + 1, 3, 1);
+    }
+    border(20 * S);
+
+    // 21: crafting table top — plank with 2×2 recessed crafting grid
+    fill(21 * S, "#c09855");
+    { const r = rng(2021);
+      // plank grain
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 22;
+        pixel(21 * S + x, y, `rgb(${(190 + v) | 0},${(150 + v * 0.7) | 0},${(82 + v * 0.4) | 0})`);
+      }
+      // 2×2 grid slots (centered 10x10, two 4×4 cells with 1px gap + 1px border)
+      ctx.fillStyle = "#5a3a10";
+      ctx.fillRect(21 * S + 2, 2, 12, 12);
+      ctx.fillStyle = "#c09855";
+      ctx.fillRect(21 * S + 3, 3, 5, 5);
+      ctx.fillRect(21 * S + 9, 3, 5, 5);
+      ctx.fillRect(21 * S + 3, 9, 5, 5);
+      ctx.fillRect(21 * S + 9, 9, 5, 5);
+    }
+
+    // 22: crafting table side — oak plank with horizontal seam
+    fill(22 * S, "#b88840");
+    { const r = rng(2022);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 18;
+        pixel(22 * S + x, y, `rgb(${(182 + v) | 0},${(135 + v * 0.7) | 0},${(62 + v * 0.3) | 0})`);
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      ctx.fillRect(22 * S, 7, S, 1); ctx.fillRect(22 * S, 8, S, 1);
+    }
+    border(22 * S);
+
+    // 23: furnace front (lit) — stone with glowing fire mouth
+    noise(23 * S, 130, 125, 115, 0.1, 1023);
+    { // fire opening — orange glow rectangle
+      ctx.fillStyle = "#111111"; ctx.fillRect(23 * S + 3, 5, 10, 8);
+      // inner glow
+      ctx.fillStyle = "#ff6600"; ctx.fillRect(23 * S + 4, 6, 8, 6);
+      ctx.fillStyle = "#ffaa00"; ctx.fillRect(23 * S + 5, 7, 6, 4);
+      ctx.fillStyle = "#ffee88"; ctx.fillRect(23 * S + 6, 8, 4, 2);
+      // glow spill at top edge
+      ctx.fillStyle = "rgba(255,120,0,0.4)"; ctx.fillRect(23 * S + 3, 4, 10, 2);
+    }
+    border(23 * S);
+
+    // 24: chest side — wood with gold band and latch
+    fill(24 * S, "#a06030");
+    { const r = rng(2024);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 16;
+        pixel(24 * S + x, y, `rgb(${(160 + v) | 0},${(95 + v * 0.6) | 0},${(48 + v * 0.3) | 0})`);
+      }
+      // gold band across center
+      ctx.fillStyle = "#c8921a"; ctx.fillRect(24 * S, 6, S, 4);
+      ctx.fillStyle = "#e8b830"; ctx.fillRect(24 * S, 7, S, 2);
+      // latch
+      ctx.fillStyle = "#8b6200"; ctx.fillRect(24 * S + 6, 5, 4, 6);
+      ctx.fillStyle = "#d4a820"; ctx.fillRect(24 * S + 7, 6, 2, 4);
+    }
+    border(24 * S);
+
+    // 25: snow — off-white with icy blue tinge
+    noise(25 * S, 235, 242, 250, 0.04, 1025);
+    { const r = rng(2025);
+      for (let i = 0; i < 20; i++) {
+        const sx = (r() * 14 + 1) | 0, sy = (r() * 14 + 1) | 0;
+        ctx.fillStyle = "rgba(200,215,235,0.3)"; ctx.fillRect(25 * S + sx, sy, 1, 1);
+      }
+    }
+    border(25 * S);
+
+    // 26: cactus side — green with vertical ridges and spine bumps
+    fill(26 * S, "#2d7a2d");
+    { const r = rng(2026);
+      for (let x = 0; x < S; x++) {
+        // alternating lighter/darker vertical strips
+        const strip = Math.floor(x / 2) % 2 === 0;
+        for (let y = 0; y < S; y++) {
+          const v = (r() - 0.5) * 15;
+          const base = strip ? 55 : 38;
+          const cr = Math.max(0, Math.min(255, base * 0.6 + v)) | 0;
+          const cg = Math.max(0, Math.min(255, base * 1.8 + v)) | 0;
+          const cb = Math.max(0, Math.min(255, base * 0.6 + v)) | 0;
+          pixel(26 * S + x, y, `rgb(${cr},${cg},${cb})`);
+        }
+      }
+      // spine dots
+      ctx.fillStyle = "rgba(200,220,180,0.6)";
+      for (let i = 0; i < 6; i++) {
+        const sx = ((i * 3) % S + 1) | 0, sy = ((i * 5 + 2) % (S - 2) + 1) | 0;
+        ctx.fillRect(26 * S + sx, sy, 1, 1);
+      }
+    }
+    border(26 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -390,7 +570,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / ATLAS_TILES, u1 = (texIdx + 1) / ATLAS_TILES;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {
