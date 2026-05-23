@@ -57,6 +57,7 @@ BLOCK_ID_INDEX.forEach((id, i) => { BLOCK_TO_IDX[id] = i; });
 const CHUNK_SIZE = 16;
 const WORLD_HEIGHT = 32;
 const BLOCK_SIZE = 1.0;
+const ATLAS_TILES = 32; // total tiles in the block texture atlas
 
 class Chunk {
   readonly cx: number;
@@ -90,21 +91,34 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
   const isTop = normalY > 0;
   const isBot = normalY < 0;
   switch (id as string) {
-    case "stone":        return 0;
-    case "cobblestone":  return 1;
+    case "stone":            return 0;
+    case "cobblestone":      return 1;
     case "dirt":
-    case "farmland":     return 2;
-    case "grass":        return isTop ? 3 : (isBot ? 2 : 4);
-    case "sand":         return 5;
-    case "wood":         return (isTop || isBot) ? 7 : 6;
-    case "planks":       return 8;
-    case "leaves":       return 9;
-    case "iron_ore":     return 10;
-    case "coal_ore":     return 11;
-    case "bedrock":      return 12;
-    case "gold_ore":     return 14;
-    case "diamond_ore":  return 15;
-    default:             return 13;
+    case "farmland":         return 2;
+    case "grass":            return isTop ? 3 : (isBot ? 2 : 4);
+    case "sand":             return 5;
+    case "wood":             return (isTop || isBot) ? 7 : 6;
+    case "planks":           return 8;
+    case "leaves":           return 9;
+    case "iron_ore":         return 10;
+    case "coal_ore":         return 11;
+    case "bedrock":          return 12;
+    case "gold_ore":         return 14;
+    case "diamond_ore":      return 15;
+    // Extended atlas — special/interactive blocks
+    case "furnace":          return isTop ? 16 : 17;
+    case "crafting_table":   return isTop ? 18 : 19;
+    case "chest":            return isTop ? 21 : 20;
+    case "glass":            return 22;
+    case "bookshelf":        return (isTop || isBot) ? 8 : 23;
+    case "enchanting_table": return isTop ? 24 : 25;
+    case "obsidian":         return 26;
+    case "gravel":           return 27;
+    case "snow":             return 28;
+    case "cactus":           return 29;
+    case "water":            return 30;
+    case "bed":              return 31;
+    default:                 return 13;
   }
 }
 
@@ -125,8 +139,7 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    // ATLAS_TILES textures × 16px wide = atlas, 16px tall
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -305,6 +318,229 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // ---- Extended atlas: tiles 16-31 for special/interactive blocks ----
+
+    // 16: furnace top — stone base with circular grill holes
+    noise(16 * S, 128, 126, 122, 0.07, 1016);
+    { for (const [hx, hy] of [[5,4],[11,4],[5,10],[11,10]] as [number,number][]) {
+        ctx.fillStyle = "#444444"; ctx.fillRect(16*S + hx-1, hy-1, 4, 4);
+        ctx.fillStyle = "#222222"; ctx.fillRect(16*S + hx, hy, 2, 2);
+        ctx.fillStyle = "#666666"; ctx.fillRect(16*S + hx-1, hy-1, 1, 1);
+      }
+    }
+    border(16 * S);
+
+    // 17: furnace front/side — stone with orange fire-mouth opening
+    noise(17 * S, 128, 126, 122, 0.07, 1017);
+    { ctx.fillStyle = "#221100"; ctx.fillRect(17*S + 4, 5, 8, 8);
+      ctx.fillStyle = "#883300"; ctx.fillRect(17*S + 5, 6, 6, 6);
+      ctx.fillStyle = "#cc5500"; ctx.fillRect(17*S + 6, 7, 4, 4);
+      ctx.fillStyle = "#ff8800"; ctx.fillRect(17*S + 7, 8, 2, 2);
+      ctx.fillStyle = "#ffcc44"; ctx.fillRect(17*S + 7, 8, 1, 1);
+    }
+    border(17 * S);
+
+    // 18: crafting table top — tan planks with 3×3 crafting grid
+    fill(18 * S, "#c8a060");
+    { const r = rng(2018);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel(18*S + x, y, `rgb(${(200+v)|0},${(160+v*0.8)|0},${(96+v*0.5)|0})`);
+      }
+      ctx.fillStyle = "rgba(80,40,0,0.6)";
+      ctx.fillRect(18*S + 5, 1, 1, 14); ctx.fillRect(18*S + 10, 1, 1, 14);
+      ctx.fillRect(18*S + 1, 5, 14, 1); ctx.fillRect(18*S + 1, 10, 14, 1);
+    }
+    border(18 * S);
+
+    // 19: crafting table side — planks with horizontal workbench mark-lines
+    fill(19 * S, "#c8a060");
+    { const r = rng(2019);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel(19*S + x, y, `rgb(${(200+v)|0},${(160+v*0.8)|0},${(96+v*0.5)|0})`);
+      }
+      for (let y = 3; y < S; y += 4) { ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(19*S, y, S, 1); }
+      ctx.fillStyle = "rgba(100,60,10,0.5)";
+      ctx.fillRect(19*S + 3, 3, 10, 2); ctx.fillRect(19*S + 3, 10, 10, 2);
+    }
+    border(19 * S);
+
+    // 20: chest front — wood with iron straps and padlock
+    noise(20 * S, 162, 82, 34, 0.1, 1020);
+    { ctx.fillStyle = "#888888"; ctx.fillRect(20*S, 3, S, 2); ctx.fillRect(20*S, 11, S, 2);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(20*S, 3, S, 1); ctx.fillRect(20*S, 11, S, 1);
+      ctx.fillStyle = "#666666"; ctx.fillRect(20*S + 6, 4, 4, 5);
+      ctx.fillStyle = "#888888"; ctx.fillRect(20*S + 7, 5, 2, 3);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(20*S + 7, 5, 1, 1);
+      ctx.fillStyle = "#333333"; ctx.fillRect(20*S + 7, 7, 2, 1);
+    }
+    border(20 * S);
+
+    // 21: chest top — wood with cross iron straps
+    noise(21 * S, 162, 82, 34, 0.1, 1021);
+    { ctx.fillStyle = "#888888";
+      ctx.fillRect(21*S, 4, S, 2); ctx.fillRect(21*S, 10, S, 2);
+      ctx.fillRect(21*S + 4, 0, 2, S); ctx.fillRect(21*S + 10, 0, 2, S);
+      ctx.fillStyle = "#aaaaaa";
+      ctx.fillRect(21*S, 4, S, 1); ctx.fillRect(21*S, 10, S, 1);
+      ctx.fillRect(21*S + 4, 0, 1, S); ctx.fillRect(21*S + 10, 0, 1, S);
+    }
+    border(21 * S);
+
+    // 22: glass — transparent center with light-blue window frame
+    ctx.clearRect(22*S, 0, S, S);
+    { ctx.fillStyle = "rgba(180,220,255,0.95)";
+      ctx.fillRect(22*S, 0, S, 2); ctx.fillRect(22*S, S-2, S, 2);
+      ctx.fillRect(22*S, 0, 2, S); ctx.fillRect(22*S+S-2, 0, 2, S);
+      ctx.fillStyle = "rgba(200,235,255,0.75)";
+      ctx.fillRect(22*S + 7, 2, 2, S-4); ctx.fillRect(22*S + 2, 7, S-4, 2);
+    }
+
+    // 23: bookshelf — planks base with two rows of colourful books
+    fill(23 * S, "#c8a060");
+    { const r = rng(2023);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 18;
+        pixel(23*S + x, y, `rgb(${(200+v)|0},${(160+v*0.8)|0},${(96+v*0.5)|0})`);
+      }
+      ctx.fillStyle = "#8b5c2a"; ctx.fillRect(23*S, 7, S, 2);
+      const top5 = ["#cc3333","#3355cc","#339933","#cc9922","#882288"];
+      let bx = 1; for (const bc of top5) {
+        ctx.fillStyle = bc; ctx.fillRect(23*S + bx, 1, 2, 5);
+        ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(23*S + bx + 2, 1, 1, 5);
+        bx += 3;
+      }
+      const bot5 = ["#226688","#8b3010","#556633","#774422","#aa4488"];
+      bx = 1; for (const bc of bot5) {
+        ctx.fillStyle = bc; ctx.fillRect(23*S + bx, 9, 2, 5);
+        ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(23*S + bx + 2, 9, 1, 5);
+        bx += 3;
+      }
+    }
+    border(23 * S);
+
+    // 24: enchanting table top — dark purple with golden rune circle
+    fill(24 * S, "#1a0a2a");
+    { const r = rng(2024);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 0.06;
+        pixel(24*S + x, y, `rgb(${(26+v*255)|0},${(10+v*200)|0},${(42+v*255)|0})`);
+      }
+      for (let ang = 0; ang < Math.PI * 2; ang += 0.25) {
+        const px2 = Math.round(8 + Math.cos(ang) * 5.5);
+        const py2 = Math.round(8 + Math.sin(ang) * 5.5);
+        pixel(24*S + px2, py2, "#ddaa22");
+      }
+      ctx.fillStyle = "#ddaa22";
+      ctx.fillRect(24*S + 7, 5, 2, 1); ctx.fillRect(24*S + 7, 10, 2, 1);
+      ctx.fillRect(24*S + 5, 7, 1, 2); ctx.fillRect(24*S + 10, 7, 1, 2);
+      pixel(24*S + 8, 8, "#ffffff");
+    }
+    border(24 * S);
+
+    // 25: enchanting table side — dark purple with red gem inlay
+    fill(25 * S, "#1a0a2a");
+    { const r = rng(2025);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 0.06;
+        pixel(25*S + x, y, `rgb(${(26+v*255)|0},${(10+v*200)|0},${(42+v*255)|0})`);
+      }
+      pixel(25*S + 8, 5, "#cc0022"); pixel(25*S + 7, 6, "#cc0022"); pixel(25*S + 9, 6, "#cc0022");
+      pixel(25*S + 6, 7, "#dd0033"); pixel(25*S + 7, 7, "#ff0044"); pixel(25*S + 8, 7, "#ff2255");
+      pixel(25*S + 9, 7, "#dd0033"); pixel(25*S + 10, 7, "#cc0022");
+      pixel(25*S + 7, 8, "#dd0033"); pixel(25*S + 8, 8, "#ff4466"); pixel(25*S + 9, 8, "#dd0033");
+      pixel(25*S + 8, 9, "#cc0022");
+      ctx.fillStyle = "rgba(140,40,200,0.35)";
+      ctx.fillRect(25*S + 2, 2, 3, 1); ctx.fillRect(25*S + 11, 13, 3, 1);
+    }
+    border(25 * S);
+
+    // 26: obsidian — deep purple-black with diagonal shimmer streaks
+    fill(26 * S, "#150822");
+    { const r = rng(2026);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const base = (r() - 0.5) * 0.07;
+        const sh = Math.sin((x + y) * 0.7) * 0.025 + Math.sin((x - y) * 0.5) * 0.02;
+        pixel(26*S + x, y, `rgb(${Math.max(0,Math.min(255,(21+(base+sh)*200)))|0},${Math.max(0,Math.min(255,(8+base*150)))|0},${Math.max(0,Math.min(255,(34+(base+sh*1.5)*220)))|0})`);
+      }
+      ctx.fillStyle = "rgba(130,60,220,0.2)";
+      ctx.fillRect(26*S + 2, 5, 5, 1); ctx.fillRect(26*S + 9, 10, 5, 1);
+      ctx.fillStyle = "rgba(200,120,255,0.12)";
+      ctx.fillRect(26*S + 3, 5, 3, 1); ctx.fillRect(26*S + 10, 10, 3, 1);
+    }
+
+    // 27: gravel — medium gray with rounded pebble highlights/shadows
+    noise(27 * S, 136, 136, 128, 0.1, 1027);
+    { const pebbles: [number,number,number,number][] = [[3,2,4,3],[8,1,3,3],[12,3,3,4],[2,7,5,3],[8,6,4,4],[12,8,3,3],[3,11,4,3],[10,11,4,3]];
+      for (const [px, py, pw, ph] of pebbles) {
+        ctx.fillStyle = "rgba(80,80,70,0.45)"; ctx.fillRect(27*S + px+1, py+1, pw, ph);
+        ctx.fillStyle = "rgba(175,175,165,0.5)"; ctx.fillRect(27*S + px, py, pw, ph);
+      }
+    }
+    border(27 * S);
+
+    // 28: snow — layered white with subtle blue tint and sparkle pixels
+    fill(28 * S, "#eaeff8");
+    { const r = rng(2028);
+      for (let y = 0; y < S; y++) {
+        const lb = 0.97 + Math.sin(y * 0.9) * 0.025;
+        for (let x = 0; x < S; x++) {
+          const v = (r() - 0.5) * 0.04;
+          pixel(28*S + x, y, `rgb(${Math.min(255,(234+v*255)*lb)|0},${Math.min(255,(239+v*255)*lb)|0},${Math.min(255,(248+v*255)*lb)|0})`);
+        }
+      }
+      const sp = rng(3028);
+      for (let i = 0; i < 6; i++) pixel(28*S + ((sp()*14+1)|0), ((sp()*14+1)|0), "#ffffff");
+    }
+    border(28 * S);
+
+    // 29: cactus — medium green with horizontal segment bands and edge spines
+    fill(29 * S, "#2d7a2d");
+    { const r = rng(2029);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 0.12;
+        pixel(29*S + x, y, `rgb(${(45+v*220)|0},${(122+v*255)|0},${(45+v*220)|0})`);
+      }
+      for (let y2 = 4; y2 < S; y2 += 4) {
+        ctx.fillStyle = "rgba(0,50,0,0.4)"; ctx.fillRect(29*S, y2, S, 1);
+        ctx.fillStyle = "rgba(80,180,80,0.2)"; ctx.fillRect(29*S, y2+1, S, 1);
+      }
+      ctx.fillStyle = "rgba(180,220,100,0.8)";
+      for (let sy = 1; sy < S; sy += 4) {
+        ctx.fillRect(29*S, sy, 1, 2); ctx.fillRect(29*S+S-1, sy, 1, 2);
+      }
+    }
+
+    // 30: water — blue with diagonal wave pattern and foam highlights
+    fill(30 * S, "#3a9aee");
+    { const r = rng(2030);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const wave = Math.sin((x + y*0.5) * 0.9) * 0.07 + Math.sin((x*0.7 - y) * 1.1) * 0.05;
+        const v = (r() - 0.5) * 0.07;
+        pixel(30*S + x, y, `rgb(${Math.max(0,Math.min(255,(58+(v+wave)*240)))|0},${Math.max(0,Math.min(255,(154+(v+wave)*255)))|0},${Math.max(0,Math.min(255,(238+(v+wave*0.5)*100)))|0})`);
+      }
+      for (let x = 0; x < S; x++) {
+        pixel(30*S + x, Math.round(8 + Math.sin(x * 0.8) * 2), "rgba(180,230,255,0.55)");
+        pixel(30*S + x, Math.round(4 + Math.sin(x * 0.6 + 1) * 2), "rgba(180,230,255,0.45)");
+      }
+    }
+
+    // 31: bed top — red with white pillow
+    fill(31 * S, "#cc3333");
+    { const r = rng(2031);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel(31*S + x, y, `rgb(${(204+v)|0},${(51+v*0.3)|0},${(51+v*0.3)|0})`);
+      }
+      ctx.fillStyle = "#dddddd"; ctx.fillRect(31*S + 2, 2, 12, 5);
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(31*S + 3, 3, 10, 3);
+      ctx.fillStyle = "rgba(0,0,0,0.1)";
+      ctx.fillRect(31*S + 3, 3, 10, 1); ctx.fillRect(31*S + 3, 3, 1, 3);
+      ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.fillRect(31*S, 7, S, 1);
+    }
+    border(31 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -390,7 +626,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / ATLAS_TILES, u1 = (texIdx + 1) / ATLAS_TILES;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {
@@ -497,6 +733,7 @@ export class VoxelWorld {
     const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
       map: this.blockTex,
+      alphaTest: 0.5,
       side: THREE.FrontSide,
     });
     chunk.mesh = new THREE.Mesh(geo, mat);
