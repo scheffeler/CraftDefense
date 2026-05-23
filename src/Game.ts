@@ -1252,6 +1252,7 @@ export class Game {
     this.scene.setUnderwaterEffect(this._wasInWater);
     // Day/night cycle runs even while paused/locked
     this.scene.updateDayNight(dt);
+    this.gameMap.updateFluidAnimation(dt);
     this.audio.updateAmbient(dt, this.scene.daylight);
 
     // Title screen orbit: slowly rotate camera around fortress when pointer not locked

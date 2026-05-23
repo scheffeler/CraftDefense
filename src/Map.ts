@@ -67,6 +67,8 @@ class Chunk {
   readonly cz: number;
   readonly data: Uint8Array;
   mesh: THREE.Mesh | null = null;
+  waterMesh: THREE.Mesh | null = null;
+  lavaMesh: THREE.Mesh | null = null;
   dirty = true;
 
   constructor(cx: number, cz: number) {
@@ -141,12 +143,115 @@ export class VoxelWorld {
   readonly scene: THREE.Scene;
   private readonly chunkMeshGroup: THREE.Group;
   private readonly blockTex: THREE.Texture;
+  private readonly waterMat: THREE.MeshLambertMaterial;
+  private readonly lavaMat: THREE.MeshLambertMaterial;
+  private _fluidTime = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.chunkMeshGroup = new THREE.Group();
     scene.add(this.chunkMeshGroup);
     this.blockTex = VoxelWorld.makeBlockTexture();
+    this.waterMat = VoxelWorld.makeFluidMaterial("water");
+    this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
+  }
+
+  /** Advance fluid animation — call every frame with elapsed seconds. */
+  updateFluidAnimation(dt: number): void {
+    this._fluidTime += dt;
+    const t = this._fluidTime;
+    // Water: diagonal scroll with a gentle wave
+    const wMap = this.waterMat.map!;
+    wMap.offset.x = (t * 0.04) % 1;
+    wMap.offset.y = (t * 0.06 + Math.sin(t * 0.7) * 0.008) % 1;
+    // Lava: slow counter-diagonal scroll
+    const lMap = this.lavaMat.map!;
+    lMap.offset.x = (t * -0.018) % 1;
+    lMap.offset.y = (t * 0.012) % 1;
+  }
+
+  private static makeFluidMaterial(type: "water" | "lava"): THREE.MeshLambertMaterial {
+    const S = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+
+    if (type === "water") {
+      // Deep blue base
+      ctx.fillStyle = "#1a5fa8";
+      ctx.fillRect(0, 0, S, S);
+      // Diagonal ripple lines (tileable at 45°)
+      for (let i = -S; i < S * 2; i += 7) {
+        const alpha = 0.12 + 0.07 * Math.sin(i * 0.45);
+        ctx.strokeStyle = `rgba(80,180,255,${alpha.toFixed(3)})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(i, 0); ctx.lineTo(i + S, S);
+        ctx.stroke();
+      }
+      // Secondary finer ripples
+      for (let i = -S; i < S * 2; i += 3) {
+        ctx.strokeStyle = "rgba(140,220,255,0.06)";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(i, 0); ctx.lineTo(i + S, S);
+        ctx.stroke();
+      }
+      // Bright highlight blobs for light-scatter feel
+      for (let j = 0; j < 7; j++) {
+        const bx = ((j * 13 + 5) % S);
+        const bz = ((j * 9  + 3) % S);
+        const grad = ctx.createRadialGradient(bx, bz, 0, bx, bz, 5);
+        grad.addColorStop(0, "rgba(180,240,255,0.30)");
+        grad.addColorStop(1, "rgba(180,240,255,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, S, S);
+      }
+    } else {
+      // Dark lava base
+      ctx.fillStyle = "#991800";
+      ctx.fillRect(0, 0, S, S);
+      // Bright molten blob cores
+      const blobData: [number, number, number][] = [
+        [4,  4,  6], [14, 10, 5], [24, 6,  7], [8,  22, 5],
+        [20, 20, 6], [28, 16, 4], [2,  16, 4], [16, 28, 5],
+      ];
+      for (const [bx, bz, r] of blobData) {
+        const grad = ctx.createRadialGradient(bx, bz, 0, bx, bz, r * 2);
+        grad.addColorStop(0,   "rgba(255,210,0,0.95)");
+        grad.addColorStop(0.4, "rgba(255,110,0,0.75)");
+        grad.addColorStop(1,   "rgba(160,20,0,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, S, S);
+      }
+      // Dark crackling veins
+      ctx.strokeStyle = "rgba(50,5,0,0.75)";
+      ctx.lineWidth = 1;
+      const veins: [number,number,number,number][] = [
+        [0,8, 12,20], [12,20,28,14], [28,14,20,32], [5,0,18,10], [22,26,32,18],
+      ];
+      for (const [x0,y0,x1,y1] of veins) {
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+
+    const mat = new THREE.MeshLambertMaterial({
+      map: tex,
+      transparent: type === "water",
+      opacity: type === "water" ? 0.80 : 1.0,
+    });
+    if (type === "lava") {
+      mat.emissive = new THREE.Color(0xff3300);
+      mat.emissiveIntensity = 0.55;
+    }
+    return mat;
   }
 
   private static makeBlockTexture(): THREE.Texture {
@@ -762,6 +867,16 @@ export class VoxelWorld {
       (chunk.mesh.material as THREE.Material).dispose();
       chunk.mesh = null;
     }
+    if (chunk.waterMesh) {
+      this.chunkMeshGroup.remove(chunk.waterMesh);
+      chunk.waterMesh.geometry.dispose();
+      chunk.waterMesh = null;
+    }
+    if (chunk.lavaMesh) {
+      this.chunkMeshGroup.remove(chunk.lavaMesh);
+      chunk.lavaMesh.geometry.dispose();
+      chunk.lavaMesh = null;
+    }
 
     const positions: number[] = [];
     const normals: number[]   = [];
@@ -769,6 +884,10 @@ export class VoxelWorld {
     const uvs: number[]       = [];
     const indices: number[]   = [];
     let vi = 0;
+
+    // Separate geometry for animated fluid (water/lava) top faces
+    const wPos: number[] = [], wUV: number[] = [], wIdx: number[] = []; let wvi = 0;
+    const lPos: number[] = [], lUV: number[] = [], lIdx: number[] = []; let lvi = 0;
 
     const isSolidAO = (bx: number, by: number, bz: number): boolean => {
       const bid = this.getBlock(bx, by, bz);
@@ -859,6 +978,20 @@ export class VoxelWorld {
             const [nx, ny, nz] = neighbors[fi];
             const nbId = this.getBlock(wx + nx, wy + ny, wz + nz);
             if (nbId !== "air" && !BLOCK_DEFS[nbId].transparent) continue;
+
+            // Water/lava top faces go to separate animated fluid meshes
+            if (fi === 0 && (id === "water" || id === "lava")) {
+              const y = wy + 1.008; // fractionally above the solid face to avoid z-fighting
+              const p = id === "water" ? { pos: wPos, uv: wUV, idx: wIdx } : { pos: lPos, uv: lUV, idx: lIdx };
+              const fvi = id === "water" ? wvi : lvi;
+              p.pos.push(wx, y, wz,   wx+1, y, wz,   wx, y, wz+1,   wx+1, y, wz+1);
+              // World-space UV so adjacent blocks tile seamlessly; scrolling offset animates them
+              p.uv.push(wx, wz,  wx+1, wz,  wx, wz+1,  wx+1, wz+1);
+              p.idx.push(fvi, fvi+1, fvi+2, fvi+1, fvi+3, fvi+2);
+              if (id === "water") wvi += 4; else lvi += 4;
+              continue;
+            }
+
             const f = faces[fi];
             const fTexIdx = getBlockTexIndex(id, f.n[1]);
             // For textured blocks, use white vertex color so atlas texture defines color
@@ -916,6 +1049,34 @@ export class VoxelWorld {
     chunk.mesh.receiveShadow = true;
     chunk.mesh.castShadow = true;
     this.chunkMeshGroup.add(chunk.mesh);
+
+    // Build animated water fluid mesh
+    if (wPos.length > 0) {
+      const wGeo = new THREE.BufferGeometry();
+      wGeo.setAttribute("position", new THREE.Float32BufferAttribute(wPos, 3));
+      const wNorm = new Float32Array(wPos.length); // all Y normals
+      for (let i = 1; i < wNorm.length; i += 3) wNorm[i] = 1;
+      wGeo.setAttribute("normal", new THREE.BufferAttribute(wNorm, 3));
+      wGeo.setAttribute("uv", new THREE.Float32BufferAttribute(wUV, 2));
+      wGeo.setIndex(wIdx);
+      chunk.waterMesh = new THREE.Mesh(wGeo, this.waterMat);
+      chunk.waterMesh.receiveShadow = false;
+      this.chunkMeshGroup.add(chunk.waterMesh);
+    }
+
+    // Build animated lava fluid mesh
+    if (lPos.length > 0) {
+      const lGeo = new THREE.BufferGeometry();
+      lGeo.setAttribute("position", new THREE.Float32BufferAttribute(lPos, 3));
+      const lNorm = new Float32Array(lPos.length);
+      for (let i = 1; i < lNorm.length; i += 3) lNorm[i] = 1;
+      lGeo.setAttribute("normal", new THREE.BufferAttribute(lNorm, 3));
+      lGeo.setAttribute("uv", new THREE.Float32BufferAttribute(lUV, 2));
+      lGeo.setIndex(lIdx);
+      chunk.lavaMesh = new THREE.Mesh(lGeo, this.lavaMat);
+      chunk.lavaMesh.receiveShadow = false;
+      this.chunkMeshGroup.add(chunk.lavaMesh);
+    }
   }
 
   getChunkMeshes(): THREE.Mesh[] {
@@ -935,6 +1096,10 @@ export class GameMap {
     this.world = new VoxelWorld(scene);
     generateWorld(this.world);
     this.world.rebuildDirtyChunks();
+  }
+
+  updateFluidAnimation(dt: number): void {
+    this.world.updateFluidAnimation(dt);
   }
 
   getChunkMeshes(): THREE.Mesh[] {

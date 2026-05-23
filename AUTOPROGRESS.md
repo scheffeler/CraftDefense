@@ -1,5 +1,36 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-23 — Animated water and lava surfaces
+
+**What was done:**
+- Added separate animated fluid meshes for water and lava block top faces.
+  - Water: 32×32 tileable canvas texture with deep-blue base (#1a5fa8) and
+    diagonal ripple lines; UV offset scrolls diagonally each frame for a
+    flowing-water effect.
+  - Lava: 32×32 tileable canvas with dark-red base, bright molten blob hotspots,
+    and dark cracking veins; emissive glow (`emissive: 0xff3300`, intensity 0.55);
+    UV offset scrolls slowly counter-diagonally.
+- Water/lava top faces are redirected from the main chunk mesh to dedicated
+  per-chunk `waterMesh`/`lavaMesh` objects using a shared animated material.
+- `updateFluidAnimation(dt)` added to `VoxelWorld` and exposed via `GameMap`;
+  called each frame from `Game.ts` — GPU-side UV scroll, essentially free.
+- World-space UVs ensure seamless tiling across adjacent fluid blocks.
+
+**Files changed:** `src/Map.ts`, `src/Game.ts`
+
+**Ideas for next run:**
+- Better arm/hand mesh: per-face UV on BoxGeometry with a hand skin texture
+  (16×16 pixel-art skin with highlight/shadow bands, held item modeled on top)
+- Enemy visual improvements: zombie face texture on the head mesh face, goblin
+  ear geometry (two small box protrusions)
+- Torch mesh: replace the current cube geometry with a billboard flame quad
+  (alpha-blended sprite) + point light at the flame tip
+- Cloud improvements: layered semi-transparent planes (3-4 stacked at different
+  heights) instead of opaque solid boxes
+- Water animation refinement: add a second pass with sine-wave vertex
+  displacement on the fluid mesh for a 3D ripple feel (requires ShaderMaterial)
+- Biome boundary visual blend: fade vertex colors between biomes using noise
+
 ## 2026-05-22 — Block texture atlas expansion + cobblestone improvement
 
 **What was done:**
