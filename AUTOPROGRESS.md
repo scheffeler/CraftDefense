@@ -1,5 +1,31 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-23 — Improved arm mesh, sword viewmodel, and puffy clouds
+
+**What was done:**
+- Arm mesh: replaced the flat brown box with a pixel-art skin canvas texture (16×16, wave-noise
+  grain + wrist crease + top highlight). Six per-face materials with different warm-skin tints
+  simulate natural directional shading. Added a dark sleeve cuff element at the upper end of the
+  arm that's visible whenever the player is in pointer-lock mode (i.e., always during gameplay).
+- Sword viewmodel: wider + flatter blade geometry (0.11×0.32×0.022 vs 0.08×0.28×0.04 before),
+  a proper crossguard bar, and a subtle bright edge-highlight strip along the blade spine for a
+  shiny metallic feel. Tool head also slightly widened with a pick-tip protrusion.
+- Clouds: each cloud rebuilt as a THREE.Group with a flat base slab + two overlapping upper puff
+  boxes at different offsets/heights, giving recognizable cumulus silhouettes instead of flat slabs.
+
+**Files changed:** `src/SceneManager.ts`
+
+**Ideas for next run:**
+- Torch mesh improvement: replace the current opaque cube torches with a cross-billboard flame
+  quad (alpha-blended sprite) + a small PointLight at the flame tip for realistic warm glow
+- Enemy face texture detail: procedural canvas textures for zombie (green mottled face,
+  X-stitched mouth) and goblin (pointed ears via box protrusions, sharp tooth hints)
+- Better held-item block: when holding a block, use a multi-material BoxGeometry that shows
+  the block's actual atlas texture faces instead of flat vertex-color tint
+- Ground-level fog: add a thin FogExp2-style volumetric layer at y=6–8 for atmosphere
+- Biome boundary visual blend: noise-based fade at forest/desert/taiga transitions
+- Star twinkle: animate PointsMaterial size with a slow sine wave for atmospheric shimmer
+
 ## 2026-05-23 — Animated water and lava surfaces
 
 **What was done:**
