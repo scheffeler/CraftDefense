@@ -70,7 +70,7 @@ export class SceneManager {
   private readonly sun:  THREE.Mesh;
 
   // Clouds
-  private readonly cloudMeshes: THREE.Mesh[] = [];
+  private readonly cloudMeshes: THREE.Object3D[] = [];
   private cloudMat!: THREE.MeshLambertMaterial;
 
   // Underwater effect
@@ -389,23 +389,78 @@ export class SceneManager {
 
       const headMat = new THREE.MeshLambertMaterial({ color });
       if (category === "weapon") {
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.04), headMat);
-        blade.position.set(-0.08, 0.44, 0.0);
+        // Wide flat blade with crossguard
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.32, 0.022), headMat);
+        blade.position.set(-0.08, 0.46, 0.0);
         g.add(blade);
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.04), headMat);
+        guard.position.set(-0.08, 0.32, 0.0);
+        g.add(guard);
+        // Bright edge highlight strip along the blade
+        const edgeMat = new THREE.MeshLambertMaterial({
+          color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.12,
+        });
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.30, 0.012), edgeMat);
+        edge.position.set(-0.035, 0.46, 0.0);
+        g.add(edge);
       } else {
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.06), headMat);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.13, 0.06), headMat);
         head.position.set(-0.07, 0.44, 0.0);
         g.add(head);
+        // Pick-tip on the right side of the head
+        const tip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.10), headMat);
+        tip.position.set(0.05, 0.44, -0.06);
+        g.add(tip);
       }
       return g;
     }
     return null;
   }
 
+  private static buildArmSkinTexture(): THREE.Texture {
+    const canvas = document.createElement("canvas");
+    canvas.width = 16; canvas.height = 16;
+    const ctx = canvas.getContext("2d")!;
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const n = Math.sin(x * 1.7 + y * 2.3 + 11.1) * Math.cos(x * 0.9 + y * 1.4 + 7.3);
+        const v = (n * 14) | 0;
+        const r = Math.max(0, Math.min(255, 208 + v));
+        const g2 = Math.max(0, Math.min(255, 148 + v));
+        const b = Math.max(0, Math.min(255, 96 + (v * 0.5) | 0));
+        ctx.fillStyle = `rgb(${r},${g2},${b})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    // Wrist crease
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0, 13, 16, 1);
+    // Top edge highlight
+    ctx.fillStyle = "rgba(255,200,160,0.22)";
+    ctx.fillRect(0, 0, 16, 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
   private buildArmMesh(): void {
-    const skinMat = new THREE.MeshLambertMaterial({ color: 0x8b6040 });
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), skinMat);
-    this.armGroup.add(arm);
+    const tex = SceneManager.buildArmSkinTexture();
+    // Six faces: +X, -X, +Y, -Y, +Z, -Z  — tinted for directional shading
+    const faceTints = [0xe0b898, 0xcca080, 0xb88868, 0x997050, 0xf0c8a8, 0xd0a888];
+    const mats = faceTints.map(c => new THREE.MeshLambertMaterial({ map: tex, color: c }));
+
+    const container = new THREE.Group();
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.12), mats);
+    container.add(arm);
+
+    // Dark sleeve cuff at the upper end of the arm
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: 0x2a1c10 });
+    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.075, 0.135), sleeveMat);
+    sleeve.position.set(0, 0.142, 0);
+    container.add(sleeve);
+
+    this.armGroup.add(container);
   }
 
   private buildStars(): THREE.Points {
@@ -455,7 +510,22 @@ export class SceneManager {
     for (const [cx, cz] of positions) {
       const w = 5 + (cx % 7);
       const d = 3 + (cz % 5);
-      const cloud = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, d), this.cloudMat);
+      const cloud = new THREE.Group();
+      // Flat base layer
+      const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.75, d), this.cloudMat);
+      cloud.add(base);
+      // Left upper puff
+      const puffL = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 0.56, 1.25, d * 0.72), this.cloudMat,
+      );
+      puffL.position.set(-w * 0.12, 0.88, 0);
+      cloud.add(puffL);
+      // Right upper puff (slightly smaller and offset)
+      const puffR = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 0.45, 1.05, d * 0.58), this.cloudMat,
+      );
+      puffR.position.set(w * 0.17, 0.72, 0);
+      cloud.add(puffR);
       cloud.position.set(cx, 22, cz);
       this.scene.add(cloud);
       this.cloudMeshes.push(cloud);
