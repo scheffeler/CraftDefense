@@ -1,5 +1,39 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-23 — Zombie/goblin canvas face textures + goblin ear protrusions
+
+**What was done:**
+- Zombie head: replaced plain-color single-material box with a per-face multi-material
+  array. +Z (front) face gets a 16×16 CanvasTexture with: sine-noise mottled green-gray
+  skin, dark rectangular Minecraft-style eye sockets with white pupils, a downturned
+  grimacing mouth with corner upticks, and a dark chin crease.
+- Goblin head: same per-face approach with a lime-green sine-noise base, glowing orange
+  eyes with dark pupil dots, a wide jagged 10px grin (alternating tooth/gap pattern),
+  and a small nose shadow between eyes and mouth.
+- Goblin ear protrusions: two `0.07×0.17×0.06` box meshes angled outward (±0.45 rad) at
+  the sides of the head for both `goblin` and `goblin_miner` types.
+- All other humanoid types (orc, golem, troll, etc.) keep existing plain-color head with
+  separate eye-box overlays — no regression there.
+
+**Files changed:** `src/Enemy.ts`
+
+**Ideas for next run:**
+- Torch visual overhaul: skip rendering torch blocks in the chunk mesh entirely; replace
+  with a dedicated THREE.Group per torch (thin stick box + alpha-blended PlaneGeometry
+  flame sprite + existing PointLight). Requires `getTorchPositions()` on VoxelWorld and
+  torch mesh management in Game.ts on place/break.
+- Orc face canvas texture: similar to zombie/goblin, add tusks (small white boxes below
+  the mouth), heavy brow ridge (dark rectangle above eyes), war-paint stripe
+- Add zombie and goblin body textures: use MeshLambertMaterial with a CanvasTexture for
+  the torso as well (ragged cloth pattern for zombie, crude vest for goblin)
+- Held-block atlas texture: when holding a block item, build a 6-material BoxGeometry
+  referencing the actual atlas tile UVs per face (top, bottom, sides) instead of a
+  flat vertex-colored cube
+- Stars twinkle: animate PointsMaterial.size with a slow sine wave per frame
+- Minimap: add a pixel-icon for enemy positions (red dot) so players can track waves
+- Biome boundary blend: noise-dither vertex colors at the forest↔desert and forest↔taiga
+  transition zones for smoother visual seams
+
 ## 2026-05-23 — Improved arm mesh, sword viewmodel, and puffy clouds
 
 **What was done:**
