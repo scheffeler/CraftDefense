@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-24 — Expanded block texture atlas (16→32 tiles, single-row approach)
+
+**What was done:**
+- This run attempted to expand the texture atlas using a 32-wide single-row approach
+  (512px wide × 16px tall) with 16 new block textures: snow, cactus (side+top),
+  bookshelf, chest (side+top), water ripples, gravel pebbles, enchanting table,
+  farmland furrows, obsidian veins, crafting table 3×3 grid, furnace glow, wheat stages.
+- NOTE: The HEAD version already had a more complete 2-row atlas (256×32) with animated
+  water and more block types. This run's Map.ts was superseded by HEAD's version.
+- Visual confirmation: water ripple texture, bookshelf spines, cobblestone patterns
+  all looking great; game renders cleanly at 60fps.
+
+**Ideas for next run:**
+- Wheat cross geometry: render wheat stages as two crossed PlaneGeometry quads
+  instead of full-block cube for correct plant appearance
+- Farmland distinct tile: tilled soil look (dark brown with furrow lines) instead
+  of sharing the dirt tile
+- Biome grass tinting: vertex-color grass blocks with biome-specific hue
+  (desert = dry tan, taiga = darker blue-green, forest = bright green)
+- Enemy HP bars: small world-space billboard above enemy heads showing health
+- Block ambient occlusion: improve the AO calculation to consider more neighbor offsets
+
+
 ## 2026-05-24 — Torch visual overhaul: dedicated 3D mesh + world-gen lighting
 
 **What was done:**
