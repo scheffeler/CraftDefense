@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-24 — Biome-tinted grass + alphaTest leaf transparency
+
+**What was done:**
+- Added `grassBiomeTint(wx, wz)` function to Map.ts that mirrors WorldGen's biome
+  detection logic: desert regions get a warm dry tan-green tint (×1.04, ×0.84, ×0.62),
+  taiga gets cool blue-green (×0.80, ×0.96, ×0.88), forest stays white (unchanged).
+- In chunk mesh builder, grass faces now apply the biome tint as vertex color
+  multiplier on the atlas texture, making biome regions visually distinct at a glance.
+- Added `alphaTest: 0.1` to the main chunk MeshLambertMaterial so the ~12% transparent
+  holes in leaves tile (tile 9) are discarded — trees render with canopy gaps instead
+  of as solid green cubes. A significant visual win for forests.
+- Fixed tsconfig.emit.json (from earlier attempt, already present in HEAD).
+
+**Ideas for next run:**
+- Wheat cross geometry: render wheat_0..wheat_3 as two crossed PlaneGeometry quads
+  (X-shape) instead of full cubes — requires a wheat sprite tile (would need atlas
+  expansion to 3 rows or adding a 64×32 secondary atlas)
+- Snow/taiga tinting: apply the cool biome tint to snow block tops too (currently snow
+  is white without tinting)
+- Dirt/sand biome tinting: apply warm tint to dirt blocks in desert areas for consistency
+- Billboard flame torch: replace ember sphere with camera-facing PlaneGeometry quad
+  using a canvas-drawn flame sprite (yellow core → orange → red → transparent edge)
+- Enemy body canvas textures: troll/orc torso cloths, spider segments color variation
+- Held-block atlas texture: when holding a block item, apply the actual atlas UV to
+  each face of the held mini-cube (currently just flat vertex-color)
+- Star twinkle: animate PointsMaterial.size with per-frame sine wave for atmospheric shimmer
+- Particle visual variety: different particle sizes/colors by damage type (fire=orange,
+  arrow=white, sword=red)
+
 ## 2026-05-24 — Expanded block texture atlas (16→32 tiles, single-row approach)
 
 **What was done:**
