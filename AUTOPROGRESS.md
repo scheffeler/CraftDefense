@@ -1,5 +1,36 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-24 — Torch visual overhaul: dedicated 3D mesh + world-gen lighting
+
+**What was done:**
+- Torch blocks are now excluded from the chunk mesh (no more ugly orange cubes)
+- Each torch is replaced by a dedicated THREE.Group: brown wooden stick
+  (0.09×0.65×0.09 box) + orange ember sphere at the tip (radius 0.065)
+- `VoxelWorld.scanForBlock(id)` added — scans all chunks and returns world-space
+  positions for any block type
+- `initTorchLights()` called at game start scans the entire world for torches;
+  fortress-wall torches, mineshaft torches, and dungeon torches now ALL emit
+  warm PointLights (previously only player-placed torches had lights)
+- Existing torch flicker code extended to also pulse the flame sphere scale
+  in sync with the light intensity for a subtle organic feel
+
+**Files changed:** `src/Map.ts`, `src/Game.ts`
+
+**Ideas for next run:**
+- Billboard flame quad: replace the ember sphere with an alpha-blended
+  PlaneGeometry (facing camera) using a canvas-drawn flame sprite texture
+  (yellow core → orange → red → transparent) for more realistic fire look
+- Biome boundary blend: noise-dither vertex colors at forest/desert/taiga
+  transitions for smoother visual seams
+- Star twinkle: animate PointsMaterial.size with a slow per-frame sine wave
+- Sun disk improvement: replace sphere with PlaneGeometry facing camera + a
+  glow halo ring (larger transparent plane behind) for a cinematic sun
+- Orc face canvas texture: add war-paint stripe, heavy brow ridge, tusks
+- Held-block item: show actual atlas tile faces on the mini-cube when holding
+  a block item (requires per-face UV mapping in buildItemMesh)
+- Wheat cross geometry: render wheat stages as two crossed PlaneGeometry
+  quads instead of full-block cube for correct plant appearance
+
 ## 2026-05-23 — Gradient sky dome via ShaderMaterial
 
 **What was done:**
