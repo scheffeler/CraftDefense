@@ -61,8 +61,16 @@ export class Game {
   // Initial build phase before wave 1 (seconds)
   private buildPhaseTimer = 60;
 
-  // Torch point lights keyed by "wx,wy,wz"
-  private readonly torchLights = new Map<string, THREE.PointLight>();
+  // Torch point lights + visual meshes keyed by "wx,wy,wz"
+  private readonly torchLights  = new Map<string, THREE.PointLight>();
+  private readonly torchMeshes  = new Map<string, THREE.Group>();
+  // Shared torch geometry/materials (created once)
+  private readonly _torchStickGeo  = new THREE.BoxGeometry(0.09, 0.65, 0.09);
+  private readonly _torchFlameGeo  = new THREE.SphereGeometry(0.065, 6, 5);
+  private readonly _torchStickMat  = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+  private readonly _torchFlameMat  = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
+  // Flame meshes for per-frame flicker animation
+  private readonly _torchFlameMeshes: THREE.Mesh[] = [];
 
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
@@ -181,9 +189,15 @@ export class Game {
 
   start(): void {
     this.buildSystems();
+    this.initTorchLights();
     // Expose camera for screenshot tooling
     (window as any).__GAME_CAMERA__ = this.scene.camera;
     requestAnimationFrame(t => this.loop(t));
+  }
+
+  private initTorchLights(): void {
+    const positions = this.gameMap.scanForBlock("torch");
+    for (const [wx, wy, wz] of positions) this.addTorchLight(wx, wy, wz);
   }
 
   // ─── System construction ───────────────────────────────────────────────────
@@ -1541,12 +1555,14 @@ export class Game {
     // TNT fuses countdown
     this.updateTNT(dt);
 
-    // Torch flicker — subtle sine-wave intensity variation
+    // Torch flicker — subtle sine-wave intensity variation + flame scale pulse
     if (this.torchLights.size > 0) {
       const t = performance.now() * 0.001;
       for (const light of this.torchLights.values()) {
         light.intensity = 1.6 + Math.sin(t * 7.3) * 0.25 + Math.sin(t * 12.1 + 1.5) * 0.12;
       }
+      const flameScale = 1.0 + Math.sin(t * 9.1) * 0.12 + Math.sin(t * 14.7 + 0.8) * 0.06;
+      for (const flame of this._torchFlameMeshes) flame.scale.setScalar(flameScale);
     }
 
     // Freeplay: flow field tracks player (recomputed every 3 s)
@@ -2382,10 +2398,27 @@ export class Game {
   private addTorchLight(wx: number, wy: number, wz: number): void {
     const key = this.torchKey(wx, wy, wz);
     if (this.torchLights.has(key)) return;
+
+    // Point light — warm orange glow
     const light = new THREE.PointLight(0xffaa44, 1.8, 10, 2);
     light.position.set(wx + 0.5, wy + 0.8, wz + 0.5);
     this.scene.scene.add(light);
     this.torchLights.set(key, light);
+
+    // Visual torch: wooden stick + glowing ember sphere
+    const group = new THREE.Group();
+    const stick = new THREE.Mesh(this._torchStickGeo, this._torchStickMat);
+    stick.position.set(0, 0.325, 0);
+    group.add(stick);
+
+    const flame = new THREE.Mesh(this._torchFlameGeo, this._torchFlameMat);
+    flame.position.set(0, 0.72, 0);
+    group.add(flame);
+    this._torchFlameMeshes.push(flame);
+
+    group.position.set(wx + 0.5, wy, wz + 0.5);
+    this.scene.scene.add(group);
+    this.torchMeshes.set(key, group);
   }
 
   private removeTorchLight(wx: number, wy: number, wz: number): void {
@@ -2395,6 +2428,17 @@ export class Game {
       this.scene.scene.remove(light);
       light.dispose();
       this.torchLights.delete(key);
+    }
+    const mesh = this.torchMeshes.get(key);
+    if (mesh) {
+      // Remove flame from flicker list
+      const flame = mesh.children[1] as THREE.Mesh | undefined;
+      if (flame) {
+        const idx = this._torchFlameMeshes.indexOf(flame);
+        if (idx !== -1) this._torchFlameMeshes.splice(idx, 1);
+      }
+      this.scene.scene.remove(mesh);
+      this.torchMeshes.delete(key);
     }
   }
 

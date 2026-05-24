@@ -937,6 +937,7 @@ export class VoxelWorld {
         for (let lz = 0; lz < CHUNK_SIZE; lz++) {
           const id = chunk.getBlock(lx, ly, lz);
           if (id === "air") continue;
+          if (id === "torch") continue; // rendered as dedicated 3D mesh, not chunk geometry
           const def = BLOCK_DEFS[id];
           const wx = offX + lx, wy = ly, wz = offZ + lz;
 
@@ -1002,7 +1003,7 @@ export class VoxelWorld {
 
             // Per-vertex AO: check adjacent blocks in tangent directions only
             // Emissive blocks skip AO so glow doesn't get darkened by corners
-            const skipAO = (id === "lava" || id === "fire" || id === "torch");
+            const skipAO = (id === "lava" || id === "fire");
             const [tax, tay, taz] = f.a;
             const [tbx, tby, tbz] = f.b;
             const s1n = skipAO ? false : isSolidAO(wx - tax, wy - tay, wz - taz);
@@ -1079,6 +1080,19 @@ export class VoxelWorld {
     }
   }
 
+  /** Return world-space positions of all blocks with the given id. */
+  scanForBlock(id: BlockId): Array<[number, number, number]> {
+    const out: Array<[number, number, number]> = [];
+    this.chunks.forEach(chunk => {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++)
+        for (let ly = 0; ly < WORLD_HEIGHT; ly++)
+          for (let lz = 0; lz < CHUNK_SIZE; lz++)
+            if (chunk.getBlock(lx, ly, lz) === id)
+              out.push([chunk.cx * CHUNK_SIZE + lx, ly, chunk.cz * CHUNK_SIZE + lz]);
+    });
+    return out;
+  }
+
   getChunkMeshes(): THREE.Mesh[] {
     const meshes: THREE.Mesh[] = [];
     this.chunks.forEach(c => { if (c.mesh) meshes.push(c.mesh); });
@@ -1100,6 +1114,10 @@ export class GameMap {
 
   updateFluidAnimation(dt: number): void {
     this.world.updateFluidAnimation(dt);
+  }
+
+  scanForBlock(id: import("./types").BlockId): Array<[number, number, number]> {
+    return this.world.scanForBlock(id);
   }
 
   getChunkMeshes(): THREE.Mesh[] {
