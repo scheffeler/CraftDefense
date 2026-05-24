@@ -94,6 +94,7 @@ class Chunk {
   mesh: THREE.Mesh | null = null;
   waterMesh: THREE.Mesh | null = null;
   lavaMesh: THREE.Mesh | null = null;
+  wheatMesh: THREE.Mesh | null = null;
   dirty = true;
 
   constructor(cx: number, cz: number) {
@@ -170,6 +171,7 @@ export class VoxelWorld {
   private readonly blockTex: THREE.Texture;
   private readonly waterMat: THREE.MeshLambertMaterial;
   private readonly lavaMat: THREE.MeshLambertMaterial;
+  private readonly wheatMat: THREE.MeshLambertMaterial;
   private _fluidTime = 0;
 
   constructor(scene: THREE.Scene) {
@@ -179,6 +181,7 @@ export class VoxelWorld {
     this.blockTex = VoxelWorld.makeBlockTexture();
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
+    this.wheatMat = VoxelWorld.makeWheatMaterial();
   }
 
   /** Advance fluid animation — call every frame with elapsed seconds. */
@@ -277,6 +280,80 @@ export class VoxelWorld {
       mat.emissiveIntensity = 0.55;
     }
     return mat;
+  }
+
+  private static makeWheatMaterial(): THREE.MeshLambertMaterial {
+    // 4-stage wheat sprite sheet: 64×16 canvas, each 16×16 tile is one growth stage.
+    // Sprites drawn with transparent backgrounds; cross geometry uses alphaTest:0.5.
+    const STAGES = 4, S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = STAGES * S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, STAGES * S, S);
+
+    const px = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
+
+    const drawStage = (ox: number, stage: number) => {
+      const stemCols: [string, string][] = [
+        ["#3d7a15", "#2d6010"],   // stage 0: dark young green
+        ["#5a9a20", "#4a8018"],   // stage 1: medium green
+        ["#8aaa2a", "#7a9a22"],   // stage 2: maturing yellow-green
+        ["#d4a820", "#c09018"],   // stage 3: golden ready
+      ];
+      const headCol = "#e8d040";
+      const [stemA, stemB] = stemCols[stage];
+
+      // Plant height (in pixels from bottom) per stage
+      const heights = [5, 9, 12, 16];
+      const h = heights[stage];
+      const y0 = S - h;  // top of plant in canvas coords (canvas y=0 is top)
+
+      // Main stem: 2px wide at center
+      for (let y = y0 + 2; y < S; y++) {
+        px(ox + 7, y, stemA);
+        px(ox + 8, y, stemB);
+      }
+
+      // Side leaves (stages 1+)
+      if (stage >= 1) {
+        const lf = y0 + 4;
+        for (let x = ox + 4; x <= ox + 6; x++) px(x, lf, stemA);  // left leaf
+        for (let x = ox + 9; x <= ox + 11; x++) px(x, lf + 1, stemA);  // right leaf staggered
+      }
+      if (stage >= 2) {
+        const lf2 = y0 + 6;
+        for (let x = ox + 3; x <= ox + 6; x++) px(x, lf2, stemA);
+        for (let x = ox + 9; x <= ox + 12; x++) px(x, lf2 + 1, stemA);
+        // Short drooping tip
+        px(ox + 7, y0 + 1, stemA); px(ox + 8, y0 + 1, stemB);
+      }
+
+      // Seed heads for stage 3 (golden top cluster)
+      if (stage === 3) {
+        for (let y = y0; y <= y0 + 3; y++) {
+          for (let x = ox + 5; x <= ox + 10; x++) px(x, y, headCol);
+        }
+        // Bright highlights inside head
+        for (let y = y0; y <= y0 + 1; y++) {
+          for (let x = ox + 6; x <= ox + 9; x++) px(x, y, "#f0e050");
+        }
+        // Individual grain bumps
+        px(ox + 5, y0, stemA); px(ox + 10, y0, stemA);
+        px(ox + 5, y0 + 2, stemA); px(ox + 10, y0 + 2, stemA);
+      }
+    };
+
+    for (let s = 0; s < STAGES; s++) drawStage(s * S, s);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return new THREE.MeshLambertMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.4,
+      side: THREE.DoubleSide,
+    });
   }
 
   private static makeBlockTexture(): THREE.Texture {
@@ -902,6 +979,11 @@ export class VoxelWorld {
       chunk.lavaMesh.geometry.dispose();
       chunk.lavaMesh = null;
     }
+    if (chunk.wheatMesh) {
+      this.chunkMeshGroup.remove(chunk.wheatMesh);
+      chunk.wheatMesh.geometry.dispose();
+      chunk.wheatMesh = null;
+    }
 
     const positions: number[] = [];
     const normals: number[]   = [];
@@ -913,6 +995,9 @@ export class VoxelWorld {
     // Separate geometry for animated fluid (water/lava) top faces
     const wPos: number[] = [], wUV: number[] = [], wIdx: number[] = []; let wvi = 0;
     const lPos: number[] = [], lUV: number[] = [], lIdx: number[] = []; let lvi = 0;
+
+    // Wheat cross geometry: collect positions during main pass, build at end
+    const wheatEntries: [number, number, number, number][] = []; // [wx, wy, wz, stage]
 
     const isSolidAO = (bx: number, by: number, bz: number): boolean => {
       const bid = this.getBlock(bx, by, bz);
@@ -963,8 +1048,14 @@ export class VoxelWorld {
           const id = chunk.getBlock(lx, ly, lz);
           if (id === "air") continue;
           if (id === "torch") continue; // rendered as dedicated 3D mesh, not chunk geometry
-          const def = BLOCK_DEFS[id];
           const wx = offX + lx, wy = ly, wz = offZ + lz;
+          // Wheat renders as crossed quads, not a solid cube
+          if (id === "wheat_0" || id === "wheat_1" || id === "wheat_2" || id === "wheat_3") {
+            const stage = id === "wheat_0" ? 0 : id === "wheat_1" ? 1 : id === "wheat_2" ? 2 : 3;
+            wheatEntries.push([wx, wy, wz, stage]);
+            continue;
+          }
+          const def = BLOCK_DEFS[id];
 
           const c = def.color;
           const r = ((c >> 16) & 0xff) / 255;
@@ -1109,6 +1200,43 @@ export class VoxelWorld {
       chunk.lavaMesh = new THREE.Mesh(lGeo, this.lavaMat);
       chunk.lavaMesh.receiveShadow = false;
       this.chunkMeshGroup.add(chunk.lavaMesh);
+    }
+
+    // Build wheat cross geometry (two X-shaped quads per wheat block)
+    if (wheatEntries.length > 0) {
+      const wpPos: number[] = [], wpNorm: number[] = [], wpUV: number[] = [], wpIdx: number[] = [];
+      let wpi = 0;
+      const DIAG = 1 / Math.SQRT2; // 0.7071
+      const HW = 0.44, YB = 0.02, YT = 0.96; // half-width, y-bottom, y-top within block
+
+      const addWheatQuad = (cx: number, cy: number, cz: number, dx: number, dz: number, u0: number, u1: number) => {
+        // Four corners of a diagonal quad: bottom-left, bottom-right, top-left, top-right
+        const x0 = cx - dx * HW, z0 = cz - dz * HW;
+        const x1 = cx + dx * HW, z1 = cz + dz * HW;
+        const y0 = cy + YB, y1 = cy + YT;
+        wpPos.push(x0, y0, z0,  x1, y0, z1,  x0, y1, z0,  x1, y1, z1);
+        // Upward normals for uniform overhead lighting
+        for (let i = 0; i < 4; i++) wpNorm.push(0, 1, 0);
+        wpUV.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
+        wpIdx.push(wpi, wpi+1, wpi+2, wpi+1, wpi+3, wpi+2);
+        wpi += 4;
+      };
+
+      for (const [wx, wy, wz, stage] of wheatEntries) {
+        const cx = wx + 0.5, cy = wy, cz = wz + 0.5;
+        const u0 = stage / 4, u1 = (stage + 1) / 4;
+        addWheatQuad(cx, cy, cz,  DIAG,  DIAG, u0, u1); // 45° diagonal
+        addWheatQuad(cx, cy, cz,  DIAG, -DIAG, u0, u1); // 135° diagonal
+      }
+
+      const wGeo = new THREE.BufferGeometry();
+      wGeo.setAttribute("position", new THREE.Float32BufferAttribute(wpPos, 3));
+      wGeo.setAttribute("normal",   new THREE.Float32BufferAttribute(wpNorm, 3));
+      wGeo.setAttribute("uv",       new THREE.Float32BufferAttribute(wpUV, 2));
+      wGeo.setIndex(wpIdx);
+      chunk.wheatMesh = new THREE.Mesh(wGeo, this.wheatMat);
+      chunk.wheatMesh.receiveShadow = false;
+      this.chunkMeshGroup.add(chunk.wheatMesh);
     }
   }
 

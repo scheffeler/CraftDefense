@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-24 — Wheat cross geometry (X-shaped plant sprites)
+
+**What was done:**
+- Wheat blocks (`wheat_0`..`wheat_3`) are now excluded from the solid chunk mesh
+  and rendered as two crossed PlaneGeometry-like quads (X-shape) per wheat block.
+- A 64×16 pixel-art sprite sheet with 4 growth stages drives UV mapping:
+  stage 0 = short green sprout, stage 1 = taller stem with side leaves,
+  stage 2 = fuller green plant, stage 3 = golden ripe grain heads.
+- `Chunk.wheatMesh` stores the per-chunk mesh; `VoxelWorld.wheatMat` is shared.
+- Material uses `transparent: true, alphaTest: 0.4, side: THREE.DoubleSide` for
+  correct back-face rendering and alpha cutout.
+- Village farms now look like actual Minecraft-style wheat plants instead of
+  solid green/yellow cubes — visually confirmed via Playwright screenshots.
+
+**Files changed:** `src/Map.ts`
+
+**Ideas for next run:**
+- Billboard flame torch: replace ember sphere with camera-facing PlaneGeometry quad
+  using a canvas-drawn flame sprite (yellow core → orange → red → transparent edge)
+- Wheat sprite detail: add more pixel art detail to the stage-3 ripe grain heads
+  (drooping seed heads, darker stem at base)
+- Star twinkle: animate PointsMaterial.size with per-frame sine wave for atmospheric shimmer
+- Particle visual variety: different particle sizes/colors by damage type (fire=orange,
+  arrow=white, sword=red)
+- Held-block atlas texture: when holding a block item, apply the actual atlas UV to
+  each face of the held mini-cube (currently just flat vertex-color)
+- Enemy body canvas textures: troll/orc torso cloths, spider segments color variation
+- Dirt/sand biome tinting: apply warm tint to dirt blocks in desert areas for consistency
+
 ## 2026-05-24 — Biome-tinted grass + alphaTest leaf transparency
 
 **What was done:**
