@@ -1,5 +1,35 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-25 — Block texture atlas resolution upgrade (16px → 32px per tile)
+
+**What was done:**
+- Increased texture resolution in `makeBlockTexture()` from 16×16 to 32×32 pixels per tile
+- Canvas changes from 256×32 → 512×64 (same 2-row, 16-tiles-per-row structure; UV math unchanged)
+- All 32 block tiles rewritten with improved pixel-level detail:
+  - Stone: 4 crack networks, each 12px long with highlight pixels
+  - Cobblestone: 6 distinct stone chunks with mortar gaps
+  - Dirt: 9 pebble inclusions at seeded-random positions
+  - Grass top: 10 dark tufts + 10 light highlights at 24px spread
+  - Grass side: 8px green band (doubled), transition zone y=8..14
+  - Wood side: sine-wave grain stripes + knothole detail
+  - Wood top: concentric rings centered properly at (16,16)
+  - Planks: 8px strips with alternating x-offset seams
+  - Ores (coal/iron/gold/diamond): blob clusters spread across 22px range
+  - Furnace: fire opening 16×16px with ember flecks
+  - Chest: seam at y=12, clasp at proportional position
+  - Bookshelf: 8 books per row at 4px each, two shelves
+  - Gravel: 12 pebbles with 3-layer rendering for depth
+  - Lava: 8 hotspots + bubble outline geometry
+  - All Row 1 tiles scaled proportionally from original 16px coordinates
+
+**Files changed:** `src/Map.ts`
+
+**Ideas for next run:**
+- Block texture atlas: add normal-map-style shading to cobblestone/stone for 3D feel
+- Held-block atlas texture: apply the actual block atlas UV to each face of the mini-cube
+- Star twinkle: animate `PointsMaterial.size` with a per-frame sine wave
+- Enemy face detail: improve orc/zombie face textures with war-paint, pupils, teeth
+
 ## 2026-05-25 — Distinct 3D tool shapes in hand + sun glow halo
 
 **What was done:**

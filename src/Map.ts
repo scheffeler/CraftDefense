@@ -357,20 +357,20 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 32px tall (2 rows of 16 tiles each).
+    // 16 tiles × 32px = 512px wide atlas, 64px tall (2 rows of 16 tiles, 32×32px each).
+    // UV mapping: col = texIdx%16, row = floor(texIdx/16), u=[col/16,(col+1)/16], v=[row*0.5,(row+1)*0.5]
     const ATLAS_TILES = 16;
-    const S = 16;
+    const S = 32;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S * 2;
     const ctx = canvas.getContext("2d")!;
 
-    // Seeded RNG per tile for deterministic pixel art
     const rng = (seed: number) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; }; };
 
     // Row-0 helpers (y offset = 0)
     const pixel = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
     const border = (ox: number) => {
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.fillRect(ox, 0, S, 1); ctx.fillRect(ox, S-1, S, 1);
       ctx.fillRect(ox, 0, 1, S); ctx.fillRect(ox+S-1, 0, 1, S);
     };
@@ -394,7 +394,7 @@ export class VoxelWorld {
       ctx.fillStyle = col; ctx.fillRect(tx, S, S, S);
     };
     const border1 = (tx: number) => {
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.fillRect(tx, S, S, 1); ctx.fillRect(tx, S + S-1, S, 1);
       ctx.fillRect(tx, S, 1, S); ctx.fillRect(tx+S-1, S, 1, S);
     };
@@ -409,427 +409,433 @@ export class VoxelWorld {
       }
     };
 
-    // 0: stone — gray noise with subtle crack detail lines
-    noise(0 * S, 136, 136, 136, 0.08, 1001);
-    { const rc = rng(2001);
-      ctx.strokeStyle = "rgba(80,80,80,0.55)"; ctx.lineWidth = 1;
-      for (let i = 0; i < 3; i++) {
-        const sx = (rc() * 10 + 3) | 0, sy = (rc() * 8 + 2) | 0;
-        const mx = (rc() * 4 + sx + 14) % 16 | 0, my = Math.min(14, sy + 2 + (rc() * 3) | 0);
-        const ex = (rc() * 3 + mx + 15) % 16 | 0, ey = Math.min(15, my + 1 + (rc() * 2) | 0);
-        ctx.beginPath();
-        ctx.moveTo(0 * S + sx + 0.5, sy + 0.5);
-        ctx.lineTo(0 * S + mx + 0.5, my + 0.5);
-        ctx.lineTo(0 * S + ex + 0.5, ey + 0.5);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(175,175,175,0.28)";
-        ctx.fillRect(0 * S + sx, Math.max(0, sy - 1), 1, 1);
+    // ── 0: Stone — gray with crack network ──────────────────────────────────────
+    noise(0, 128, 128, 128, 0.10, 1001);
+    { const r = rng(2001);
+      for (let c = 0; c < 4; c++) {
+        let cx = (r() * 26 + 3) | 0, cy = (r() * 26 + 3) | 0;
+        for (let i = 0; i < 12; i++) {
+          pixel(cx, cy, `rgb(62,62,62)`);
+          if (cx + 1 < S) pixel(cx + 1, cy, `rgb(162,162,162)`);
+          cx += ((r() * 3 - 1) | 0); cy += ((r() * 3 - 1) | 0);
+          if (cx < 1) cx = 1; if (cx > S - 2) cx = S - 2;
+          if (cy < 1) cy = 1; if (cy > S - 2) cy = S - 2;
+        }
       }
     }
-    border(0 * S);
+    border(0);
 
-    // 1: cobblestone — dark mortar with defined stone blocks
-    fill(1 * S, "#6e6658");
+    // ── 1: Cobblestone — dark mortar with defined stone chunks ──────────────────
+    fill(1 * S, "#60605a");
     { const r = rng(2002);
       const stones: [number,number,number,number,number,number,number][] = [
-        [1,0,6,5,138,130,114], [8,0,7,4,124,118,102],
-        [0,6,5,8,144,136,118], [7,5,8,9,130,122,106],
-        [1,13,5,3,136,128,112], [8,14,7,2,126,120,104],
+        [2,0,13,10,138,130,114], [16,0,15,8,124,118,102],
+        [0,11,10,16,144,136,118], [14,10,16,18,130,122,106],
+        [2,27,10,5,136,128,112], [16,26,15,6,126,120,104],
       ];
       for (const [sx,sy,sw,sh,br,bg,bb] of stones) {
         for (let py = 1; py < sh-1; py++) for (let px = 1; px < sw-1; px++) {
-          const v = (r() - 0.5) * 0.1;
+          const v = (r() - 0.5) * 0.12;
           pixel(1*S + sx+px, sy+py,
             `rgb(${Math.max(0,Math.min(255,(br + v*255)|0))},${Math.max(0,Math.min(255,(bg + v*255)|0))},${Math.max(0,Math.min(255,(bb + v*255)|0))})`);
         }
         ctx.fillStyle = "rgba(255,255,255,0.14)";
         ctx.fillRect(1*S + sx+1, sy+1, sw-2, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
         ctx.fillRect(1*S + sx+1, sy+sh-2, sw-2, 1);
       }
     }
+    border(1 * S);
 
-    // 2: dirt — brown with noise
-    noise(2 * S, 139, 92, 42, 0.1, 1003);
+    // ── 2: Dirt — brown with pebble inclusions ──────────────────────────────────
+    noise(2 * S, 108, 70, 30, 0.12, 1003);
+    { const r = rng(2003);
+      for (let i = 0; i < 9; i++) {
+        const px2 = (r() * 26 + 3) | 0, py2 = (r() * 26 + 3) | 0;
+        const dark = r() > 0.5;
+        const cr = dark ? 75 : 148, cg = dark ? 46 : 92, cb = dark ? 16 : 44;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (r() > 0.45) pixel(2 * S + px2 + dx, py2 + dy, `rgb(${cr},${cg},${cb})`);
+        }
+      }
+    }
     border(2 * S);
 
-    // 3: grass top — bright green with varied tufts
-    noise(3 * S, 90, 155, 55, 0.12, 1004);
+    // ── 3: Grass top — bright green with highlights ─────────────────────────────
+    noise(3 * S, 80, 150, 52, 0.12, 1004);
     { const r = rng(2004);
-      for (let i = 0; i < 5; i++) {
-        const px2 = (r() * 12 + 2) | 0, py2 = (r() * 12 + 2) | 0;
-        ctx.fillStyle = "rgba(55,105,25,0.45)"; ctx.fillRect(3 * S + px2, py2, 2, 2);
+      for (let i = 0; i < 10; i++) {
+        const px2 = (r() * 24 + 4) | 0, py2 = (r() * 24 + 4) | 0;
+        ctx.fillStyle = "rgba(55,105,25,0.45)"; ctx.fillRect(3 * S + px2, py2, 3, 3);
       }
-      for (let i = 0; i < 5; i++) {
-        const px2 = (r() * 12 + 2) | 0, py2 = (r() * 12 + 2) | 0;
-        ctx.fillStyle = "rgba(140,215,85,0.35)"; ctx.fillRect(3 * S + px2, py2, 2, 1);
+      for (let i = 0; i < 10; i++) {
+        const px2 = (r() * 24 + 4) | 0, py2 = (r() * 24 + 4) | 0;
+        ctx.fillStyle = "rgba(140,215,85,0.35)"; ctx.fillRect(3 * S + px2, py2, 3, 2);
       }
     }
     border(3 * S);
 
-    // 4: grass side — 4px green band with blade highlights and fading transition
-    noise(4 * S, 139, 92, 42, 0.08, 1005);
+    // ── 4: Grass side — 8px green band with blade highlights and transition ──────
+    noise(4 * S, 108, 70, 30, 0.10, 1005);
     { const rg = rng(2005);
-      ctx.fillStyle = "rgba(88,155,50,0.94)"; ctx.fillRect(4 * S, 0, S, 4);
+      ctx.fillStyle = "rgba(88,155,50,0.94)"; ctx.fillRect(4 * S, 0, S, 8);
       for (let x = 0; x < S; x++) {
-        if (rg() > 0.48) { ctx.fillStyle = "rgba(115,192,65,0.72)"; ctx.fillRect(4 * S + x, 0, 1, rg() > 0.6 ? 2 : 1); }
+        if (rg() > 0.48) { ctx.fillStyle = "rgba(115,192,65,0.72)"; ctx.fillRect(4 * S + x, 0, 1, rg() > 0.6 ? 4 : 2); }
       }
-      for (let x = 0; x < S; x++) for (let y = 4; y < 7; y++) {
-        const f = (7 - y) / 3.5;
+      for (let x = 0; x < S; x++) for (let y = 8; y < 14; y++) {
+        const f = (14 - y) / 7.0;
         if (rg() < f * 0.55) { ctx.fillStyle = `rgba(88,155,50,${(0.28 + rg() * 0.42).toFixed(2)})`; ctx.fillRect(4 * S + x, y, 1, 1); }
       }
     }
     border(4 * S);
 
-    // 5: sand — sandy with subtle horizontal dune ripple lines
-    noise(5 * S, 212, 196, 132, 0.07, 1006);
-    { for (let y = 1; y < S; y += 3) {
-        ctx.fillStyle = "rgba(175,160,100,0.14)"; ctx.fillRect(5 * S, y, S, 1);
-        ctx.fillStyle = "rgba(235,220,162,0.18)"; ctx.fillRect(5 * S, y + 1, S, 1);
+    // ── 5: Sand — warm sandy with ripple lines ───────────────────────────────────
+    noise(5 * S, 210, 186, 118, 0.08, 1006);
+    { const r = rng(2006);
+      for (let y = 4; y < S; y += 7) {
+        for (let x = 0; x < S; x++) {
+          const rip = Math.sin(x * 0.45 + r() * 0.4) * 0.5;
+          if (rip > 0.25)       pixel(5 * S + x, y, `rgb(228,208,138)`);
+          else if (rip < -0.25) pixel(5 * S + x, y, `rgb(190,168,100)`);
+        }
       }
     }
     border(5 * S);
 
-    // 6: wood side — brown with vertical grain
-    fill(6 * S, "#6b4c2a");
+    // ── 6: Wood side — dark brown with vertical grain and knothole ───────────────
+    fill(6 * S, "rgb(76,48,18)");
     { const r = rng(2006);
-      for (let x = 1; x < S - 1; x++) {
-        const dark = r() > 0.6;
-        for (let y = 1; y < S - 1; y++) {
-          const v = (r() - 0.5) * 30;
-          const b = dark ? -20 : 0;
-          const cr = Math.max(0, Math.min(255, 107 + b + v)) | 0;
-          const cg = Math.max(0, Math.min(255, 76 + b + v)) | 0;
-          const cb = Math.max(0, Math.min(255, 42 + b + v * 0.5)) | 0;
+      for (let x = 0; x < S; x++) {
+        const stripe = Math.sin(x * 0.65 + r() * 0.5) * 14;
+        for (let y = 0; y < S; y++) {
+          const gv = (r() - 0.5) * 10;
+          const cr = Math.max(0, Math.min(255, 76 + stripe + gv)) | 0;
+          const cg = Math.max(0, Math.min(255, 48 + stripe * 0.7 + gv)) | 0;
+          const cb = Math.max(0, Math.min(255, 18 + stripe * 0.3 + gv)) | 0;
           pixel(6 * S + x, y, `rgb(${cr},${cg},${cb})`);
         }
+      }
+      const kx = (10 + r() * 12) | 0, ky = (10 + r() * 12) | 0;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
+        if (dx * dx * 0.28 + dy * dy < 7) pixel(6 * S + kx + dx, ky + dy, `rgb(40,22,6)`);
+      }
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        pixel(6 * S + kx + dx, ky + dy, `rgb(98,62,26)`);
       }
     }
     border(6 * S);
 
-    // 7: wood top — annular ring pattern
-    fill(7 * S, "#b8905a");
-    { const cx = 8, cy = 8;
+    // ── 7: Wood top — concentric tree rings ─────────────────────────────────────
+    fill(7 * S, "rgb(142,92,46)");
+    { const r = rng(2008);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-        const ring = Math.abs(Math.sin(dist * 0.8)) * 0.2 + 0.9;
-        const cr = Math.min(255, Math.round(184 * ring)) | 0;
-        const cg = Math.min(255, Math.round(144 * ring)) | 0;
-        const cb = Math.min(255, Math.round(90 * ring)) | 0;
+        const dist = Math.sqrt((x - S/2) ** 2 + (y - S/2) ** 2);
+        const ring = Math.sin(dist * 0.88 + r() * 0.08);
+        const gv = (r() - 0.5) * 8;
+        const base = ring > 0 ? 155 : 118;
+        const cr = Math.max(0, Math.min(255, base + gv + 10)) | 0;
+        const cg = Math.max(0, Math.min(255, base * 0.62 + gv + 4)) | 0;
+        const cb = Math.max(0, Math.min(255, base * 0.30 + gv)) | 0;
         pixel(7 * S + x, y, `rgb(${cr},${cg},${cb})`);
       }
     }
     border(7 * S);
 
-    // 8: planks — tan with plank seams
-    fill(8 * S, "#c8a060");
-    { const r = rng(2008);
-      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const v = (r() - 0.5) * 20;
-        pixel(8 * S + x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
+    // ── 8: Planks — warm wood with 8px plank strips and offset seams ────────────
+    { const r = rng(2009);
+      for (let y = 0; y < S; y++) {
+        const plank = Math.floor(y / 8);
+        const xOff = (plank % 2) * 16;
+        for (let x = 0; x < S; x++) {
+          const gv = (r() - 0.5) * 16;
+          const seam  = (y % 8 === 0) ? -30 : 0;
+          const vseam = ((x + xOff) % 16 === 0) ? -18 : 0;
+          const cr = Math.max(0, Math.min(255, 185 + gv + seam + vseam)) | 0;
+          const cg = Math.max(0, Math.min(255, 138 + gv * 0.8 + seam + vseam)) | 0;
+          const cb = Math.max(0, Math.min(255, 72 + gv * 0.5 + seam + vseam)) | 0;
+          pixel(8 * S + x, y, `rgb(${cr},${cg},${cb})`);
+        }
       }
-      // horizontal seams every 4px
-      for (let y = 3; y < S; y += 4) { ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(8 * S, y, S, 1); }
-      // vertical offset seam
-      ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.fillRect(8 * S + 8, 0, 1, 4); ctx.fillRect(8 * S + 8, 8, 1, 4);
     }
     border(8 * S);
 
-    // 9: leaves — mottled green with varied palette and highlight accents
-    fill(9 * S, "transparent");
+    // ── 9: Leaves — transparent mottled multi-shade green ───────────────────────
     { const rl = rng(2009);
       const lp: [number,number,number][] = [
         [46, 104, 28], [60, 128, 40], [72, 150, 52], [40, 92, 22], [85, 165, 54],
       ];
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        if (rl() < 0.12) { pixel(9 * S + x, y, "rgba(0,0,0,0)"); continue; }
-        const [lr, lg, lb] = lp[(rl() * lp.length) | 0];
+        const v = rl();
         const bright = 0.74 + rl() * 0.36;
+        if (v < 0.12) continue;
+        const [lr, lg, lb] = lp[(rl() * lp.length) | 0];
         pixel(9 * S + x, y, `rgb(${(lr * bright)|0},${(lg * bright)|0},${(lb * bright)|0})`);
       }
-      for (let i = 0; i < 3; i++) {
-        const hx = (rl() * 12 + 2) | 0, hy = (rl() * 12 + 2) | 0;
-        ctx.fillStyle = "rgba(100,192,62,0.30)"; ctx.fillRect(9 * S + hx, hy, 2, 1);
+      for (let i = 0; i < 6; i++) {
+        const hx = (rl() * 24 + 4) | 0, hy = (rl() * 24 + 4) | 0;
+        ctx.fillStyle = "rgba(100,192,62,0.30)"; ctx.fillRect(9 * S + hx, hy, 3, 2);
       }
     }
     border(9 * S);
 
-    // 10: iron ore — stone base with orange flecks
-    noise(10 * S, 136, 136, 136, 0.07, 1010);
-    { const r = rng(2010);
-      for (let i = 0; i < 5; i++) {
-        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
-        ctx.fillStyle = "#cc8844"; ctx.fillRect(10 * S + ox2, oy2, 2, 2);
-        ctx.fillStyle = "#dd9955"; ctx.fillRect(10 * S + ox2, oy2, 1, 1);
+    // ── 10: Iron ore — stone with prominent orange vein blobs ───────────────────
+    noise(10 * S, 128, 128, 128, 0.09, 1010);
+    { const r = rng(3010);
+      for (let blob = 0; blob < 3; blob++) {
+        const bx2 = (r() * 22 + 5) | 0, by2 = (r() * 22 + 5) | 0;
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
+          if (r() > 0.45 && dx * dx * 0.45 + dy * dy < 9)
+            pixel(10 * S + bx2 + dx, by2 + dy, `rgb(195,128,68)`);
+        }
+        pixel(10 * S + bx2, by2, `rgb(220,158,90)`);
       }
     }
     border(10 * S);
 
-    // 11: coal ore — stone base with dark spots
-    noise(11 * S, 136, 136, 136, 0.07, 1011);
-    { const r = rng(2011);
-      for (let i = 0; i < 5; i++) {
-        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
-        ctx.fillStyle = "#222222"; ctx.fillRect(11 * S + ox2, oy2, 2, 2);
-        ctx.fillStyle = "#333333"; ctx.fillRect(11 * S + ox2 + 1, oy2, 1, 1);
+    // ── 11: Coal ore — stone with prominent dark coal clusters ──────────────────
+    noise(11 * S, 128, 128, 128, 0.09, 1011);
+    { const r = rng(3011);
+      for (let blob = 0; blob < 3; blob++) {
+        const bx2 = (r() * 22 + 5) | 0, by2 = (r() * 22 + 5) | 0;
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
+          if (r() > 0.40 && dx * dx * 0.45 + dy * dy < 10)
+            pixel(11 * S + bx2 + dx, by2 + dy, `rgb(22,22,22)`);
+        }
+        pixel(11 * S + bx2, by2, `rgb(50,50,52)`);
       }
     }
     border(11 * S);
 
-    // 12: bedrock — very dark irregular
-    noise(12 * S, 51, 51, 51, 0.15, 1012);
+    // ── 12: Bedrock — very dark with irregular blobs ─────────────────────────────
+    noise(12 * S, 36, 36, 36, 0.12, 1012);
     { const r = rng(2012);
-      for (let i = 0; i < 8; i++) {
-        const ox2 = (r() * 12 + 1) | 0, oy2 = (r() * 12 + 1) | 0;
-        ctx.fillStyle = "#111111"; ctx.fillRect(12 * S + ox2, oy2, 2, 2);
+      for (let i = 0; i < 10; i++) {
+        const bx2 = (r() * 26 + 3) | 0, by2 = (r() * 26 + 3) | 0;
+        const bw2 = (r() * 6 + 2) | 0, bh2 = (r() * 4 + 2) | 0;
+        ctx.fillStyle = "#0e0e0e"; ctx.fillRect(12 * S + bx2, by2, bw2, bh2);
       }
     }
     border(12 * S);
 
-    // 13: generic/default — white with border (vertex color controls appearance)
-    fill(13 * S, "#ffffff");
+    // ── 13: Default/white — vertex color controls final appearance ───────────────
+    fill(13 * S, "rgb(255,255,255)");
     border(13 * S);
 
-    // 14: gold ore — stone base with gold flecks
-    noise(14 * S, 136, 136, 136, 0.07, 1014);
-    { const r = rng(2014);
-      for (let i = 0; i < 5; i++) {
-        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
-        ctx.fillStyle = "#ddaa00"; ctx.fillRect(14 * S + ox2, oy2, 2, 2);
-        ctx.fillStyle = "#eebb22"; ctx.fillRect(14 * S + ox2, oy2, 1, 1);
+    // ── 14: Gold ore — stone with gold cluster veins ─────────────────────────────
+    noise(14 * S, 128, 128, 128, 0.09, 1014);
+    { const r = rng(3014);
+      for (let blob = 0; blob < 4; blob++) {
+        const bx2 = (r() * 20 + 6) | 0, by2 = (r() * 20 + 6) | 0;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) {
+          if (r() > 0.45 && dx * dx * 0.45 + dy * dy < 7)
+            pixel(14 * S + bx2 + dx, by2 + dy, `rgb(215,170,0)`);
+        }
+        pixel(14 * S + bx2, by2, `rgb(242,212,22)`);
       }
     }
     border(14 * S);
 
-    // 15: diamond ore — stone base with cyan diamonds
-    noise(15 * S, 136, 136, 136, 0.07, 1015);
-    { const r = rng(2015);
-      for (let i = 0; i < 4; i++) {
-        const ox2 = (r() * 10 + 3) | 0, oy2 = (r() * 10 + 3) | 0;
-        pixel(15 * S + ox2, oy2 + 1, "#00cccc"); pixel(15 * S + ox2 + 1, oy2, "#00cccc");
-        pixel(15 * S + ox2 + 1, oy2 + 2, "#00cccc"); pixel(15 * S + ox2 + 2, oy2 + 1, "#00cccc");
-        pixel(15 * S + ox2 + 1, oy2 + 1, "#55ffff");
+    // ── 15: Diamond ore — stone with cyan crystal clusters ───────────────────────
+    noise(15 * S, 128, 128, 128, 0.09, 1015);
+    { const r = rng(3015);
+      const diaShape: [number, number][] = [
+        [0,-2],[-1,-1],[0,-1],[1,-1],[-2,0],[-1,0],[0,0],[1,0],[2,0],[-1,1],[0,1],[1,1],[0,2],
+      ];
+      for (let gem = 0; gem < 3; gem++) {
+        const gx2 = (r() * 18 + 7) | 0, gy2 = (r() * 18 + 7) | 0;
+        for (const [ddx, ddy] of diaShape) {
+          pixel(15 * S + gx2 + ddx, gy2 + ddy, `rgb(0,175,175)`);
+        }
+        pixel(15 * S + gx2, gy2, `rgb(45,235,235)`);
       }
     }
     border(15 * S);
 
-    // ── Row 1: tiles 16–31 ───────────────────────────────────────────────────
+    // ── Row 1: tiles 16–31 (each 32×32, y offset = S = 32) ──────────────────────
 
-    // Tile 16: furnace side — stone with fire opening
+    // Tile 16: furnace side — stone with centered fire opening
     noise1(0 * S, 108, 108, 108, 0.09, 3016);
-    { // Stone block pattern
-      const r = rng(4016);
-      for (let i = 0; i < 4; i++) {
-        const bx = (r() * 10 + 2) | 0, by = (r() * 10 + 2) | 0, bw = (r() * 3 + 2) | 0, bh = (r() * 2 + 1) | 0;
+    { const r = rng(4016);
+      for (let i = 0; i < 6; i++) {
+        const bx = (r() * 20 + 4) | 0, by = (r() * 20 + 4) | 0, bw = (r() * 5 + 3) | 0, bh = (r() * 3 + 2) | 0;
         ctx.fillStyle = "rgba(60,60,60,0.3)"; ctx.fillRect(0 * S + bx, S + by, bw, bh);
       }
-      // Dark surround for fire opening (centered, lower half)
-      ctx.fillStyle = "#222222"; ctx.fillRect(0 * S + 4, S + 5, 8, 8);
-      // Orange fire
-      ctx.fillStyle = "#cc5500"; ctx.fillRect(0 * S + 5, S + 7, 6, 5);
-      ctx.fillStyle = "#ff7700"; ctx.fillRect(0 * S + 6, S + 8, 4, 3);
-      ctx.fillStyle = "#ffcc00"; ctx.fillRect(0 * S + 7, S + 9, 2, 2);
-      // Top decorative bar
-      ctx.fillStyle = "rgba(60,60,60,0.4)"; ctx.fillRect(0 * S + 3, S + 3, 10, 1);
+      ctx.fillStyle = "#222222"; ctx.fillRect(0 * S + 8, S + 10, 16, 16); // fire surround
+      ctx.fillStyle = "#cc5500"; ctx.fillRect(0 * S + 9, S + 14, 14, 10);  // orange fire
+      ctx.fillStyle = "#ff7700"; ctx.fillRect(0 * S + 11, S + 16, 10, 6); // bright fire
+      ctx.fillStyle = "#ffcc00"; ctx.fillRect(0 * S + 13, S + 18, 6, 4);  // hottest core
+      ctx.fillStyle = "rgba(60,60,60,0.4)"; ctx.fillRect(0 * S + 6, S + 6, 20, 2); // top bar
     }
     border1(0 * S);
 
     // Tile 17: chest — wood with metal trim and clasp
     fill1(1 * S, "#7a4a22");
     { const r = rng(3017);
-      // Wood grain noise
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * 20;
         pixel1(1 * S, x, y, `rgb(${(122 + v) | 0},${(74 + v * 0.7) | 0},${(34 + v * 0.4) | 0})`);
       }
-      // Metal trim frame (1px inner border)
       ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + 1, S + 1, S - 2, 1);
       ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + 1, S + S-2, S - 2, 1);
       ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + 1, S + 1, 1, S - 2);
       ctx.fillStyle = "#996633"; ctx.fillRect(1 * S + S-2, S + 1, 1, S - 2);
-      // Horizontal seam (lid line at y=6)
-      ctx.fillStyle = "#553311"; ctx.fillRect(1 * S + 1, S + 6, S-2, 1);
-      ctx.fillStyle = "#aa7733"; ctx.fillRect(1 * S + 1, S + 7, S-2, 1);
-      // Clasp (gold, center)
-      ctx.fillStyle = "#ddaa00"; ctx.fillRect(1 * S + 6, S + 5, 4, 5);
-      ctx.fillStyle = "#ffdd44"; ctx.fillRect(1 * S + 7, S + 6, 2, 2);
-      ctx.fillStyle = "#aa8800"; ctx.fillRect(1 * S + 7, S + 8, 2, 2);
+      ctx.fillStyle = "#553311"; ctx.fillRect(1 * S + 1, S + 12, S-2, 2);
+      ctx.fillStyle = "#aa7733"; ctx.fillRect(1 * S + 1, S + 14, S-2, 2);
+      ctx.fillStyle = "#ddaa00"; ctx.fillRect(1 * S + 13, S + 10, 6, 10);
+      ctx.fillStyle = "#ffdd44"; ctx.fillRect(1 * S + 14, S + 12, 4, 4);
+      ctx.fillStyle = "#aa8800"; ctx.fillRect(1 * S + 14, S + 16, 4, 4);
     }
     border1(1 * S);
 
-    // Tile 18: crafting table top — plank base with 3×3 grid marks
+    // Tile 18: crafting table top — plank base with 3×3 grid
     { const r = rng(3018);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * 18;
         pixel1(2 * S, x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
       }
-      // 3×3 cell grid lines (every 5px, offset by 1)
       for (let i = 0; i < 3; i++) {
-        const gx = 1 + i * 5, gz = 1 + i * 5;
+        const gx = 2 + i * 10, gz = 2 + i * 10;
         ctx.fillStyle = "rgba(80,50,20,0.4)";
-        ctx.fillRect(2 * S + gx, S, 1, S); // vertical
-        ctx.fillRect(2 * S, S + gz, S, 1); // horizontal
+        ctx.fillRect(2 * S + gx, S, 1, S);
+        ctx.fillRect(2 * S, S + gz, S, 1);
       }
-      // Slight highlight offset lines
       ctx.fillStyle = "rgba(255,220,150,0.2)";
       for (let i = 0; i < 3; i++) {
-        ctx.fillRect(2 * S + 2 + i * 5, S, 1, S);
-        ctx.fillRect(2 * S, S + 2 + i * 5, S, 1);
+        ctx.fillRect(2 * S + 4 + i * 10, S, 1, S);
+        ctx.fillRect(2 * S, S + 4 + i * 10, S, 1);
       }
     }
     border1(2 * S);
 
-    // Tile 19: obsidian — deep purple-black with faint crystal shimmer
+    // Tile 19: obsidian — deep purple-black with crystal shimmer
     { const r = rng(3019);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * 0.15;
-        const cr = Math.max(0, Math.min(255, 18  + v * 255)) | 0;
-        const cg = Math.max(0, Math.min(255,  8  + v * 255)) | 0;
-        const cb = Math.max(0, Math.min(255, 28  + v * 255)) | 0;
+        const cr = Math.max(0, Math.min(255, 18 + v * 255)) | 0;
+        const cg = Math.max(0, Math.min(255,  8 + v * 255)) | 0;
+        const cb = Math.max(0, Math.min(255, 28 + v * 255)) | 0;
         pixel1(3 * S, x, y, `rgb(${cr},${cg},${cb})`);
       }
-      // Faint purple crystal inclusions
       const r2 = rng(4019);
-      for (let i = 0; i < 6; i++) {
-        const px2 = (r2() * 12 + 2) | 0, py2 = (r2() * 12 + 2) | 0;
+      for (let i = 0; i < 8; i++) {
+        const px2 = (r2() * 24 + 4) | 0, py2 = (r2() * 24 + 4) | 0;
         ctx.fillStyle = `rgba(${(80 + r2() * 60) | 0},${(20 + r2() * 20) | 0},${(100 + r2() * 80) | 0},0.5)`;
-        ctx.fillRect(3 * S + px2, S + py2, 2, 1);
+        ctx.fillRect(3 * S + px2, S + py2, 3, 2);
       }
     }
     border1(3 * S);
 
     // Tile 20: iron block — smooth silver with subtle grid seams
     noise1(4 * S, 172, 172, 176, 0.06, 3020);
-    { // Subtle seams every 4px
-      ctx.fillStyle = "rgba(100,100,110,0.25)";
-      for (let i = 4; i < S; i += 4) {
+    { ctx.fillStyle = "rgba(100,100,110,0.25)";
+      for (let i = 8; i < S; i += 8) {
         ctx.fillRect(4 * S, S + i, S, 1);
         ctx.fillRect(4 * S + i, S, 1, S);
       }
-      // Highlight on seam corners
       ctx.fillStyle = "rgba(220,220,230,0.3)";
-      for (let i = 4; i < S; i += 4) {
-        ctx.fillRect(4 * S + i + 1, S + i + 1, 2, 2);
+      for (let i = 8; i < S; i += 8) {
+        ctx.fillRect(4 * S + i + 1, S + i + 1, 3, 3);
       }
+      ctx.fillStyle = "rgba(220,220,230,0.4)"; ctx.fillRect(4 * S + 2, S + 2, S - 4, 3);
+      ctx.fillStyle = "rgba(220,220,230,0.4)"; ctx.fillRect(4 * S + 2, S + 2, 3, S - 4);
     }
     border1(4 * S);
 
-    // Tile 21: glass — light blue with frosted border frame
+    // Tile 21: glass — frosted with white border frame
     fill1(5 * S, "rgba(160,210,240,0.7)");
     { const r = rng(3021);
-      // Slight inner variation
-      for (let y = 2; y < S-2; y++) for (let x = 2; x < S-2; x++) {
+      for (let y = 3; y < S-3; y++) for (let x = 3; x < S-3; x++) {
         const v = r() * 0.12;
         pixel1(5 * S, x, y, `rgba(${(150 + v * 100) | 0},${(200 + v * 80) | 0},${(235 + v * 20) | 0},0.6)`);
       }
-      // White border frame (2px)
       ctx.fillStyle = "rgba(220,235,245,0.9)";
-      ctx.fillRect(5 * S,     S,     S, 2);
-      ctx.fillRect(5 * S,     S+S-2, S, 2);
-      ctx.fillRect(5 * S,     S,     2, S);
-      ctx.fillRect(5 * S+S-2, S,     2, S);
-      // Corner highlights
+      ctx.fillRect(5 * S,     S,     S, 3); ctx.fillRect(5 * S,     S+S-3, S, 3);
+      ctx.fillRect(5 * S,     S,     3, S); ctx.fillRect(5 * S+S-3, S,     3, S);
       ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.fillRect(5 * S + 1, S + 1, 2, 2);
-      ctx.fillRect(5 * S + S-3, S + 1, 2, 2);
-      ctx.fillRect(5 * S + 1, S + S-3, 2, 2);
-      ctx.fillRect(5 * S + S-3, S + S-3, 2, 2);
+      ctx.fillRect(5 * S + 2, S + 2, 3, 3); ctx.fillRect(5 * S + S-5, S + 2, 3, 3);
+      ctx.fillRect(5 * S + 2, S + S-5, 3, 3); ctx.fillRect(5 * S + S-5, S + S-5, 3, 3);
     }
 
     // Tile 22: water top — blue with darker ripple lines
     { const r = rng(3022);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const ripple = Math.sin((x + y * 0.7) * 0.9) * 0.12 + Math.sin((x * 0.6 - y) * 1.2) * 0.08;
+        const ripple = Math.sin((x + y * 0.7) * 0.45) * 0.12 + Math.sin((x * 0.6 - y) * 0.6) * 0.08;
         const brightness = 0.85 + ripple;
         const cr = Math.min(255, (50  * brightness + (r() - 0.5) * 10)) | 0;
         const cg = Math.min(255, (130 * brightness + (r() - 0.5) * 10)) | 0;
         const cb = Math.min(255, (220 * brightness + (r() - 0.5) * 10)) | 0;
         pixel1(6 * S, x, y, `rgb(${cr},${cg},${cb})`);
       }
-      // Subtle foam/highlight streaks
       ctx.fillStyle = "rgba(180,220,255,0.3)";
-      for (let i = 0; i < 3; i++) {
-        const lx = (i * 5 + 2), ly = (i * 4 + 1);
-        ctx.fillRect(6 * S + lx, S + ly, 4, 1);
+      for (let i = 0; i < 5; i++) {
+        ctx.fillRect(6 * S + (i * 10 + 4) % S, S + (i * 8 + 2) % S, 6, 2);
       }
     }
 
     // Tile 23: bookshelf side — two rows of coloured book spines on wood
     { const r = rng(3023);
-      // Wood background
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * 18;
         pixel1(7 * S, x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
       }
-      // Top and bottom plank rails (2px)
-      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S,     S, 2);
-      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S+S-2, S, 2);
-      // Middle rail
-      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S + 7, S, 2);
-      // Book spines — top row (y 2–6)
+      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S,     S, 3);
+      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S+S-3, S, 3);
+      ctx.fillStyle = "#8b6020"; ctx.fillRect(7 * S, S + 14, S, 3);
       const bookColors = ["#cc2222","#2244cc","#228833","#cc9900","#882299","#cc4411","#116688","#554422"];
       for (let i = 0; i < 8; i++) {
-        const bx = i * 2;
+        const bx = i * 4;
         ctx.fillStyle = bookColors[i % bookColors.length];
-        ctx.fillRect(7 * S + bx, S + 2, 2, 5);
-        // Lighter spine highlight
-        ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(7 * S + bx, S + 2, 1, 5);
+        ctx.fillRect(7 * S + bx, S + 3, 4, 11);
+        ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(7 * S + bx, S + 3, 2, 11);
       }
-      // Book spines — bottom row (y 9–13)
       for (let i = 0; i < 8; i++) {
-        const bx = i * 2;
+        const bx = i * 4;
         ctx.fillStyle = bookColors[(i + 3) % bookColors.length];
-        ctx.fillRect(7 * S + bx, S + 9, 2, 5);
-        ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(7 * S + bx, S + 9, 1, 5);
+        ctx.fillRect(7 * S + bx, S + 17, 4, 11);
+        ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(7 * S + bx, S + 17, 2, 11);
       }
     }
     border1(7 * S);
 
-    // Tile 24: snow — white with subtle cold blue-white noise
+    // Tile 24: snow — white with subtle blue-white noise and sparkles
     noise1(8 * S, 230, 235, 245, 0.05, 3024);
     { const r = rng(4024);
-      // Occasional sparkle pixel
-      for (let i = 0; i < 8; i++) {
-        const sx = (r() * 14 + 1) | 0, sy = (r() * 14 + 1) | 0;
+      for (let i = 0; i < 16; i++) {
+        const sx = (r() * 28 + 2) | 0, sy = (r() * 28 + 2) | 0;
         pixel1(8 * S, sx, sy, "#ffffff");
+        if (r() > 0.5) { pixel1(8 * S, sx+1, sy, "rgba(200,220,240,0.8)"); pixel1(8 * S, sx, sy+1, "rgba(200,220,240,0.8)"); }
       }
     }
     border1(8 * S);
 
-    // Tile 25: cactus — green with lighter stripe and spine dots
+    // Tile 25: cactus — green with lighter rib and spine dots
     fill1(9 * S, "#2d7a2d");
     { const r = rng(3025);
-      // Green noise base
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * 20;
         pixel1(9 * S, x, y, `rgb(${(45 + v) | 0},${(122 + v) | 0},${(45 + v) | 0})`);
       }
-      // Lighter vertical stripe in center (the rib)
-      ctx.fillStyle = "rgba(100,180,100,0.4)";
-      ctx.fillRect(9 * S + 6, S, 4, S);
-      // Even lighter highlight on stripe
-      ctx.fillStyle = "rgba(150,210,150,0.3)";
-      ctx.fillRect(9 * S + 7, S, 2, S);
-      // Spine dots on edges (every 4px)
+      ctx.fillStyle = "rgba(100,180,100,0.4)"; ctx.fillRect(9 * S + 12, S, 8, S);
+      ctx.fillStyle = "rgba(150,210,150,0.3)"; ctx.fillRect(9 * S + 14, S, 4, S);
       ctx.fillStyle = "#e0e8b0";
-      for (let sy = 2; sy < S; sy += 4) {
-        ctx.fillRect(9 * S + 1, S + sy, 1, 1);
-        ctx.fillRect(9 * S + S-2, S + sy, 1, 1);
+      for (let sy = 4; sy < S; sy += 8) {
+        ctx.fillRect(9 * S + 2, S + sy, 2, 2);
+        ctx.fillRect(9 * S + S-4, S + sy, 2, 2);
       }
     }
     border1(9 * S);
 
-    // Tile 26: TNT — red body with dark cross (classic Minecraft look)
+    // Tile 26: TNT — red with dark cross pattern
     fill1(10 * S, "#cc2222");
     { ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(10 * S, S + 5, S, 6);     // horizontal dark band
-      ctx.fillRect(10 * S + 5, S, 6, S);     // vertical dark band
+      ctx.fillRect(10 * S, S + 10, S, 12);
+      ctx.fillRect(10 * S + 10, S, 12, S);
       ctx.fillStyle = "#ee4444";
-      ctx.fillRect(10 * S + 6, S + 6, 4, 4); // bright center highlight
+      ctx.fillRect(10 * S + 12, S + 12, 8, 8);
       ctx.fillStyle = "rgba(255,255,255,0.12)";
-      for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++)
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++)
         ctx.fillRect(10 * S + x, S + y, 1, 1);
-      for (let y = 11; y < S; y++) for (let x = 11; x < S; x++)
+      for (let y = 22; y < S; y++) for (let x = 22; x < S; x++)
         ctx.fillRect(10 * S + x, S + y, 1, 1);
     }
     border1(10 * S);
@@ -837,11 +843,12 @@ export class VoxelWorld {
     // Tile 27: gravel — rounded pebble shapes on gray base
     noise1(11 * S, 112, 110, 106, 0.12, 3027);
     { const r = rng(4027);
-      for (let i = 0; i < 9; i++) {
-        const px2 = (r() * 11 + 1) | 0, py2 = (r() * 11 + 1) | 0;
-        const pw = (r() * 3 + 2) | 0,  ph = (r() * 2 + 2) | 0;
-        ctx.fillStyle = "rgba(65,62,58,0.55)";  ctx.fillRect(11 * S + px2, S + py2, pw, ph);
-        ctx.fillStyle = "rgba(155,150,144,0.4)"; ctx.fillRect(11 * S + px2 - 1, S + py2 - 1, pw, ph);
+      for (let i = 0; i < 12; i++) {
+        const px2 = (r() * 22 + 2) | 0, py2 = (r() * 22 + 2) | 0;
+        const pw = (r() * 5 + 3) | 0, ph = (r() * 4 + 3) | 0;
+        ctx.fillStyle = "rgba(65,62,58,0.55)";   ctx.fillRect(11 * S + px2, S + py2, pw, ph);
+        ctx.fillStyle = "rgba(155,150,144,0.4)";  ctx.fillRect(11 * S + px2 - 1, S + py2 - 1, pw, ph);
+        ctx.fillStyle = "rgba(178,175,170,0.3)";  ctx.fillRect(11 * S + px2, S + py2, 2, 2);
       }
     }
     border1(11 * S);
@@ -852,69 +859,60 @@ export class VoxelWorld {
         const v = (r() - 0.5) * 0.2;
         pixel1(12 * S, x, y, `rgb(${(22 + v * 255 * 0.5) | 0},${(8 + v * 255 * 0.3) | 0},${(40 + v * 255) | 0})`);
       }
-      // Glowing rune marks — red and cyan
       const runeColors = ["#cc0033","#ee1144","#00aacc","#0088aa","#ff2266","#22ccee"];
       const r2 = rng(4028);
-      for (let i = 0; i < 9; i++) {
-        const rx = (r2() * 12 + 2) | 0, ry = (r2() * 10 + 3) | 0;
-        const rw = (r2() * 3 + 1) | 0;
+      for (let i = 0; i < 14; i++) {
+        const rx = (r2() * 24 + 4) | 0, ry = (r2() * 20 + 6) | 0;
+        const rw = (r2() * 5 + 2) | 0;
         ctx.fillStyle = runeColors[i % runeColors.length];
-        ctx.fillRect(12 * S + rx, S + ry, rw, 1);
-        if (r2() > 0.5) ctx.fillRect(12 * S + rx, S + ry + 1, 1, 1);
+        ctx.fillRect(12 * S + rx, S + ry, rw, 2);
+        if (r2() > 0.5) ctx.fillRect(12 * S + rx, S + ry + 2, 2, 2);
       }
-      // Bright center glow
-      pixel1(12 * S, 7, 7, "#ff3366");
-      pixel1(12 * S, 8, 8, "#33ddff");
+      pixel1(12 * S, 14, 14, "#ff3366"); pixel1(12 * S, 15, 14, "#ff3366");
+      pixel1(12 * S, 16, 16, "#33ddff"); pixel1(12 * S, 17, 16, "#33ddff");
     }
     border1(12 * S);
 
     // Tile 29: lava top — molten orange with hot-spot glow
     { const r = rng(3029);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const heat = Math.sin((x * 0.6 + y * 0.4) * 0.9) * 0.18 + Math.cos((x * 0.4 - y * 0.7) * 1.1) * 0.12;
+        const heat = Math.sin((x * 0.3 + y * 0.2) * 0.9) * 0.18 + Math.cos((x * 0.2 - y * 0.35) * 1.1) * 0.12;
         const v = (r() - 0.5) * 0.12 + heat;
         const cr = Math.min(255, (220 + v * 255 * 0.3)) | 0;
         const cg = Math.min(255, (80  + v * 255 * 0.6)) | 0;
         const cb = Math.max(0,   (5   + v * 255 * 0.1)) | 0;
         pixel1(13 * S, x, y, `rgb(${cr},${cg},${cb})`);
       }
-      // Bright yellow hotspots
       const r2 = rng(4029);
-      for (let i = 0; i < 5; i++) {
-        const hx = (r2() * 12 + 2) | 0, hy = (r2() * 12 + 2) | 0;
-        ctx.fillStyle = "#ffee00"; ctx.fillRect(13 * S + hx, S + hy, 2, 1);
-        ctx.fillStyle = "#ffffff"; ctx.fillRect(13 * S + hx, S + hy, 1, 1);
+      for (let i = 0; i < 8; i++) {
+        const hx = (r2() * 24 + 4) | 0, hy = (r2() * 24 + 4) | 0;
+        ctx.fillStyle = "#ffee00"; ctx.fillRect(13 * S + hx, S + hy, 3, 2);
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(13 * S + hx, S + hy, 2, 2);
       }
     }
 
-    // Tile 30: dispenser front — stone with arrow slot opening
+    // Tile 30: dispenser front — stone with arrow slot
     noise1(14 * S, 115, 113, 110, 0.09, 3030);
-    { // Dark arrow slot (narrow rectangle center)
-      ctx.fillStyle = "#1a1a1a"; ctx.fillRect(14 * S + 5, S + 4, 6, 8);
-      // Arrow tip pointing forward (outward)
-      ctx.fillStyle = "#888870"; ctx.fillRect(14 * S + 7, S + 6, 2, 4);
-      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(14 * S + 8, S + 7, 1, 2);
-      // Arrow head v-shape
-      ctx.fillStyle = "#ccccaa"; ctx.fillRect(14 * S + 6, S + 5, 4, 1);
-      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(14 * S + 7, S + 4, 2, 1);
+    { ctx.fillStyle = "#1a1a1a"; ctx.fillRect(14 * S + 10, S + 8, 12, 16);
+      ctx.fillStyle = "#888870"; ctx.fillRect(14 * S + 13, S + 12, 4, 8);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(14 * S + 14, S + 14, 2, 4);
+      ctx.fillStyle = "#ccccaa"; ctx.fillRect(14 * S + 11, S + 10, 10, 2);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(14 * S + 13, S + 8, 6, 2);
     }
     border1(14 * S);
 
     // Tile 31: bed top — red blanket with tan pillow
     { const r = rng(3031);
-      // Red blanket noise (lower 2/3)
-      for (let y = 5; y < S; y++) for (let x = 0; x < S; x++) {
+      for (let y = 10; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * 20;
         pixel1(15 * S, x, y, `rgb(${(180 + v) | 0},${(35 + v * 0.3) | 0},${(35 + v * 0.3) | 0})`);
       }
-      // Tan pillow (top ~1/3)
-      for (let y = 0; y < 5; y++) for (let x = 1; x < S - 1; x++) {
+      for (let y = 0; y < 10; y++) for (let x = 2; x < S - 2; x++) {
         const v = (r() - 0.5) * 15;
         pixel1(15 * S, x, y, `rgb(${(215 + v) | 0},${(195 + v * 0.8) | 0},${(165 + v * 0.6) | 0})`);
       }
-      // Dividing seam
-      ctx.fillStyle = "#701515"; ctx.fillRect(15 * S, S + 5, S, 1);
-      ctx.fillStyle = "#c04040"; ctx.fillRect(15 * S, S + 4, S, 1);
+      ctx.fillStyle = "#701515"; ctx.fillRect(15 * S, S + 10, S, 2);
+      ctx.fillStyle = "#c04040"; ctx.fillRect(15 * S, S + 8, S, 2);
     }
     border1(15 * S);
 
