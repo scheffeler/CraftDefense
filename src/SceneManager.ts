@@ -65,7 +65,8 @@ export class SceneManager {
   private ambientLight!: THREE.AmbientLight;
 
   // Sky elements
-  private readonly stars: THREE.Points;
+  private readonly starGroups: THREE.Points[];
+  private _starTime = 0;
   private readonly moon: THREE.Mesh;
   private readonly sun:  THREE.Mesh;
   private readonly skyDome: THREE.Mesh;
@@ -123,7 +124,7 @@ export class SceneManager {
     this.setupLighting();
     this.skyDome = this.buildSkyDome();
     this.buildClouds();
-    this.stars = this.buildStars();
+    this.starGroups = this.buildStars();
     this.moon  = this.buildMoon();
     this.sun   = this.buildSun();
 
@@ -203,9 +204,17 @@ export class SceneManager {
     // Tone mapping exposure: brighter at noon, dimmer at night
     this.renderer.toneMappingExposure = 0.5 + frame.ambientInt * 0.8;
 
-    // Stars and moon: visible at night
+    // Stars and moon: visible at night; stars twinkle with staggered phases
     const nightness = Math.max(0, 1 - frame.ambientInt * 4);
-    (this.stars.material as THREE.PointsMaterial).opacity = nightness * 0.9;
+    this._starTime += dt;
+    const PHASES = [0, Math.PI * 0.67, Math.PI * 1.33];
+    for (let g = 0; g < this.starGroups.length; g++) {
+      const mat = this.starGroups[g].material as THREE.PointsMaterial;
+      mat.opacity = nightness * 0.9;
+      // Twinkle: slow sine wave gives ±20% size flicker, different phase per group
+      mat.size = 0.45 + 0.18 * Math.sin(this._starTime * 1.1 + PHASES[g])
+                      + 0.07 * Math.sin(this._starTime * 2.9 + PHASES[g]);
+    }
     (this.moon.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
 
     // Moon position: opposite side of sky from sun
@@ -620,23 +629,31 @@ export class SceneManager {
     return mesh;
   }
 
-  private buildStars(): THREE.Points {
-    const count = 800;
-    const positions = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-      const r     = 160;
-      positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta) + 32;
-      positions[i * 3 + 1] = Math.abs(r * Math.cos(phi));      // upper hemisphere only
-      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) + 32;
+  private buildStars(): THREE.Points[] {
+    // 3 groups of ~267 stars each, slightly different sizes — staggered twinkle phases
+    const GROUPS = 3;
+    const PER_GROUP = 267;
+    const r = 160;
+    const groups: THREE.Points[] = [];
+    for (let g = 0; g < GROUPS; g++) {
+      const positions = new Float32Array(PER_GROUP * 3);
+      for (let i = 0; i < PER_GROUP; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi   = Math.acos(2 * Math.random() - 1);
+        positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta) + 32;
+        positions[i * 3 + 1] = Math.abs(r * Math.cos(phi));
+        positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) + 32;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      // Base size varies slightly per group so they don't all look the same
+      const baseSize = 0.38 + g * 0.08;
+      const mat = new THREE.PointsMaterial({ color: 0xffffff, size: baseSize, transparent: true, opacity: 0 });
+      const pts = new THREE.Points(geo, mat);
+      this.scene.add(pts);
+      groups.push(pts);
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, transparent: true, opacity: 0 });
-    const pts = new THREE.Points(geo, mat);
-    this.scene.add(pts);
-    return pts;
+    return groups;
   }
 
   private buildMoon(): THREE.Mesh {

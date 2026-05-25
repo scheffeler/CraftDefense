@@ -1,5 +1,31 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-25 — Twinkling stars: 3-group staggered phase animation
+
+**What was done:**
+- Split the single 800-star `THREE.Points` into 3 independent groups (~267 stars each),
+  each with its own `PointsMaterial` so their sizes can be animated independently.
+- Each group gets a different base point size (0.38, 0.46, 0.54) so night sky shows
+  varied star "magnitudes" — some dim, some bright.
+- Added `_starTime` accumulator (advances each frame via `updateDayNight`).
+- In `updateDayNight`, each group's `size` is set to a composite of two sine waves at
+  different frequencies (`1.1 Hz` slow envelope + `2.9 Hz` fast shimmer), with phases
+  spaced 120° apart (0, 2π/3, 4π/3). Result: different stars appear to brighten/dim
+  at different times, giving a natural twinkling sky feel.
+- Total star density unchanged (801 stars), just split across 3 draw calls instead of 1.
+
+**Files changed:** `src/SceneManager.ts`
+
+**Ideas for next run:**
+- Held-block atlas texture: when holding a block item, show actual block atlas UV on the
+  mini-cube faces (replace flat vertex color with per-face UV mapping via 6 materials)
+- Orc/troll face canvas texture: war-paint markings, heavier brow ridge, tusks
+- Dirt/sand biome tinting: apply warm tan tint to dirt/sand blocks in desert areas
+- Water surface normal animation: ShaderMaterial with sine-wave vertex Y-displacement
+  on water tops for a 3D ripple feel
+- Particle visual variety: different sizes/colors per damage type (fire=orange, arrow=white)
+- Merge cloud sub-meshes with `mergeGeometries` from `BufferGeometryUtils` for fewer draw calls
+
 ## 2026-05-25 — Block texture atlas resolution upgrade (16px → 32px per tile)
 
 **What was done:**
