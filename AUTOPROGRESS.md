@@ -1,5 +1,32 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-25 — World-gen torch point lights on startup
+
+**What was done:**
+- Added `scanWorldTorches()` to `Game.ts`: on world load, walks every voxel
+  in the 64×64×32 world and calls `addTorchLight()` for each pre-generated
+  torch block. Finds ~72 torches total.
+- Previously only player-placed torches emitted `THREE.PointLight(0xffaa44, 1.8, 10, 2)`;
+  the fortress-wall torches, village torches, dungeon torches, and mine-shaft torches
+  were dark even though torch blocks were placed by WorldGen.
+- Result: the fortress now glows warmly at night with dozens of orange point lights
+  illuminating walls and interiors — visually confirmed. Night gameplay atmosphere
+  is dramatically improved.
+
+**Files changed:** `src/Game.ts`
+
+**Ideas for next run:**
+- Billboard flame torch: replace the torch voxel cube with a thin stick + alpha-blended
+  PlaneGeometry flame sprite (yellow/orange gradient, rotating to face camera) + smaller
+  PointLight (currently 10-unit radius — a billboard flame would let us tighten to 6 and
+  look more realistic)
+- Star twinkle: animate PointsMaterial.size per-frame with a slow sine wave
+- Sun disk: replace the sphere with a camera-facing PlaneGeometry + glow halo ring
+- Orc/troll face canvas texture: war-paint markings, tusks, heavy brow ridge
+- Held-block item: show actual atlas tile faces on the mini-cube (per-face UV mapping)
+- Dirt/sand biome tinting: warm tan tint on desert dirt blocks (taiga tinting already done
+  for grass; apply same multiplier to dirt/sand faces in desert biomes)
+
 ## 2026-05-24 — Wheat cross geometry (X-shaped plant sprites)
 
 **What was done:**
