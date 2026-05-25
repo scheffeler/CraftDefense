@@ -321,6 +321,7 @@ export class Game {
     });
 
     this.wireCallbacks();
+    this.scanWorldTorches();
     this.refreshHUD();
     this.ui.setObjective(
       `Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`,
@@ -2393,6 +2394,20 @@ export class Game {
 
   private torchKey(wx: number, wy: number, wz: number): string {
     return `${wx},${wy},${wz}`;
+  }
+
+  /** Scan the voxel world for pre-generated torch blocks and add point lights. */
+  private scanWorldTorches(): void {
+    const world = this.gameMap.world;
+    for (let wx = 0; wx < 64; wx++) {
+      for (let wz = 0; wz < 64; wz++) {
+        for (let wy = 1; wy < 32; wy++) {
+          if (world.getBlock(wx, wy, wz) === "torch") {
+            this.addTorchLight(wx, wy, wz);
+          }
+        }
+      }
+    }
   }
 
   private addTorchLight(wx: number, wy: number, wz: number): void {
