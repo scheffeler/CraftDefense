@@ -349,3 +349,37 @@
 - Torch mesh: replace box geometry with billboard flame + emissive point light
 - Cloud improvements: layered semi-transparent planes instead of opaque boxes
 - Biome boundary smoothing: noise blend at forest/desert/taiga borders
+
+## 2026-05-25 — Billboard flame torch sprite replaces ember sphere
+
+**What was done:**
+- Replaced the orange `SphereGeometry` ember on all torch meshes with a `THREE.Sprite` 
+  using a hand-drawn 16×32 canvas flame texture.
+- Flame texture: pixel-by-pixel teardrop shape — bright yellow base (rgb(255,255,0))
+  fading to orange through the middle and red-orange at the tip; soft edge falloff via
+  power curve; seeded noise adds jagged tips for organic look.
+- `THREE.SpriteMaterial` with `AdditiveBlending + depthWrite=false` — flame adds warm
+  light on top of the scene geometry without depth-sorting artifacts.
+- Sprite auto-faces the camera (no per-frame rotation needed); positioned so base aligns
+  with the stick tip (y = 0.72 + half-height).
+- Flicker now applies `flame.scale.set(0.22 * s, 0.32 * s, 1)` to keep correct aspect
+  while pulsing ±12% with a dual-sine pattern.
+- `Game.buildFlameTexture()` is a private static method, called once at field initialisation
+  time (not per-torch) so there's no runtime overhead per torch.
+- Removed unused `_torchFlameGeo` (SphereGeometry) field; `_torchFlameMeshes` array type
+  changed from `THREE.Mesh[]` to `THREE.Sprite[]`.
+
+**Files changed:** `src/Game.ts`, `scripts/screenshot-torch.mjs`
+
+**Ideas for next run:**
+- Star twinkle: animate `PointsMaterial.size` per-frame with a slow sine wave (different
+  phase per star group) for atmospheric night shimmer
+- Held-block atlas texture: when holding a block item, show actual block atlas UV on the
+  mini-cube faces (replace flat vertex color with per-face UV mapping via 6 materials)
+- Orc/troll face canvas texture: war-paint markings, heavier brow ridge, tusks
+- Dirt/sand biome tinting: apply warm tan tint to dirt blocks in desert areas (taiga/forest
+  grass tinting is already done; dirt/sand should match)
+- Water surface normal animation: add ShaderMaterial with sine-wave vertex Y-displacement
+  on water tops for a 3D ripple feel
+- Particle visual variety: different sizes/colors per damage type (fire=large orange,
+  arrow=small white, sword=medium red)

@@ -66,11 +66,15 @@ export class Game {
   private readonly torchMeshes  = new Map<string, THREE.Group>();
   // Shared torch geometry/materials (created once)
   private readonly _torchStickGeo  = new THREE.BoxGeometry(0.09, 0.65, 0.09);
-  private readonly _torchFlameGeo  = new THREE.SphereGeometry(0.065, 6, 5);
   private readonly _torchStickMat  = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
-  private readonly _torchFlameMat  = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
-  // Flame meshes for per-frame flicker animation
-  private readonly _torchFlameMeshes: THREE.Mesh[] = [];
+  private readonly _torchFlameMat  = new THREE.SpriteMaterial({
+    map: Game.buildFlameTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  // Flame sprites for per-frame flicker animation
+  private readonly _torchFlameMeshes: THREE.Sprite[] = [];
 
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
@@ -1563,7 +1567,7 @@ export class Game {
         light.intensity = 1.6 + Math.sin(t * 7.3) * 0.25 + Math.sin(t * 12.1 + 1.5) * 0.12;
       }
       const flameScale = 1.0 + Math.sin(t * 9.1) * 0.12 + Math.sin(t * 14.7 + 0.8) * 0.06;
-      for (const flame of this._torchFlameMeshes) flame.scale.setScalar(flameScale);
+      for (const flame of this._torchFlameMeshes) flame.scale.set(0.22 * flameScale, 0.32 * flameScale, 1);
     }
 
     // Freeplay: flow field tracks player (recomputed every 3 s)
@@ -2392,6 +2396,50 @@ export class Game {
 
   // ─── Torch lights ─────────────────────────────────────────────────────────
 
+  /** Build a 16×32 canvas flame texture: yellow base → orange → red tip, alpha cutout edges. */
+  private static buildFlameTexture(): THREE.CanvasTexture {
+    const W = 16, H = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+    const imageData = ctx.createImageData(W, H);
+    const data = imageData.data;
+
+    // Seeded noise for jagged flame tip
+    let seed = 0xdeadbeef;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
+
+    for (let cy = 0; cy < H; cy++) {
+      // t = 0 at canvas top (flame tip), 1 at canvas bottom (flame base)
+      // Three.js CanvasTexture flips Y so canvas top → UV top → sprite top ✓
+      const t = (H - 1 - cy) / (H - 1);
+      const halfWidth = Math.sqrt(t) * (W * 0.48);
+      // Jagged top edge for flame tips
+      const jag = t < 0.25 ? (rand() - 0.5) * 3 * (1 - t / 0.25) : 0;
+      for (let cx = 0; cx < W; cx++) {
+        const dist = Math.abs(cx - (W / 2 - 0.5));
+        const hw = halfWidth + jag;
+        if (dist >= hw || hw <= 0) continue;
+        const edge = Math.max(0, 1 - dist / hw);
+        // Color: warm yellow base → orange middle → orange-red tip
+        const gChannel = Math.max(0, Math.min(255, Math.round(80 + 175 * t)));
+        const bChannel = Math.max(0, Math.round(20 * t));
+        const alpha = Math.round(Math.pow(edge, 0.6) * (0.25 + 0.75 * Math.sqrt(t)) * 255);
+        const idx = (cy * W + cx) * 4;
+        data[idx]     = 255;
+        data[idx + 1] = gChannel;
+        data[idx + 2] = bChannel;
+        data[idx + 3] = alpha;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+  }
+
   private torchKey(wx: number, wy: number, wz: number): string {
     return `${wx},${wy},${wz}`;
   }
@@ -2420,14 +2468,16 @@ export class Game {
     this.scene.scene.add(light);
     this.torchLights.set(key, light);
 
-    // Visual torch: wooden stick + glowing ember sphere
+    // Visual torch: wooden stick + billboard flame sprite
     const group = new THREE.Group();
     const stick = new THREE.Mesh(this._torchStickGeo, this._torchStickMat);
     stick.position.set(0, 0.325, 0);
     group.add(stick);
 
-    const flame = new THREE.Mesh(this._torchFlameGeo, this._torchFlameMat);
-    flame.position.set(0, 0.72, 0);
+    // Sprite origin is at its center; position 0.72 + half-height so base aligns with stick tip
+    const flame = new THREE.Sprite(this._torchFlameMat);
+    flame.scale.set(0.22, 0.32, 1);
+    flame.position.set(0, 0.72 + 0.16, 0);
     group.add(flame);
     this._torchFlameMeshes.push(flame);
 
@@ -2446,8 +2496,8 @@ export class Game {
     }
     const mesh = this.torchMeshes.get(key);
     if (mesh) {
-      // Remove flame from flicker list
-      const flame = mesh.children[1] as THREE.Mesh | undefined;
+      // Remove flame sprite from flicker list
+      const flame = mesh.children[1] as THREE.Sprite | undefined;
       if (flame) {
         const idx = this._torchFlameMeshes.indexOf(flame);
         if (idx !== -1) this._torchFlameMeshes.splice(idx, 1);
