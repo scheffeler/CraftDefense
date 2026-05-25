@@ -1,5 +1,29 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-25 — Distinct 3D tool shapes in hand + sun glow halo
+
+**What was done:**
+- Replaced the generic "stick + rectangle" with purpose-built 3D meshes per tool type:
+  - **Sword**: grip + pommel + cross-guard + flat blade + subtle edge highlight
+  - **Pickaxe**: shaft + horizontal head bar + two angled prongs
+  - **Axe**: shaft + wedge-shaped blade with back piece
+  - **Shovel**: long shaft + wide flat blade
+  - **Hoe**: shaft + horizontal head + downward tooth
+  - **Bow**: three curved limb segments + thin bowstring (separate from sword)
+  - **Food/material**: small flat item held in palm (was invisible before)
+- Sun upgraded: flat `CircleGeometry` billboard (always faces camera) instead of sphere; added
+  `RingGeometry` glow corona with `AdditiveBlending` for atmospheric dawn/dusk look
+- Both new tool builders and sun glow applied cleanly on top of prior remote changes (sky dome,
+  night vision, lava effects, gun models, wheat cross-geometry, biome tinting, torch lights)
+
+**Ideas for next run:**
+- Billboard flame torch: replace the ember sphere with a canvas-drawn flame sprite on a
+  `PlaneGeometry` quad that faces the camera — more organic fire look
+- Star twinkle: animate `PointsMaterial.size` with a per-frame sine wave for night atmosphere
+- Held-block atlas texture: apply the actual block atlas UV to each face of the mini-cube
+- Enemy body canvas textures: troll/orc torso cloths, spider leg color variation
+- Water surface animation: animated UV-scroll sine wave on top faces of water blocks
+
 ## 2026-05-25 — World-gen torch point lights on startup
 
 **What was done:**

@@ -76,6 +76,9 @@ export class SceneManager {
   private readonly cloudMeshes: THREE.Object3D[] = [];
   private cloudMat!: THREE.MeshLambertMaterial;
 
+  // Sun glow halo
+  private sunGlow!: THREE.Mesh;
+
   // Underwater effect
   private _underwaterEffect  = false;
   private _nightVisionEffect = false;
@@ -220,11 +223,17 @@ export class SceneManager {
     // Tint: warm yellow at noon, orange-red at dawn/dusk
     const sunColor = lerpHex(0xff8833, 0xffee88, Math.min(1, (frame.ambientInt - 0.4) * 5));
     (this.sun.material as THREE.MeshBasicMaterial).color.setHex(sunColor);
-    this.sun.position.set(
-      32 + Math.cos(angle) * 130,
-      Math.abs(Math.sin(angle)) * 130,
-      32,
-    );
+    const sunX = 32 + Math.cos(angle) * 130;
+    const sunY = Math.abs(Math.sin(angle)) * 130;
+    this.sun.position.set(sunX, sunY, 32);
+    // Billboard: disc always faces camera
+    this.sun.quaternion.copy(this.camera.quaternion);
+
+    // Glow halo follows sun
+    this.sunGlow.position.set(sunX, sunY, 31.5);
+    this.sunGlow.quaternion.copy(this.camera.quaternion);
+    (this.sunGlow.material as THREE.MeshBasicMaterial).opacity = sunOpacity * 0.45;
+    (this.sunGlow.material as THREE.MeshBasicMaterial).color.setHex(lerpHex(0xff6600, 0xffcc44, Math.min(1, (frame.ambientInt - 0.3) * 4)));
 
     // Drift clouds and tint them with day cycle
     for (const cloud of this.cloudMeshes) {
@@ -285,7 +294,7 @@ export class SceneManager {
       else if (def.id === "shotgun") itemMesh = this.buildShotgunMesh();
       else itemMesh = this.buildGunMesh(def.color);
     } else {
-      itemMesh = this.buildItemMesh(def.category, def.color);
+      itemMesh = this.buildItemMesh(itemId, def.category, def.color);
     }
     if (itemMesh) this.armGroup.add(itemMesh);
   }
@@ -381,7 +390,7 @@ export class SceneManager {
     return g;
   }
 
-  private buildItemMesh(category: string, color: number): THREE.Object3D | null {
+  private buildItemMesh(itemId: string, category: string, color: number): THREE.Object3D | null {
     if (category === "block") {
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), mat);
@@ -389,42 +398,146 @@ export class SceneManager {
       mesh.rotation.set(0.3, 0.5, 0.2);
       return mesh;
     }
-    if (category === "weapon" || category === "tool" || category === "material") {
-      const g = new THREE.Group();
-      const stickMat = new THREE.MeshLambertMaterial({ color: 0x8b6914 });
-      const stick = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.42, 0.05), stickMat);
-      stick.position.set(0.0, 0.18, 0.0);
-      stick.rotation.z = 0.35;
-      g.add(stick);
-
-      const headMat = new THREE.MeshLambertMaterial({ color });
-      if (category === "weapon") {
-        // Wide flat blade with crossguard
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.32, 0.022), headMat);
-        blade.position.set(-0.08, 0.46, 0.0);
-        g.add(blade);
-        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.04), headMat);
-        guard.position.set(-0.08, 0.32, 0.0);
-        g.add(guard);
-        // Bright edge highlight strip along the blade
-        const edgeMat = new THREE.MeshLambertMaterial({
-          color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.12,
-        });
-        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.30, 0.012), edgeMat);
-        edge.position.set(-0.035, 0.46, 0.0);
-        g.add(edge);
-      } else {
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.13, 0.06), headMat);
-        head.position.set(-0.07, 0.44, 0.0);
-        g.add(head);
-        // Pick-tip on the right side of the head
-        const tip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.10), headMat);
-        tip.position.set(0.05, 0.44, -0.06);
-        g.add(tip);
-      }
-      return g;
+    if (category === "food" || category === "material") {
+      const mat = new THREE.MeshLambertMaterial({ color });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.08), mat);
+      mesh.position.set(-0.04, 0.22, 0.0);
+      mesh.rotation.set(0.2, 0.4, 0.1);
+      return mesh;
+    }
+    if (category === "weapon") {
+      if (itemId === "bow") return this.buildBowMesh();
+      return this.buildSwordMesh(color);
+    }
+    if (category === "tool") {
+      if (itemId.includes("pickaxe")) return this.buildPickaxeMesh(color);
+      if (itemId.includes("_axe"))    return this.buildAxeMesh(color);
+      if (itemId.includes("shovel"))  return this.buildShovelMesh(color);
+      if (itemId.includes("hoe"))     return this.buildHoeMesh(color);
     }
     return null;
+  }
+
+  private buildSwordMesh(color: number): THREE.Object3D {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    const b = (w: number, h: number, d: number, c: number) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m(c));
+
+    const grip = b(0.06, 0.18, 0.05, 0x5a3a1a);
+    grip.position.set(0.0, 0.06, 0.0); grip.rotation.z = 0.3;
+    g.add(grip);
+    const pommel = b(0.10, 0.06, 0.06, color);
+    pommel.position.set(0.03, -0.04, 0.0); pommel.rotation.z = 0.3;
+    g.add(pommel);
+    const guard = b(0.20, 0.045, 0.045, color);
+    guard.position.set(-0.05, 0.20, 0.0); guard.rotation.z = 0.3;
+    g.add(guard);
+    const blade = b(0.055, 0.34, 0.022, color);
+    blade.position.set(-0.10, 0.39, 0.0); blade.rotation.z = 0.3;
+    g.add(blade);
+    // Subtle edge highlight
+    const edge = b(0.012, 0.32, 0.012, 0xffffff);
+    (edge.material as THREE.MeshLambertMaterial).emissive.setHex(0xffffff);
+    (edge.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.10;
+    edge.position.set(-0.072, 0.39, 0.0); edge.rotation.z = 0.3;
+    g.add(edge);
+
+    return g;
+  }
+
+  private buildPickaxeMesh(color: number): THREE.Object3D {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    const b = (w: number, h: number, d: number, c: number) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m(c));
+
+    const stick = b(0.05, 0.40, 0.05, 0x8b6914);
+    stick.position.set(0.0, 0.18, 0.0); stick.rotation.z = 0.35;
+    g.add(stick);
+    const bar = b(0.22, 0.07, 0.07, color);
+    bar.position.set(-0.06, 0.43, 0.0); bar.rotation.z = 0.35;
+    g.add(bar);
+    const prong1 = b(0.06, 0.12, 0.05, color);
+    prong1.position.set(-0.16, 0.38, 0.0); prong1.rotation.z = 0.35 + 0.55;
+    g.add(prong1);
+    const prong2 = b(0.06, 0.10, 0.05, color);
+    prong2.position.set(0.06, 0.48, 0.0); prong2.rotation.z = 0.35 - 0.45;
+    g.add(prong2);
+
+    return g;
+  }
+
+  private buildAxeMesh(color: number): THREE.Object3D {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    const b = (w: number, h: number, d: number, c: number) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m(c));
+
+    const stick = b(0.05, 0.40, 0.05, 0x8b6914);
+    stick.position.set(0.0, 0.18, 0.0); stick.rotation.z = 0.35;
+    g.add(stick);
+    const blade = b(0.18, 0.22, 0.05, color);
+    blade.position.set(-0.12, 0.44, 0.0); blade.rotation.z = 0.35;
+    g.add(blade);
+    const back = b(0.06, 0.14, 0.05, color);
+    back.position.set(-0.02, 0.43, 0.0); back.rotation.z = 0.35;
+    g.add(back);
+
+    return g;
+  }
+
+  private buildShovelMesh(color: number): THREE.Object3D {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    const b = (w: number, h: number, d: number, c: number) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m(c));
+
+    const stick = b(0.05, 0.42, 0.05, 0x8b6914);
+    stick.position.set(0.0, 0.18, 0.0); stick.rotation.z = 0.35;
+    g.add(stick);
+    const blade = b(0.16, 0.20, 0.03, color);
+    blade.position.set(-0.07, 0.47, 0.0); blade.rotation.z = 0.35;
+    g.add(blade);
+
+    return g;
+  }
+
+  private buildHoeMesh(color: number): THREE.Object3D {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    const b = (w: number, h: number, d: number, c: number) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m(c));
+
+    const stick = b(0.05, 0.40, 0.05, 0x8b6914);
+    stick.position.set(0.0, 0.18, 0.0); stick.rotation.z = 0.35;
+    g.add(stick);
+    const head = b(0.20, 0.06, 0.06, color);
+    head.position.set(-0.07, 0.44, 0.0); head.rotation.z = 0.35;
+    g.add(head);
+    const tooth = b(0.05, 0.09, 0.05, color);
+    tooth.position.set(-0.15, 0.40, 0.0); tooth.rotation.z = 0.35;
+    g.add(tooth);
+
+    return g;
+  }
+
+  private buildBowMesh(): THREE.Object3D {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    const b = (w: number, h: number, d: number, c: number) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m(c));
+
+    const bowCol = 0x7a5010;
+    const center = b(0.06, 0.14, 0.06, bowCol);
+    center.position.set(-0.04, 0.26, 0.0); center.rotation.z = 0.15;
+    g.add(center);
+    const upper = b(0.05, 0.17, 0.05, bowCol);
+    upper.position.set(-0.12, 0.41, 0.0); upper.rotation.z = 0.15 + 0.52;
+    g.add(upper);
+    const lower = b(0.05, 0.17, 0.05, bowCol);
+    lower.position.set(0.04, 0.11, 0.0); lower.rotation.z = 0.15 - 0.52;
+    g.add(lower);
+    // Bowstring
+    const str = b(0.008, 0.40, 0.008, 0xddddcc);
+    str.position.set(-0.16, 0.26, 0.0); str.rotation.z = 0.06;
+    g.add(str);
+
+    return g;
   }
 
   private static buildArmSkinTexture(): THREE.Texture {
@@ -535,10 +648,21 @@ export class SceneManager {
   }
 
   private buildSun(): THREE.Mesh {
-    const geo = new THREE.SphereGeometry(6, 10, 10);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffee88, transparent: true, opacity: 0, fog: false });
+    // Flat billboard disc — oriented to face camera each frame
+    const geo = new THREE.CircleGeometry(8, 20);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffee88, transparent: true, opacity: 0, fog: false, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geo, mat);
     this.scene.add(mesh);
+
+    // Glow corona ring with additive blending
+    const glowGeo = new THREE.RingGeometry(8, 20, 24);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xffdd44, transparent: true, opacity: 0, fog: false,
+      side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.sunGlow = new THREE.Mesh(glowGeo, glowMat);
+    this.scene.add(this.sunGlow);
+
     return mesh;
   }
 
