@@ -1,5 +1,31 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-26 — Held-block atlas UV on first-person cube viewmodel
+
+**What was done:**
+- Exported `blockFaceUV(blockId, normalY)` from `Map.ts` — returns `{u0,u1,v0,v1}` in atlas
+  UV space using the same convention as `rebuildChunkMesh`, so faces match the world exactly.
+- Added `VoxelWorld.getBlockTexture()` getter to share the canvas texture atlas.
+- Added `SceneManager.setBlockTexture()` + `_blockTex` field; called from `Game.buildSystems()`
+  right after GameMap creation.
+- Added `SceneManager.buildBlockCubeMesh(blockId)`: creates a `BoxGeometry(0.22, 0.22, 0.22)`,
+  rewrites the UV buffer per face using `blockFaceUV` (face order +x,-x,+y,-y,+z,-z; normalY
+  is 1 for top, -1 for bottom, 0 for sides), and applies the atlas as the material map.
+- `buildItemMesh()` for `category === "block"` now calls `buildBlockCubeMesh` when the atlas
+  texture is available and the item has a `placesBlock` id; falls back to flat vertex color cube.
+- Result: holding cobblestone/stone/wood/sand/etc. shows the actual pixel-art block face texture
+  on the rotated cube in the first-person arm view.
+
+**Files changed:** `src/Map.ts`, `src/SceneManager.ts`, `src/Game.ts`
+
+**Ideas for next run:**
+- Orc/troll face canvas texture: war-paint markings, heavier brow ridge, tusks
+- Dirt/sand biome tinting: apply warm tan tint to dirt/sand blocks in desert areas
+- Water surface normal animation: ShaderMaterial with sine-wave vertex Y-displacement
+  on water tops for a 3D ripple feel
+- Particle visual variety: different sizes/colors per damage type (fire=orange, arrow=white)
+- Merge cloud sub-meshes with `mergeGeometries` from `BufferGeometryUtils` for fewer draw calls
+
 ## 2026-05-25 — Twinkling stars: 3-group staggered phase animation
 
 **What was done:**
