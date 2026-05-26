@@ -1139,6 +1139,22 @@ export class EnemyManager {
         ear.rotation.z = dir * 0.45;
         group.add(ear);
       }
+    } else if (type === "orc") {
+      const faceTex = EnemyManager.buildOrcFaceTex();
+      const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      head = new THREE.Mesh(headGeo, [
+        side, side, side, side,
+        new THREE.MeshLambertMaterial({ map: faceTex }),
+        side,
+      ]);
+    } else if (type === "troll") {
+      const faceTex = EnemyManager.buildTrollFaceTex();
+      const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      head = new THREE.Mesh(headGeo, [
+        side, side, side, side,
+        new THREE.MeshLambertMaterial({ map: faceTex }),
+        side,
+      ]);
     } else {
       const headMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
       head = new THREE.Mesh(headGeo, headMat);
@@ -1199,6 +1215,19 @@ export class EnemyManager {
       pick.position.set(0.38, 0.7, 0.2);
       pick.rotation.x = Math.PI / 4;
       group.add(pick);
+    }
+
+    if (type === "orc") {
+      // Leather belt across waist
+      const beltMat = new THREE.MeshLambertMaterial({ color: 0x3a1a08 });
+      const belt = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.08, 0.32), beltMat);
+      belt.position.set(0, 0.48, 0);
+      group.add(belt);
+      // Metal belt buckle (gold-ish)
+      const buckleMat = new THREE.MeshLambertMaterial({ color: 0xcc9900, emissive: 0x553300, emissiveIntensity: 0.2 });
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.04), buckleMat);
+      buckle.position.set(0, 0.48, 0.165);
+      group.add(buckle);
     }
 
     if (type === "orc" || type === "zombie") {
@@ -1516,6 +1545,71 @@ export class EnemyManager {
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 orc face: warm brown skin, heavy brow, red glowing eyes, tusk stubs, warpaint stripe. */
+  private static buildOrcFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Warm brown-red base skin (matches headColor 0xaa6a30)
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 2.7 + y * 1.9 + 7.3) * 0.5;
+      const v = (n * 14) | 0;
+      ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,170+v))},${Math.max(0,Math.min(255,106+v))},${Math.max(0,Math.min(255,48+v))})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Heavy brow ridge
+    ctx.fillStyle = "#5a2808"; ctx.fillRect(1, 3, 14, 2);
+    ctx.fillStyle = "#3a1a04"; ctx.fillRect(1, 5, 14, 1); // shadow under brow
+    // Narrow squinting eyes
+    ctx.fillStyle = "#2a1004"; ctx.fillRect(2, 6, 5, 2); ctx.fillRect(9, 6, 5, 2);
+    ctx.fillStyle = "#dd2200"; ctx.fillRect(4, 6, 2, 1); ctx.fillRect(10, 6, 2, 1);
+    ctx.fillStyle = "#1a0000"; ctx.fillRect(4, 6, 1, 1); ctx.fillRect(11, 6, 1, 1);
+    // Warpaint stripe (dark scar-like diagonal on left cheek)
+    ctx.fillStyle = "rgba(60,0,0,0.7)";
+    ctx.fillRect(1, 5, 2, 6); ctx.fillRect(2, 8, 1, 3);
+    // Flat wide nose
+    ctx.fillStyle = "#7a3a10"; ctx.fillRect(6, 8, 4, 3);
+    ctx.fillStyle = "#2a0800"; ctx.fillRect(6, 9, 2, 1); ctx.fillRect(9, 9, 2, 1);
+    // Mouth + tusk stubs
+    ctx.fillStyle = "#3a1004"; ctx.fillRect(3, 12, 10, 2);
+    ctx.fillStyle = "#eeeedd"; ctx.fillRect(4, 12, 2, 2); ctx.fillRect(10, 12, 2, 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 troll face: gray-green rough skin, massive brow ridge, beady yellow eyes, wide mouth. */
+  private static buildTrollFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Gray-green rough skin base (matches headColor 0x445533)
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 1.8 + y * 2.4 + 3.3) * Math.cos(x * 3.1 + y * 0.7) * 0.5;
+      const v = (n * 20) | 0;
+      ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,68+v))},${Math.max(0,Math.min(255,85+v))},${Math.max(0,Math.min(255,51+v))})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Massive brow that dominates top ~40% of face
+    ctx.fillStyle = "#2a3319"; ctx.fillRect(0, 2, 16, 4);
+    ctx.fillStyle = "#1a2210"; ctx.fillRect(0, 6, 16, 2); // heavy shadow
+    // Beady yellow eyes under brow
+    ctx.fillStyle = "#eecc00"; ctx.fillRect(3, 7, 2, 2); ctx.fillRect(11, 7, 2, 2);
+    ctx.fillStyle = "#1a0a00"; ctx.fillRect(4, 7, 1, 2); ctx.fillRect(12, 7, 1, 2);
+    // Wide flat nose
+    ctx.fillStyle = "#3a4428"; ctx.fillRect(5, 8, 6, 3);
+    ctx.fillStyle = "#1a1a0c"; ctx.fillRect(5, 9, 3, 2); ctx.fillRect(8, 9, 3, 2);
+    // Wide mouth with 3 stubby teeth
+    ctx.fillStyle = "#1a0a04"; ctx.fillRect(2, 12, 12, 3);
+    ctx.fillStyle = "#ddcc99"; ctx.fillRect(3, 12, 2, 2); ctx.fillRect(7, 12, 2, 2); ctx.fillRect(11, 12, 2, 2);
+    ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(2, 12, 12, 1);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
     return tex;
   }
 
