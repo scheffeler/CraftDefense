@@ -1,5 +1,41 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-26 — Creeper canvas face texture + priming flash fix
+
+### What was done
+- **Creeper canvas face**: Replaced the 5 separate box-mesh face parts (2 eyes, 1 nose,
+  2 mouth corner pieces) with a single 16×16 canvas texture on the head's +Z face,
+  matching the approach used by every other enemy (zombie, goblin, orc, troll, skeleton,
+  iron golem). The texture features: noisy dark-green skin base, edge vignette, two
+  3×3 black square eyes, a subtle inner highlight pixel per eye, and the iconic
+  downward bracket mouth — top bar + descending sides that flare outward, giving the
+  classic "sad" Creeper expression. The face material has `name = "face"` so it is
+  correctly excluded from the priming flash effect.
+- **Priming flash fix**: Updated both traverse callbacks in the creeper priming logic
+  to handle 6-material head meshes (array materials). Previously `m.material as
+  MeshLambertMaterial` would silently break on a mesh with an array of materials;
+  now both the flash and reset traversals iterate the material array properly so the
+  head flashes along with the body when priming.
+
+**Files changed:** `src/Enemy.ts`
+
+### Ideas for next time
+- **Better arm/hand mesh**: per-face UV BoxGeometry with a hand skin canvas texture
+  (16×16 skin with highlight/shadow bands — currently the arm is a plain box with
+  flat vertex color)
+- **Animated water/lava**: scroll UV offset each frame in SceneManager so water and
+  lava surfaces appear to flow (store a `_waterTime` uniform updated in render())
+- **Moon crescent phase**: replace the plain white sphere with a canvas texture showing
+  a crescent or full-moon detail based on day number
+- **Mob torso detail**: ragged shirt canvas texture for zombie torso (currently just a
+  flat colored box), chainmail for skeleton, leather armor straps for orc
+- **Particle variety**: distinct sizes/colors per damage type (fire=large orange,
+  arrow=small white elongated, sword=medium red splatter shapes)
+- **Uruk Captain canvas face**: the boss currently has separate eye boxes; upgrade to
+  a canvas face (dark helm visor with glowing red eyes) for consistency
+
+---
+
 ## 2026-05-26 — Skeleton skull face + Iron Golem canvas face
 
 ### What was done

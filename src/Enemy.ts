@@ -538,11 +538,12 @@ export class EnemyManager {
           const isWhite = Math.floor((state.primeTimer ?? 0) * flashRate) % 2 === 0;
           group.traverse(c => {
             const m = c as THREE.Mesh;
-            if (m.isMesh) {
-              const mat = m.material as THREE.MeshLambertMaterial;
-              if (mat.name !== "face") {
-                mat.emissive?.setHex(isWhite ? 0xaaffaa : 0x001100);
-              }
+            if (!m.isMesh) return;
+            const mats = Array.isArray(m.material)
+              ? (m.material as THREE.MeshLambertMaterial[])
+              : [m.material as THREE.MeshLambertMaterial];
+            for (const mat of mats) {
+              if (mat.name !== "face") mat.emissive?.setHex(isWhite ? 0xaaffaa : 0x001100);
             }
           });
         }
@@ -562,7 +563,11 @@ export class EnemyManager {
         state.primeTimer = 0;
         group.traverse(c => {
           const m = c as THREE.Mesh;
-          if (m.isMesh) (m.material as THREE.MeshLambertMaterial).emissive?.setHex(0);
+          if (!m.isMesh) return;
+          const mats = Array.isArray(m.material)
+            ? (m.material as THREE.MeshLambertMaterial[])
+            : [m.material as THREE.MeshLambertMaterial];
+          for (const mat of mats) mat.emissive?.setHex(0);
         });
       }
     }
@@ -918,31 +923,19 @@ export class EnemyManager {
     body.name = "creeper_body";
     group.add(body);
 
-    // Head (square)
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.48, 0.48), bodyMat);
+    // Head — canvas face texture on +Z front face
+    const faceTex = EnemyManager.buildCreeperFaceTex();
+    const faceMat = new THREE.MeshLambertMaterial({ map: faceTex });
+    faceMat.name = "face"; // exclude from priming flash
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.48, 0.48), [
+      bodyMat, bodyMat, bodyMat, bodyMat, // -X +X -Y +Y
+      bodyMat,                            // -Z back
+      faceMat,                            // +Z front
+    ]);
     head.position.y = 1.24;
     head.castShadow = true;
     head.name = "creeper_head";
     group.add(head);
-
-    // Creeper face — dark rectangular "sad" mouth + two eyes
-    const faceMat = new THREE.MeshLambertMaterial({ color: 0x000000, emissive: 0x001100 });
-    // Eyes
-    for (const ex of [-0.09, 0.09]) {
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.01), faceMat);
-      eye.position.set(ex, 1.30, 0.245);
-      group.add(eye);
-    }
-    // Nose bridge
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.01), faceMat);
-    nose.position.set(0, 1.17, 0.245);
-    group.add(nose);
-    // Mouth corners (characteristic Creeper "N" shape)
-    for (const mx of [-0.14, 0.14]) {
-      const mPart = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.01), faceMat);
-      mPart.position.set(mx, 1.10, 0.245);
-      group.add(mPart);
-    }
 
     // Four stubby legs
     const legMat = new THREE.MeshLambertMaterial({ color: 0x166016 });
@@ -1712,6 +1705,44 @@ export class EnemyManager {
     for (const [rx, ry] of [[1,2],[14,2],[1,9],[14,9]] as [number,number][]) {
       ctx.fillRect(rx, ry, 1, 1);
     }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 creeper face: dark-green skin, two square eyes, iconic sad bracket mouth. */
+  private static buildCreeperFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Dark green skin base with subtle noise
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 2.1 + y * 1.9 + 0.7) * 0.5;
+      const v = (n * 12) | 0;
+      ctx.fillStyle = `rgb(${26 + v},${122 + v},${26 + v})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Edge darkening
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0, 0, S, 1); ctx.fillRect(0, S - 1, S, 1);
+    ctx.fillRect(0, 0, 1, S); ctx.fillRect(S - 1, 0, 1, S);
+    // Eyes — two 3×3 dark squares
+    ctx.fillStyle = "#080808";
+    ctx.fillRect(3, 3, 3, 3);   // left eye
+    ctx.fillRect(10, 3, 3, 3);  // right eye
+    // Subtle inner highlight pixel per eye
+    ctx.fillStyle = "#1c5c1c";
+    ctx.fillRect(4, 4, 1, 1);
+    ctx.fillRect(11, 4, 1, 1);
+    // Mouth — inverted bracket: top bar + two descending sides that flare outward
+    ctx.fillStyle = "#080808";
+    ctx.fillRect(5, 8, 6, 2);   // top horizontal bar (6 wide, 2 tall)
+    ctx.fillRect(4, 10, 2, 2);  // left descend
+    ctx.fillRect(10, 10, 2, 2); // right descend
+    ctx.fillRect(3, 12, 2, 1);  // left outer flare
+    ctx.fillRect(11, 12, 2, 1); // right outer flare
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
