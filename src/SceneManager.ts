@@ -438,7 +438,7 @@ export class SceneManager {
       mesh.rotation.set(0.3, 0.5, 0.2);
       return mesh;
     }
-    if (category === "food" || category === "material") {
+    if (category === "food" || category === "material" || category === "armor") {
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.08), mat);
       mesh.position.set(-0.04, 0.22, 0.0);

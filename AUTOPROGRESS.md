@@ -1,5 +1,44 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-26 — Block texture atlas expansion + first-person weapon improvements
+
+### What was done
+**Block texture atlas expanded from 16 → 32 tiles** (512px wide atlas):
+- Added distinct texture tile for **water** (blue with horizontal wave highlight lines)
+- **Chest** now shows brown oak wood grain + dark metal trim + golden latch in center
+- **Chest top** shows lighter oak + round metallic medallion
+- **Crafting table top** shows oak planks + blue 3×3 grid lines
+- **Crafting table side** shows oak planks + dark top trim band
+- **Furnace front** shows stone + glowing dark fire-arch opening with orange/gold flame inside
+- **Obsidian** shows near-black with purple crystalline vein highlights
+- **Snow** shows bright white-blue with subtle sparkle dots
+- **Cactus** shows green with darker vertical ridge lines
+- **Glass** shows light blue with darker frame border
+- **Torch** shows dark background + centered brown stick + orange-yellow flame crown
+- **Bookshelf side** shows oak planks + colorful book spine strips (7 books)
+- **Enchanting table top** shows deep dark + red cloth border + purple rune marks
+- `getBlockTexIndex()` extended with all new block cases
+
+**First-person held-item rendering overhauled** (`buildItemMesh` in SceneManager.ts):
+- **Sword**: brown grip + pommel + prominent crossguard + wide flat blade + tapered tip (5-piece model)
+- **Bow**: central grip + upper/lower angled limbs + thin string bar (4-piece model)
+- **Pickaxe**: handle + horizontal head + angled pick-point
+- **Axe**: handle + rectangular head + wider blade edge
+- **Shovel**: long handle + flat wide head
+- **Hoe/generic**: handle + small horizontal blade
+- **Food/material/armor**: small flat tile displayed at angle in palm
+
+**Files changed:** `src/Map.ts`, `src/SceneManager.ts`
+
+### Ideas for next time
+- **Proper transparent mesh pass**: split chunk into two meshes (opaque + transparent) so water/glass actually render with alpha blending
+- **Torch point lights**: add THREE.PointLight at each torch block position (bake positions on world load, limit to nearest 8 within view)
+- **Improved cloud shapes**: replace single BoxGeometry with 3-5 overlapping boxes per cloud for puffier silhouettes
+- **Mob texture improvements**: add more detail to zombie/skeleton/goblin — striped clothing, belt, textured skin using emissive face maps
+- **Grass biome tint**: lerp grass top color between biomes (taiga = blue-green, desert fringe = yellow-green)
+- **Night sky improvements**: stars twinkle via opacity sine, moon has crescent shape
+- **Enchanting table animated book**: floating open book above table using a rotating mesh
+
 ## 2026-05-26 — Held-block atlas UV on first-person cube viewmodel
 
 **What was done:**
