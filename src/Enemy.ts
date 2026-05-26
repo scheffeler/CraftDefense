@@ -964,23 +964,16 @@ export class EnemyManager {
     torso.castShadow = true;
     group.add(torso);
 
-    // Head
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.38, 0.38), boneMat);
+    // Head with skull canvas texture on +Z front face
+    const skullTex = EnemyManager.buildSkeletonFaceTex();
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.38, 0.38), [
+      boneMat, boneMat, boneMat, boneMat,
+      new THREE.MeshLambertMaterial({ map: skullTex }), // +Z front face
+      boneMat,
+    ]);
     head.position.y = 1.24;
     head.castShadow = true;
     group.add(head);
-
-    // Skull eye sockets (dark)
-    const eyeMat = new THREE.MeshLambertMaterial({ color: 0x000000, emissive: 0x220000, emissiveIntensity: 0.8 });
-    for (const ex of [-0.09, 0.09]) {
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.01), eyeMat);
-      eye.position.set(ex, 1.28, 0.2);
-      group.add(eye);
-    }
-    // Nose socket
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.01), eyeMat);
-    nose.position.set(0, 1.18, 0.2);
-    group.add(nose);
 
     // Thin arms/legs
     for (const [ax, i] of [[-0.26, 0], [0.26, 1]] as [number, number][]) {
@@ -1155,15 +1148,18 @@ export class EnemyManager {
         new THREE.MeshLambertMaterial({ map: faceTex }),
         side,
       ]);
+    } else if (type === "golem") {
+      const faceTex = EnemyManager.buildGolemFaceTex();
+      const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+      head = new THREE.Mesh(headGeo, [
+        side, side, side, side,
+        new THREE.MeshLambertMaterial({ map: faceTex }), // +Z front face
+        side,
+      ]);
     } else {
       const headMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
       head = new THREE.Mesh(headGeo, headMat);
-      // Eye boxes for non-textured heads
-      const eyeColor   = type === "golem" ? 0xff4400 : 0xffffff;
-      const eyeEmissive = type === "golem" ? 0xff4400 : 0x888888;
-      const eyeMat = new THREE.MeshLambertMaterial({
-        color: eyeColor, emissive: eyeEmissive, emissiveIntensity: 0.5,
-      });
+      const eyeMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x888888, emissiveIntensity: 0.5 });
       for (const ex of [-0.1, 0.1]) {
         const eye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.01), eyeMat);
         eye.position.set(ex, 1.3, 0.22);
@@ -1610,6 +1606,115 @@ export class EnemyManager {
     ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(2, 12, 12, 1);
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 skeleton skull face: bone-white cranium, dark hollow eye sockets with red glow,
+   *  T-shaped nasal cavity, and four visible teeth at the jaw. */
+  private static buildSkeletonFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Bone-white base with radial edge darkening for skull roundness
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const ex = (x - 7.5) / 7.5, ey = (y - 7.5) / 7.5;
+      const edge = (ex * ex + ey * ey) * 0.18;
+      const r = Math.max(0, Math.min(255, (215 - edge * 55) | 0));
+      const g = Math.max(0, Math.min(255, (210 - edge * 50) | 0));
+      const b = Math.max(0, Math.min(255, (196 - edge * 40) | 0));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Top cranium shading band
+    ctx.fillStyle = "rgba(0,0,0,0.14)";
+    ctx.fillRect(2, 0, 12, 2);
+    // Eye sockets — wide rectangular hollow voids
+    ctx.fillStyle = "#080606";
+    ctx.fillRect(1, 5, 5, 3);    // left socket
+    ctx.fillRect(10, 5, 5, 3);   // right socket
+    // Eerie red glow within sockets
+    ctx.fillStyle = "rgba(200,20,20,0.65)";
+    ctx.fillRect(2, 6, 3, 1);
+    ctx.fillRect(11, 6, 3, 1);
+    // Nasal cavity — inverted-T
+    ctx.fillStyle = "#181414";
+    ctx.fillRect(6, 9, 4, 1);    // horizontal bar
+    ctx.fillRect(7, 10, 2, 2);   // vertical drop
+    // Jaw bone crease line
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(2, 11, 12, 1);
+    // Four bone-white teeth with dark gaps between
+    ctx.fillStyle = "#e8e6d0";
+    ctx.fillRect(2, 12, 2, 3);   // tooth 1
+    ctx.fillRect(6, 12, 2, 3);   // tooth 2
+    ctx.fillRect(10, 12, 2, 3);  // tooth 3
+    ctx.fillRect(14, 12, 1, 3);  // tooth 4 (partial at edge)
+    // Dark gap between teeth
+    ctx.fillStyle = "#0a0808";
+    ctx.fillRect(4, 12, 2, 3);
+    ctx.fillRect(8, 12, 2, 3);
+    ctx.fillRect(12, 12, 2, 3);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 iron golem face: cold dark metal, heavy brow, cracked glowing orange eyes,
+   *  angular nose bridge, and a grim set jaw. */
+  private static buildGolemFaceTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Cold dark iron base with slight blue-gray variation
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 2.7 + y * 1.9 + 3.1) * 0.5;
+      const v = (n * 12) | 0;
+      const r = Math.max(0, Math.min(255, 68 + v));
+      const g = Math.max(0, Math.min(255, 70 + v));
+      const b = Math.max(0, Math.min(255, 74 + v));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Heavy brow ridge — darkest band at top
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(0, 0, S, 4);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(0, 4, S, 2);
+    // Glowing orange-red cracked eye slits
+    ctx.fillStyle = "#ff5500";
+    ctx.fillRect(2, 5, 4, 2);    // left eye slit
+    ctx.fillRect(10, 5, 4, 2);   // right eye slit
+    // Bright inner glow of eyes
+    ctx.fillStyle = "#ffaa44";
+    ctx.fillRect(3, 5, 2, 1);
+    ctx.fillRect(11, 5, 2, 1);
+    // Crack lines emanating from eyes
+    ctx.fillStyle = "rgba(200,80,10,0.6)";
+    ctx.fillRect(0, 6, 2, 1);    // left outer crack
+    ctx.fillRect(14, 6, 2, 1);   // right outer crack
+    ctx.fillRect(2, 7, 1, 2);    // left lower crack
+    ctx.fillRect(13, 7, 1, 2);   // right lower crack
+    // Flat angular nose bridge
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(6, 8, 4, 2);
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillRect(7, 8, 2, 1);    // nose highlight top
+    // Grim jaw — three horizontal shadow bands
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(2, 11, 12, 1);  // jaw line
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(3, 12, 10, 2);  // chin shadow
+    // Rivet dots (iron golem construction detail)
+    ctx.fillStyle = "rgba(180,180,190,0.6)";
+    for (const [rx, ry] of [[1,2],[14,2],[1,9],[14,9]] as [number,number][]) {
+      ctx.fillRect(rx, ry, 1, 1);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
     return tex;
   }
 
