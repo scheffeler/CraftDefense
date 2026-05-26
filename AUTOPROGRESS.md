@@ -1,5 +1,25 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-26 — Skeleton skull face + Iron Golem canvas face
+
+### What was done
+- **Skeleton**: Replaced separate eye/nose box meshes with a 16×16 canvas skull texture on the +Z front face (matching the zombie/goblin/orc/troll technique). Texture shows: bone-white with radial edge darkening, heavy top cranium shadow, two wide dark eye sockets with eerie red inner glow, inverted-T nasal cavity, jaw crease, and four visible teeth with dark gaps.
+- **Iron Golem**: Replaced flat headColor head + orange eye boxes with a 16×16 iron face canvas. Features: cold dark iron noise, 4px heavy brow ridge, narrow orange cracked eye slits with inner glow, crack lines emanating from eyes, angular nose bridge, grim jaw shadow, corner rivets.
+- Both follow the same 6-material BoxGeometry pattern: all non-front faces use the flat headColor material; only the +Z face gets the canvas texture.
+
+**Files changed:** `src/Enemy.ts`
+
+### Ideas for next time
+- **Transparent mesh pass for water/glass**: split chunk rendering into opaque + transparent sub-meshes so water/glass blocks render with real alpha blending
+- **Water surface animation**: ShaderMaterial with time-based sine-wave vertex Y-displacement on water-block top faces for 3D ripple effect
+- **Particle visual variety**: different sizes/colors per damage type (fire=large orange, arrow=small white elongated cylinder, sword=medium red splatter)
+- **Mob clothing/body detail**: torso canvas textures — ragged shirt for zombie, chainmail for skeleton, war-paint stripes on orc body
+- **Enchanting table animated book**: floating open book mesh above table that slowly rotates on Y axis
+- **Creeper canvas face**: replace separate box-mesh eyes/nose/mouth with a single canvas face on +Z face (consistency with other mobs)
+- **Night sky improvements**: moon crescent phase texture, occasional shooting star (fast moving sprite)
+
+---
+
 ## 2026-05-26 — Canvas face textures for orc and troll enemies + orc leather belt
 
 ### What was done
