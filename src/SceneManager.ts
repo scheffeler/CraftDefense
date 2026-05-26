@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import { ITEMS } from "./config/items";
+import { blockFaceUV } from "./Map";
+import type { BlockId } from "./types";
 
 // ---------------------------------------------------------------------------
 // Day/night cycle keyframes (t=0 midnight, t=0.5 noon, t=1 midnight)
@@ -84,6 +86,8 @@ export class SceneManager {
   private _underwaterEffect  = false;
   private _nightVisionEffect = false;
 
+  // Block texture shared with the voxel world — used for the held-block cube
+  private _blockTex: THREE.Texture | null = null;
 
   // Screen shake
   private _shakeTimer = 0;
@@ -287,6 +291,8 @@ export class SceneManager {
     this.skyHorizon.setHex(fogHex);
   }
 
+  setBlockTexture(tex: THREE.Texture): void { this._blockTex = tex; }
+
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
   updateArmItem(itemId: string | null): void {
     while (this.armGroup.children.length > 1) {
@@ -399,8 +405,33 @@ export class SceneManager {
     return g;
   }
 
+  private buildBlockCubeMesh(blockId: BlockId): THREE.Mesh {
+    const geo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+    // BoxGeometry face order: +x, -x, +y, -y, +z, -z
+    const faceNormals = [0, 0, 1, -1, 0, 0];
+    const uvAttr = geo.attributes.uv as THREE.BufferAttribute;
+    for (let fi = 0; fi < 6; fi++) {
+      const { u0, u1, v0, v1 } = blockFaceUV(blockId, faceNormals[fi]);
+      const base = fi * 4;
+      uvAttr.setXY(base,     u0, v1);
+      uvAttr.setXY(base + 1, u1, v1);
+      uvAttr.setXY(base + 2, u0, v0);
+      uvAttr.setXY(base + 3, u1, v0);
+    }
+    uvAttr.needsUpdate = true;
+    const mat = new THREE.MeshLambertMaterial({ map: this._blockTex! });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(-0.06, 0.24, 0.0);
+    mesh.rotation.set(0.3, 0.5, 0.2);
+    return mesh;
+  }
+
   private buildItemMesh(itemId: string, category: string, color: number): THREE.Object3D | null {
     if (category === "block") {
+      const placesBlock = ITEMS[itemId]?.placesBlock;
+      if (this._blockTex && placesBlock) {
+        return this.buildBlockCubeMesh(placesBlock);
+      }
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), mat);
       mesh.position.set(-0.06, 0.24, 0.0);

@@ -209,6 +209,7 @@ export class Game {
   private buildSystems(): void {
     this.scene   = new SceneManager(this.container);
     this.gameMap = new GameMap(this.scene.scene);
+    this.scene.setBlockTexture(this.gameMap.world.getBlockTexture());
 
     this.flowField = new FlowField(this.gameMap.world);
     this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);

@@ -161,6 +161,18 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
   }
 }
 
+export function blockFaceUV(blockId: BlockId, normalY: number): { u0: number; u1: number; v0: number; v1: number } {
+  const texIdx = getBlockTexIndex(blockId, normalY);
+  const col = texIdx % 16;
+  const row = Math.floor(texIdx / 16);
+  return {
+    u0: col / 16,
+    u1: (col + 1) / 16,
+    v0: row * 0.5,
+    v1: row * 0.5 + 0.5,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Voxel world
 // ---------------------------------------------------------------------------
@@ -183,6 +195,8 @@ export class VoxelWorld {
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
     this.wheatMat = VoxelWorld.makeWheatMaterial();
   }
+
+  getBlockTexture(): THREE.Texture { return this.blockTex; }
 
   /** Advance fluid animation — call every frame with elapsed seconds. */
   updateFluidAnimation(dt: number): void {
