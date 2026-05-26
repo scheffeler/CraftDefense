@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-26 — Canvas face textures for orc and troll enemies + orc leather belt
+
+### What was done
+**Orc and Troll now have distinct 16×16 canvas face textures** (same technique as zombie/goblin):
+
+- **Orc face**: warm brown-red mottled skin, heavy brow with shadow line, narrow red-glowing squinting eyes, dark warpaint scar stripe on left cheek, flat nose with nostrils, wide mouth with tusk stubs
+- **Troll face**: gray-green lumpy skin, massive brow ridge dominating top 40% with heavy shadow, tiny beady yellow-slit eyes, wide double-nostril nose, wide mouth with 3 stubby square teeth
+- **Orc body**: leather belt strip across waist + gold-tinted metal buckle — makes orc instantly recognizable from across the battlefield
+- Both use the existing 6-material BoxGeometry pattern so only the `+Z` front face shows the canvas texture; sides use flat vertex color
+
+**Files changed:** `src/Enemy.ts`
+
+### Ideas for next time
+- **Transparent mesh pass for water/glass**: split chunk into opaque + transparent sub-meshes so water/glass render with real alpha blending
+- **Water surface animation**: ShaderMaterial with sine-wave vertex Y-displacement on water-block top faces for 3D ripple
+- **Skeleton canvas face**: skull texture with proper cranium shade, dark nasal cavity, classic Minecraft skeleton eye sockets
+- **Grass biome tinting**: lerp grass `topColor` between biomes — taiga gets blue-green, desert fringe gets yellow-green
+- **Particle visual variety**: fire=orange/red, arrow=white elongated, bleed=dark red splatter dots
+- **Mob clothing detail**: torso canvas textures (ragged shirt for zombie, chainmail pattern for skeleton, war-paint body for orc)
+- **Enchanting table animated book**: floating open book mesh above table, slowly rotating
+
+---
+
 ## 2026-05-26 — Block texture atlas expansion + first-person weapon improvements
 
 ### What was done
