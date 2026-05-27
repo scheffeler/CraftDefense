@@ -1,5 +1,41 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-27 — Textured crescent moon billboard
+
+### What was done
+- **Moon texture overhaul**: Replaced the plain white `SphereGeometry(4)` moon with a
+  `PlaneGeometry(14, 14)` billboard using a hand-crafted 64×64 `CanvasTexture`.
+  The texture features: radial gradient base (bright center → dark limb), four semi-
+  transparent elliptical maria (dark lunar seas), per-pixel surface noise, 12 craters
+  with dark pits and bright upper-left rim highlights, a limb-darkening radial gradient,
+  and a linear shadow gradient over the right 20–38% of the disc for a crescent/gibbous
+  appearance.
+- **Billboard facing**: Added `this.moon.quaternion.copy(this.camera.quaternion)` in
+  `updateDayNight()`, matching the sun's billboard technique so the disc always faces
+  the player.
+- **Moon orbit phase fix**: Changed the moonAngle offset from `Math.PI` to `Math.PI/2`
+  so the moon is at maximum sky height (y=130) at midnight (t=0) instead of at the
+  horizon. Previously the moon was always near the horizon when it was visible at night.
+
+**Files changed:** `src/SceneManager.ts`
+
+### Ideas for next time
+- **Moon phase variation**: Use `_totalDays % 8` to shift the shadow gradient left/right
+  over 8 days, giving a full lunar cycle (new → crescent → half → gibbous → full → back).
+  Store a `moonPhase` field on SceneManager updated in `updateDayNight`.
+- **Enemy body textures**: Zombie torso with ragged cloth pattern (dark streaks on green-
+  gray base), skeleton with chainmail texture, orc with crude leather straps. Each uses a
+  16×16 `CanvasTexture` on the torso Mesh via a per-face multi-material array.
+- **Particle variety**: Different colors/sizes per damage type — fire=large orange, 
+  arrow=small white/gray, sword=medium red, poison=small green. Pass a `damageType`
+  enum to `ParticleSystem.spawn()`.
+- **Biome vertex-color tinting**: In `rebuildChunkMesh`, query biome at (wx, wz) and
+  multiply dirt/stone vertex colors by a warm-sand tint in desert and blue-white tint
+  in taiga for more visual biome distinction (grass already has this).
+- **Star density bands**: Add a Milky Way arc — a band of denser stars at a fixed
+  inclination that rotates with `_dayTime`. Implemented as a 4th `THREE.Points` group
+  with more points concentrated along a great-circle arc.
+
 ## 2026-05-26 — Creeper canvas face texture + priming flash fix
 
 ### What was done
