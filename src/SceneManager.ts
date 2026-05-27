@@ -813,32 +813,51 @@ export class SceneManager {
 
   private buildClouds(): void {
     this.cloudMat = new THREE.MeshLambertMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.85,
+      color: 0xfafafa, transparent: true, opacity: 0.88,
     });
+    // Expanded cloud positions — more coverage across the map, including far edges
     const positions: [number, number][] = [
       [10, 8], [28, 5], [48, 12], [15, 42], [45, 38],
       [5, 22], [38, 25], [55, 50], [22, 55], [50, 20],
       [35, 14], [18, 48], [52, 32], [8, 36], [42, 58],
+      [-8, 14], [62, 8], [32, 70], [-4, 50], [68, 40],
+      [25, -5], [55, 65], [0, 35],
     ];
-    for (const [cx, cz] of positions) {
-      const w = 5 + (cx % 7);
-      const d = 3 + (cz % 5);
+    // Simple hash for deterministic variety
+    const hash = (n: number) => { let x = (n * 2654435761) >>> 0; x ^= x >> 16; return x / 0xffffffff; };
+    for (let ci = 0; ci < positions.length; ci++) {
+      const [cx, cz] = positions[ci];
+      const w = 5 + (cx & 0xff) % 7;
+      const d = 3 + (cz & 0xff) % 5;
       const cloud = new THREE.Group();
+
       // Flat base layer
       const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.75, d), this.cloudMat);
       cloud.add(base);
+
       // Left upper puff
       const puffL = new THREE.Mesh(
         new THREE.BoxGeometry(w * 0.56, 1.25, d * 0.72), this.cloudMat,
       );
       puffL.position.set(-w * 0.12, 0.88, 0);
       cloud.add(puffL);
+
       // Right upper puff (slightly smaller and offset)
       const puffR = new THREE.Mesh(
         new THREE.BoxGeometry(w * 0.45, 1.05, d * 0.58), this.cloudMat,
       );
       puffR.position.set(w * 0.17, 0.72, 0);
       cloud.add(puffR);
+
+      // Optional center top puff on larger clouds
+      if (hash(ci * 13 + 7) > 0.45 && w > 8) {
+        const puffC = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.35, 1.55, d * 0.5), this.cloudMat,
+        );
+        puffC.position.set(w * 0.03, 1.1, 0);
+        cloud.add(puffC);
+      }
+
       cloud.position.set(cx, 22, cz);
       this.scene.add(cloud);
       this.cloudMeshes.push(cloud);
