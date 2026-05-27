@@ -1114,6 +1114,15 @@ export class EnemyManager {
         new THREE.MeshLambertMaterial({ map: bodyTex }), // +Z front face
         bodyColorMat,
       ]);
+    } else if (type === "goblin" || type === "goblin_miner") {
+      const bodyTex = type === "goblin_miner"
+        ? EnemyManager.buildGoblinMinerBodyTex()
+        : EnemyManager.buildGoblinBodyTex();
+      body = new THREE.Mesh(bodyGeo, [
+        bodyColorMat, bodyColorMat, bodyColorMat, bodyColorMat,
+        new THREE.MeshLambertMaterial({ map: bodyTex }), // +Z front face
+        bodyColorMat,
+      ]);
     } else {
       body = new THREE.Mesh(bodyGeo, bodyColorMat);
     }
@@ -1840,6 +1849,78 @@ export class EnemyManager {
     ctx.fillStyle = "#aaaaaa"; ctx.fillRect(1, 6, 2, 2); ctx.fillRect(13, 6, 2, 2);
     ctx.fillStyle = "#cccccc"; ctx.fillRect(1, 6, 1, 1); ctx.fillRect(13, 6, 1, 1);
     ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fillRect(5, 3, 1, 3); ctx.fillRect(10, 9, 1, 3);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 goblin body: ragged dark-green tunic with goblin skin peeking through tears and a diagonal war-sash. */
+  private static buildGoblinBodyTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Dark green-brown ratty cloth base
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 2.7 + y * 1.9 + 4.1) * Math.cos(x * 1.3 + y * 2.4 + 2.3);
+      const v = (n * 14) | 0;
+      ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,38+v))},${Math.max(0,Math.min(255,52+v))},${Math.max(0,Math.min(255,15+v))})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Goblin green skin visible through 3 cloth tears
+    ctx.fillStyle = "#5a8a2a";
+    ctx.fillRect(1, 2, 2, 3);   // left shoulder tear
+    ctx.fillRect(12, 5, 3, 2);  // right side tear
+    ctx.fillRect(5, 12, 3, 2);  // bottom hem tear
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(1, 1, 3, 1);   // shadow at tear top
+    ctx.fillRect(11, 4, 4, 1);
+    ctx.fillRect(4, 11, 5, 1);
+    // Diagonal brown war-sash (shoulder to hip)
+    ctx.fillStyle = "rgba(88,50,12,0.72)";
+    for (let i = 0; i < 8; i++) ctx.fillRect(8 - i, i + 1, 2, 1);
+    // Collar notch (V-neck)
+    ctx.fillStyle = "#5a8a2a";
+    ctx.fillRect(7, 0, 2, 2);
+    // Edge darkening
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.fillRect(0, 0, 1, S); ctx.fillRect(S - 1, 0, 1, S);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 goblin miner body: brown mining tunic with dirt stains, a tool belt and crossed pickaxe motif. */
+  private static buildGoblinMinerBodyTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    // Dark brown-tan mining vest base
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 1.9 + y * 2.8 + 5.2) * Math.cos(x * 2.2 + y * 1.1 + 0.8);
+      const v = (n * 12) | 0;
+      ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,118+v))},${Math.max(0,Math.min(255,74+v))},${Math.max(0,Math.min(255,28+v))})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // Dirt smudges
+    ctx.fillStyle = "rgba(55,30,6,0.55)";
+    ctx.fillRect(3, 5, 4, 2);   // chest smudge
+    ctx.fillRect(9, 8, 3, 3);   // belly smudge
+    ctx.fillRect(5, 13, 5, 2);  // hem dirt
+    // Pickaxe motif: horizontal head + diagonal shaft
+    ctx.fillStyle = "rgba(180,120,40,0.7)";
+    ctx.fillRect(5, 5, 6, 1);                              // horizontal pick head
+    ctx.fillRect(5, 5, 2, 2);                              // left blade
+    for (let i = 0; i < 5; i++) ctx.fillRect(9 + i, 4 + i, 1, 1); // handle shaft diagonal
+    // Tool belt across waist
+    ctx.fillStyle = "rgba(38,18,4,0.7)";
+    ctx.fillRect(0, 10, S, 2);
+    ctx.fillStyle = "rgba(150,95,35,0.45)";
+    ctx.fillRect(0, 10, S, 1);  // top highlight on belt
+    // Edge darkening
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.fillRect(0, 0, 1, S); ctx.fillRect(S - 1, 0, 1, S);
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
     return tex;

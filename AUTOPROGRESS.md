@@ -1,5 +1,37 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-27 — Goblin + goblin_miner body canvas textures
+
+### What was done
+- **Goblin body canvas** (`src/Enemy.ts`): added `buildGoblinBodyTex()` — 16×16 canvas showing
+  a ragged dark-green cloth tunic with three tears where lime-green goblin skin shows through,
+  a diagonal dark-brown war-sash running from upper-right to lower-left, a V-neck collar
+  showing skin, and subtle edge darkening. Applied to goblin's +Z front face via 6-material
+  BoxGeometry (same pattern used by zombie/orc/troll).
+- **Goblin miner body canvas** (`src/Enemy.ts`): added `buildGoblinMinerBodyTex()` — 16×16
+  canvas showing a dark brown mining tunic with dirt smudges on chest and belly, a crossed
+  pickaxe motif stamped center-chest (horizontal head + diagonal shaft), and a tool belt
+  stripe with a lighter top highlight across the waist. Applied identically to goblin_miner.
+- Both are the most frequently encountered enemies in early waves — goblins appear from wave 1
+  and now have fully textured bodies matching their detailed canvas faces.
+
+**Files changed:** `src/Enemy.ts`
+
+### Ideas for next time
+- **Goblin miner face canvas**: goblin_miner currently re-uses the goblin face; add a
+  dedicated face texture (dirtier, grimier, maybe wearing a mining goggles-stripe)
+- **Uruk Captain canvas face + body**: boss currently has flat colors; give it a dark helm
+  with glowing visor eyes and plate-armor chest texture
+- **Stone Golem body canvas**: iron/stone surface with heavy cracks and moss patches
+- **Star twinkling**: animate `PointsMaterial.size` per-star with a per-star phase offset to
+  simulate natural scintillation
+- **Moon phase 8-day cycle**: use `_totalDays % 8` to shift the shadow disc offset,
+  giving a full new → crescent → half → gibbous → full cycle
+- **Enchanting table animated book**: floating open book mesh above table that rotates on Y
+- **Water surface ripple**: time-scrolled UV offset on water block top faces
+
+---
+
 ## 2026-05-27 — Extended biome tinting + moon phase shadow disc
 
 ### What was done
