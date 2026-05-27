@@ -1,5 +1,42 @@
 # CraftDefense Auto-Iterate Progress
 
+## 2026-05-27 — Extended biome tinting + moon phase shadow disc
+
+### What was done
+- **Extended biome vertex-color tinting** (`src/Map.ts`): renamed `grassBiomeTint` →
+  `blockBiomeTint` and extended per-block per-biome multipliers beyond grass:
+  - *Dirt/farmland*: desert=warm ochre (+12% R, −24% B), taiga=cool grey-blue
+  - *Stone*: desert=warm limestone (+8% R, −10% B), taiga=cold blue-grey (+8% B)
+  - *Leaves*: desert=dusty olive (−8% G, −34% B), taiga=deep cool green (−24% R, +8% B)
+  - Fortress clearing (x=13–50, z=13–50) stays neutral to keep walls consistent
+  - All other textured blocks default to neutral [1,1,1]
+  - This makes desert biomes feel warm and dry across all block types (not just grass),
+    and taiga biomes feel cold and icy
+- **Moon phase shadow disc** (`src/SceneManager.ts`): added `moonShadow: THREE.Mesh`
+  (dark CircleGeometry(7.3, 32)), positioned in front of the moon billboard. Each frame
+  its x-offset in local billboard space cycles from +moonR×1.85 (full moon, shadow off
+  to right) to 0 (new moon, centered) over 8 game days. Shadow opacity matches moon
+  opacity so it only appears at night.
+
+**Files changed:** `src/Map.ts`, `src/SceneManager.ts`
+
+### Ideas for next time
+- **Torch point lights**: add THREE.PointLight at each torch block with `castShadow=false`
+  and short decay radius (~4 units). Limit to nearest 8 torches to the camera to keep
+  performance sane. Store positions on world load.
+- **Block breaking particles tinted by block**: pass the broken block's ID to
+  `ParticleSystem.spawn()` and look up a representative color from BLOCK_DEFS to tint
+  the particle burst (cobblestone=gray, dirt=brown, leaves=green, etc.)
+- **Mob clothing detail**: zombie torso canvas — ragged shirt (torn linen with stain
+  patches), belt with buckle; skeleton torso — rib cage detail with dark gaps between
+  each bone bar.
+- **Water/lava animated scroll**: scroll UV offset each frame in the fluid mesh shader
+  (or just move geometry UVs) for a flowing water/lava surface effect.
+- **Goblin/orc body canvas textures**: ratty tunic on goblin torso, leather straps and
+  war-paint stripes on orc body.
+
+---
+
 ## 2026-05-27 — Textured crescent moon billboard
 
 ### What was done
