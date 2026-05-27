@@ -952,7 +952,12 @@ export class EnemyManager {
     const darkMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
 
     // Torso (narrower than zombie — bones showing)
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.55, 0.22), boneMat);
+    const bodyTex = EnemyManager.buildSkeletonBodyTex();
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.55, 0.22), [
+      boneMat, boneMat, boneMat, boneMat,
+      new THREE.MeshLambertMaterial({ map: bodyTex }), // +Z front face (rib cage)
+      boneMat,
+    ]);
     torso.position.y = 0.72;
     torso.castShadow = true;
     group.add(torso);
@@ -1092,8 +1097,26 @@ export class EnemyManager {
   private buildHumanoidMesh(group: THREE.Group, type: EnemyTypeName): void {
     const cfg = ENEMY_CONFIGS[type];
 
-    const bodyMat = new THREE.MeshLambertMaterial({ color: cfg.color });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.65, 0.3), bodyMat);
+    const bodyColorMat = new THREE.MeshLambertMaterial({ color: cfg.color });
+    const bodyGeo = new THREE.BoxGeometry(0.5, 0.65, 0.3);
+    let body: THREE.Mesh;
+    if (type === "zombie") {
+      const bodyTex = EnemyManager.buildZombieBodyTex();
+      body = new THREE.Mesh(bodyGeo, [
+        bodyColorMat, bodyColorMat, bodyColorMat, bodyColorMat,
+        new THREE.MeshLambertMaterial({ map: bodyTex }), // +Z front face
+        bodyColorMat,
+      ]);
+    } else if (type === "orc" || type === "troll") {
+      const bodyTex = EnemyManager.buildOrcBodyTex();
+      body = new THREE.Mesh(bodyGeo, [
+        bodyColorMat, bodyColorMat, bodyColorMat, bodyColorMat,
+        new THREE.MeshLambertMaterial({ map: bodyTex }), // +Z front face
+        bodyColorMat,
+      ]);
+    } else {
+      body = new THREE.Mesh(bodyGeo, bodyColorMat);
+    }
     body.position.y = 0.7;
     body.castShadow = true;
     group.add(body);
@@ -1746,6 +1769,79 @@ export class EnemyManager {
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  // ─── Body canvas textures ──────────────────────────────────────────────────
+
+  /** 16×16 zombie torso: mottled green cloth with dark tear streaks. */
+  private static buildZombieBodyTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 1.8 + y * 2.4 + 3.2) * Math.cos(x * 1.1 + y * 0.7 + 1.5);
+      const v = (n * 12) | 0;
+      ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,88+v))},${Math.max(0,Math.min(255,120+v))},${Math.max(0,Math.min(255,68+v))})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.fillStyle = "rgba(20,30,10,0.55)";
+    ctx.fillRect(2, 4, 12, 1); ctx.fillRect(1, 8, 13, 1); ctx.fillRect(3, 12, 10, 1);
+    ctx.fillStyle = "rgba(15,25,8,0.7)";
+    for (let x = 0; x < S; x += 2) ctx.fillRect(x, 14, 1, 2);
+    ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(7, 0, 1, S);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 skeleton torso: bone-white with rib cage lines. */
+  private static buildSkeletonBodyTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 3.1 + y * 1.7) * Math.cos(y * 2.3 + x * 0.9) * 10;
+      const c = Math.max(180, Math.min(240, 210 + (n | 0)));
+      ctx.fillStyle = `rgb(${c},${c},${(c - 12) | 0})`; ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.fillStyle = "rgba(60,60,40,0.55)";
+    for (let rib = 0; rib < 4; rib++) {
+      ctx.fillRect(2, 2 + rib * 3, 5, 1); ctx.fillRect(9, 2 + rib * 3, 5, 1);
+    }
+    ctx.fillStyle = "rgba(255,255,230,0.35)";
+    for (let rib = 0; rib < 4; rib++) {
+      ctx.fillRect(2, 1 + rib * 3, 5, 1); ctx.fillRect(9, 1 + rib * 3, 5, 1);
+    }
+    ctx.fillStyle = "rgba(50,50,35,0.55)"; ctx.fillRect(7, 0, 2, S);
+    ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(0, 0, 2, S); ctx.fillRect(14, 0, 2, S);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** 16×16 orc torso: dark leather breastplate with iron rivets and chest strap. */
+  private static buildOrcBodyTex(): THREE.Texture {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const n = Math.sin(x * 2.1 + y * 1.3 + 2.7) * Math.cos(x * 0.7 + y * 2.9 + 4.1);
+      const v = (n * 14) | 0;
+      ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,105+v))},${Math.max(0,Math.min(255,62+v))},${Math.max(0,Math.min(255,25+v))})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.fillStyle = "rgba(140,85,35,0.38)"; ctx.fillRect(4, 1, 8, 14);
+    ctx.fillStyle = "rgba(55,32,10,0.72)"; ctx.fillRect(0, 6, S, 2);
+    ctx.fillStyle = "rgba(80,48,15,0.45)"; ctx.fillRect(0, 7, S, 1);
+    ctx.fillStyle = "#aaaaaa"; ctx.fillRect(1, 6, 2, 2); ctx.fillRect(13, 6, 2, 2);
+    ctx.fillStyle = "#cccccc"; ctx.fillRect(1, 6, 1, 1); ctx.fillRect(13, 6, 1, 1);
+    ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fillRect(5, 3, 1, 3); ctx.fillRect(10, 9, 1, 3);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
     return tex;
   }
 

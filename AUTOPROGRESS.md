@@ -619,3 +619,35 @@
   on water tops for a 3D ripple feel
 - Particle visual variety: different sizes/colors per damage type (fire=large orange,
   arrow=small white, sword=medium red)
+
+---
+
+## 2026-05-27 — Enemy body textures (zombie, skeleton, orc/troll)
+
+### What was done
+- **Zombie torso**: replaced flat `bodyMat` single-material with a 6-material `BoxGeometry`
+  array. The +Z front face uses a 16×16 `CanvasTexture` showing mottled green-gray cloth
+  with three horizontal dark tear streaks, a ragged alternating-pixel bottom edge, and a
+  faint center seam line.
+- **Skeleton torso**: same 6-material approach on `buildSkeletonMesh`. Front face shows
+  bone-white base noise with 4 pairs of horizontal rib lines (dark shadow + light
+  highlight above each), a sternum/spine double-pixel line down the centre, and side-edge
+  shadows for depth.
+- **Orc (and troll) torso**: 6-material front face shows dark leather base with a lighter
+  centre armour panel, a horizontal chest strap band in dark brown, iron rivets at the
+  strap ends with lighter specular pixel, and two diagonal battle-scratch marks.
+- Added `buildZombieBodyTex`, `buildSkeletonBodyTex`, `buildOrcBodyTex` static builders
+  following the same CanvasTexture NearestFilter pattern as the existing face builders.
+
+**Files changed:** `src/Enemy.ts`
+
+### Ideas for next time
+- **Goblin body texture**: ratty torn tunic (dirty tan/brown cloth with stain patches)
+- **Moon phase variation**: shift the shadow gradient left/right using `_totalDays % 8`
+  to simulate a lunar cycle (new → crescent → half → gibbous → full → back).
+- **Biome vertex-color tinting**: in `rebuildChunkMesh` multiply dirt/stone vertex RGB
+  by a warm-sand tint for desert and blue-white for taiga to distinguish biomes visually.
+- **Star Milky Way band**: a second `THREE.Points` with 2000 dense stars concentrated
+  along a great-circle arc for a more dramatic night sky.
+- **Particle type variety**: pass a `damageType` enum to `ParticleSystem.spawn()` and
+  vary color/size per type (fire=large orange, arrow=small grey, sword=medium red).
