@@ -221,14 +221,16 @@ export class SceneManager {
     }
     (this.moon.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
 
-    // Moon position: opposite side of sky from sun
-    const moonAngle = this._dayTime * Math.PI * 2 + Math.PI;
+    // Moon position: high at midnight (t=0), offset PI/2 so |sin|=1 at t=0
+    const moonAngle = this._dayTime * Math.PI * 2 + Math.PI * 0.5;
     const mr = 130;
     this.moon.position.set(
       Math.cos(moonAngle) * mr + 32,
       Math.abs(Math.sin(moonAngle)) * mr,
       20,
     );
+    // Billboard: moon disc always faces camera
+    this.moon.quaternion.copy(this.camera.quaternion);
 
     // Sun: follows sun light direction
     const sunOpacity = Math.min(1, Math.max(0, frame.ambientInt * 1.8 - 0.4));
@@ -688,11 +690,106 @@ export class SceneManager {
   }
 
   private buildMoon(): THREE.Mesh {
-    const geo = new THREE.SphereGeometry(4, 8, 8);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xeeeedd, transparent: true, opacity: 0 });
+    const geo = new THREE.PlaneGeometry(14, 14);
+    const tex = SceneManager.makeMoonTexture();
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0, fog: false,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
     const mesh = new THREE.Mesh(geo, mat);
     this.scene.add(mesh);
     return mesh;
+  }
+
+  private static makeMoonTexture(): THREE.CanvasTexture {
+    const S = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+
+    // Seed-based RNG for deterministic craters
+    let seed = 4447;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff; };
+
+    const cx = S / 2, cy = S / 2, R = S / 2 - 1;
+
+    // Base moon disc — off-white
+    ctx.clearRect(0, 0, S, S);
+    const baseGrad = ctx.createRadialGradient(cx - 4, cy - 4, R * 0.1, cx, cy, R);
+    baseGrad.addColorStop(0, "rgb(240,240,230)");
+    baseGrad.addColorStop(0.7, "rgb(220,220,205)");
+    baseGrad.addColorStop(1, "rgb(180,180,168)");
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = baseGrad; ctx.fill();
+
+    // Maria (dark lunar seas) — large irregular patches
+    const mariaSpots = [
+      { x: 20, y: 22, rx: 12, ry: 9 },
+      { x: 38, y: 28, rx: 8,  ry: 6 },
+      { x: 26, y: 42, rx: 7,  ry: 5 },
+      { x: 44, y: 44, rx: 5,  ry: 4 },
+    ];
+    for (const m of mariaSpots) {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y, m.rx, m.ry, rand() * Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = "rgb(140,140,128)";
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Surface noise — per-pixel grey variation
+    const imageData = ctx.getImageData(0, 0, S, S);
+    for (let py = 0; py < S; py++) {
+      for (let px = 0; px < S; px++) {
+        const dx = px - cx, dy = py - cy;
+        if (dx * dx + dy * dy > R * R) continue;
+        const i = (py * S + px) * 4;
+        const v = (rand() - 0.5) * 10;
+        imageData.data[i]     = Math.max(0, Math.min(255, imageData.data[i]     + v));
+        imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + v));
+        imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + v));
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    // Craters — dark pit with light rim
+    const craters = [
+      { x: 14, y: 18, r: 4.5 }, { x: 44, y: 14, r: 3.5 }, { x: 32, y: 48, r: 3.0 },
+      { x: 50, y: 36, r: 2.5 }, { x: 22, y: 36, r: 2.0 }, { x: 38, y: 52, r: 1.8 },
+      { x: 16, y: 50, r: 1.5 }, { x: 54, y: 54, r: 2.2 }, { x: 42, y: 20, r: 1.6 },
+      { x: 28, y: 14, r: 1.4 }, { x: 12, y: 38, r: 1.3 }, { x: 58, y: 24, r: 1.2 },
+    ];
+    for (const cr of craters) {
+      // Shadow pit
+      ctx.beginPath(); ctx.arc(cr.x, cr.y, cr.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(100,100,90,0.55)"; ctx.fill();
+      // Bright rim (upper-left highlight)
+      ctx.beginPath(); ctx.arc(cr.x - cr.r * 0.2, cr.y - cr.r * 0.2, cr.r * 1.05, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(248,248,235,0.5)"; ctx.lineWidth = 0.8; ctx.stroke();
+    }
+
+    // Limb darkening — darker toward the edge
+    const limbGrad = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
+    limbGrad.addColorStop(0, "rgba(0,0,0,0)");
+    limbGrad.addColorStop(1, "rgba(0,0,0,0.35)");
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = limbGrad; ctx.fill();
+
+    // Shadow half — varies per phase (shadow moves left→right over 8 days)
+    // Phase 0 = full moon (no shadow), Phase 4 = new moon (full shadow)
+    // Use totalDays progression — stored externally; apply a fixed half-shadow for now
+    // (slight crescent look: shadow covers rightmost 30% of disc)
+    const shadowGrad = ctx.createLinearGradient(cx - R, cy, cx + R, cy);
+    shadowGrad.addColorStop(0, "rgba(0,0,0,0)");
+    shadowGrad.addColorStop(0.62, "rgba(0,0,0,0)");
+    shadowGrad.addColorStop(0.82, "rgba(0,0,0,0.5)");
+    shadowGrad.addColorStop(1, "rgba(0,0,0,0.88)");
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = shadowGrad; ctx.fill();
+
+    return new THREE.CanvasTexture(canvas);
   }
 
   private buildSun(): THREE.Mesh {
