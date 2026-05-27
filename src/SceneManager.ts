@@ -70,6 +70,7 @@ export class SceneManager {
   private readonly starGroups: THREE.Points[];
   private _starTime = 0;
   private readonly moon: THREE.Mesh;
+  private readonly moonShadow: THREE.Mesh;
   private readonly sun:  THREE.Mesh;
   private readonly skyDome: THREE.Mesh;
   private readonly skyZenith  = new THREE.Color(0x5ab3dd);
@@ -129,7 +130,7 @@ export class SceneManager {
     this.skyDome = this.buildSkyDome();
     this.buildClouds();
     this.starGroups = this.buildStars();
-    this.moon  = this.buildMoon();
+    [this.moon, this.moonShadow] = this.buildMoon();
     this.sun   = this.buildSun();
 
     // Arm scene — rendered after main scene with depth cleared
@@ -231,6 +232,20 @@ export class SceneManager {
     );
     // Billboard: moon disc always faces camera
     this.moon.quaternion.copy(this.camera.quaternion);
+
+    // Moon phase shadow: a dark disc slides over the lit face over 8-day cycle.
+    // phase=0 → full moon (shadow fully off to right), phase=0.5 → new moon (centered).
+    const moonPhase = (this._totalDays % 8) / 8;
+    const moonR = 7.0;
+    // Shadow x offset in local billboard space: waxing = moves left, waning = moves right
+    const shadowOffsetX = moonR * 1.85 * (1.0 - moonPhase * 2.0);
+    const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const camFwd   = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    this.moonShadow.position.copy(this.moon.position)
+      .addScaledVector(camRight, shadowOffsetX)
+      .addScaledVector(camFwd, -0.5);
+    this.moonShadow.quaternion.copy(this.camera.quaternion);
+    (this.moonShadow.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
 
     // Sun: follows sun light direction
     const sunOpacity = Math.min(1, Math.max(0, frame.ambientInt * 1.8 - 0.4));
@@ -689,7 +704,7 @@ export class SceneManager {
     return groups;
   }
 
-  private buildMoon(): THREE.Mesh {
+  private buildMoon(): [THREE.Mesh, THREE.Mesh] {
     const geo = new THREE.PlaneGeometry(14, 14);
     const tex = SceneManager.makeMoonTexture();
     const mat = new THREE.MeshBasicMaterial({
@@ -698,7 +713,16 @@ export class SceneManager {
     });
     const mesh = new THREE.Mesh(geo, mat);
     this.scene.add(mesh);
-    return mesh;
+
+    // Shadow disc: same radius as moon, slides to produce crescent phases over 8 days.
+    const shadowGeo = new THREE.CircleGeometry(7.3, 32);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x040408, transparent: true, opacity: 0,
+      fog: false, side: THREE.DoubleSide, depthWrite: false,
+    });
+    const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+    this.scene.add(shadow);
+    return [mesh, shadow];
   }
 
   private static makeMoonTexture(): THREE.CanvasTexture {

@@ -64,8 +64,8 @@ const WORLD_HEIGHT = 32;
 const BLOCK_SIZE = 1.0;
 
 // ---------------------------------------------------------------------------
-// Biome grass tinting — matches WorldGen biome detection so grass color
-// varies by region (forest=lush green, desert=dry yellow, taiga=cool blue)
+// Biome block tinting — vertex color multiplier on atlas texture per block type.
+// Forest=neutral, Desert=warm/dry, Taiga=cool/icy. Matches WorldGen.getBiome().
 // ---------------------------------------------------------------------------
 function biomeHash(x: number, z: number): number {
   let h = (x * 374761393 + z * 1234567891) | 0;
@@ -73,18 +73,38 @@ function biomeHash(x: number, z: number): number {
   return h >>> 0;
 }
 
-function grassBiomeTint(wx: number, wz: number): [number, number, number] {
-  // Near map edges → always forest
+function blockBiomeTint(id: string, wx: number, wz: number): [number, number, number] {
+  // Map edges and fortress clearing → always neutral
   if (wz <= 12 || wz >= WORLD_DEPTH - 13) return [1.0, 1.0, 1.0];
-  // Coarse + fine noise matches WorldGen.getBiome
+  if (wx >= 13 && wx <= 50 && wz >= 13 && wz <= 50) return [1.0, 1.0, 1.0];
   const bx = Math.floor(wx / 22), bz = Math.floor(wz / 22);
   const n1 = (biomeHash(bx * 9871 + 3001, bz * 7649 + 2003) % 1000) / 1000;
   const fx = Math.floor(wx / 11), fz = Math.floor(wz / 11);
   const n2 = (biomeHash(fx * 4567 + 1001, fz * 3457 + 5003) % 1000) / 1000;
   const n = n1 * 0.75 + n2 * 0.25;
-  if (n < 0.28) return [1.04, 0.84, 0.62]; // desert: warm dry tan-green
-  if (n > 0.70) return [0.80, 0.96, 0.88]; // taiga: cool blue-green
-  return [1.0, 1.0, 1.0];                   // forest: vibrant green (unchanged)
+  const isDesert = n < 0.28;
+  const isTaiga  = n > 0.70;
+  switch (id) {
+    case "grass":
+      if (isDesert) return [1.04, 0.84, 0.62]; // dry tan-green
+      if (isTaiga)  return [0.80, 0.96, 0.88]; // cool blue-green
+      return [1.0, 1.0, 1.0];
+    case "leaves":
+      if (isDesert) return [0.98, 0.92, 0.66]; // dusty olive
+      if (isTaiga)  return [0.76, 0.98, 0.84]; // deep cool green
+      return [1.0, 1.0, 1.0];
+    case "dirt":
+    case "farmland":
+      if (isDesert) return [1.12, 0.96, 0.76]; // warm dry ochre
+      if (isTaiga)  return [0.88, 0.94, 1.06]; // cool grey-blue soil
+      return [1.0, 1.0, 1.0];
+    case "stone":
+      if (isDesert) return [1.08, 1.03, 0.90]; // warm limestone
+      if (isTaiga)  return [0.92, 0.95, 1.08]; // cold blue-grey rock
+      return [1.0, 1.0, 1.0];
+    default:
+      return [1.0, 1.0, 1.0];
+  }
 }
 
 class Chunk {
@@ -1123,14 +1143,10 @@ export class VoxelWorld {
 
             const f = faces[fi];
             const fTexIdx = getBlockTexIndex(id, f.n[1]);
-            // For textured blocks use white vertex colors; grass applies biome tint
+            // For textured blocks apply biome tint; generic tile-13 blocks use vertex color
             let fr = f.cr, fg = f.cg, fb = f.cb;
             if (fTexIdx !== 13) {
-              if (id === "grass") {
-                [fr, fg, fb] = grassBiomeTint(wx, wz);
-              } else {
-                fr = fg = fb = 1.0;
-              }
+              [fr, fg, fb] = blockBiomeTint(id, wx, wz);
             }
             // Lava and fire self-illuminate: boost HDR above 1.0 so ACES tone mapping glows
             if (id === "lava" || id === "fire") { fr = 2.8; fg = 1.1; fb = 0.1; }
