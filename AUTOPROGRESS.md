@@ -651,3 +651,37 @@
   along a great-circle arc for a more dramatic night sky.
 - **Particle type variety**: pass a `damageType` enum to `ParticleSystem.spawn()` and
   vary color/size per type (fire=large orange, arrow=small grey, sword=medium red).
+
+---
+
+## 2026-05-27 — Cloud coverage expansion + tsconfig deprecation fix
+
+### What was done
+- **Cloud positions expanded**: `buildClouds()` in `SceneManager.ts` now has 23 cloud
+  clusters (up from 15) including positions in the negative-X/Z map margins and beyond
+  the far edge, giving much better sky coverage with no visible "empty corner" gaps.
+  Each cloud still uses the remote's 3-box puff technique (flat base + 2 raised puffs).
+- **Optional center puff**: Large clouds (w > 8) with hash > 0.45 now get a third
+  taller center puff for more varied cloud shapes.
+- **Cloud material**: Slightly adjusted to `0xfafafa` and opacity 0.88 for a crisper
+  white look.
+- **tsconfig deprecation fix**: Resolved `moduleResolution=node10` deprecation warning
+  in TypeScript 6 by setting `"moduleResolution": "bundler"` in `tsconfig.json` and
+  `tsconfig.emit.json` (zero-impact on Vite bundling).
+- **Merged remote improvements**: The remote `auto-iterate` branch already had
+  32×32 block texture atlas, row-2 tile slots (tiles 16–31) for furnace/chest/crafting
+  table/obsidian/iron_block/glass/water/bookshelf/snow/cactus/lava/etc.,
+  per-face UV mapping (`blockFaceUV` export), fluid materials (water/lava), wheat
+  billboard geometry, sky dome shader, star groups, detailed arm skin texture, and
+  per-tool mesh builders. All of these were preserved as-is.
+
+**Files changed:** `src/SceneManager.ts`, `tsconfig.json`, `tsconfig.emit.json`
+
+### Ideas for next time
+- **Biome vertex-color tinting**: in `rebuildChunkMesh` multiply dirt/stone vertex RGB
+  by a warm-sand tint in desert areas and blue-white for taiga snow.
+- **Moon phase variation**: use `_totalDays % 8` to animate the crescent shadow left/right.
+- **Block breaking particles**: tint particles with the broken block's color so cobblestone
+  breaks show gray chips, dirt shows brown, etc.
+- **Goblin body texture**: ratty torn tunic on the front face (dirty tan/brown with stain patches).
+- **Star twinkle**: animate `PointsMaterial.size` with a slow per-group sine wave at night.
