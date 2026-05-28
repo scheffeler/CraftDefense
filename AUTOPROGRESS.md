@@ -41,6 +41,22 @@
 
 ---
 
+## 2026-05-28 — Cobblestone 9-stone redesign + TypeScript build fix
+
+**What was done:**
+- Upgraded cobblestone texture (tile 1) from 6 large unequal stone shapes to 9 stones arranged in a proper 3×3 grid with consistent mortar gaps, each with full 4-way bevel (top+left highlight, bottom+right shadow) for a more 3D Minecraft-like appearance. Also darkened the mortar background from #60605a to #3e3b35 for sharper contrast.
+- Fixed `tsc -p tsconfig.emit.json` exit code: added `"types": ["vite/client"]` to tsconfig.emit.json so the CSS side-effect import in main.ts resolves cleanly (TS2882 was causing exit 2). Build now exits 0.
+- Added `src/vite-env.d.ts` with `/// <reference types="vite/client" />` for IDE support.
+
+**Ideas for next time:**
+- Animated water: scrolling UV or ripple normal map for the water block material
+- Torch light halos: spawn a PointLight near each placed torch
+- Block break particles colored by block type (stone=grey, dirt=brown, grass=green)
+- Screen-shake on heavy hits (orc, troll, troll_king)
+- Death burst particles colored by enemy type
+
+---
+
 ## Session 2026-05-28 — Combat Impact Particles
 
 **Goal:** Add visual particle feedback for melee and ranged combat hits.

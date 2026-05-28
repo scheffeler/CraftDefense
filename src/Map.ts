@@ -459,24 +459,28 @@ export class VoxelWorld {
     }
     border(0);
 
-    // ── 1: Cobblestone — dark mortar with defined stone chunks ──────────────────
-    fill(1 * S, "#60605a");
+    // ── 1: Cobblestone — 9 stone lumps in 3×3 grid with 4-way bevel ────────────
+    fill(1 * S, "#3e3b35");
     { const r = rng(2002);
       const stones: [number,number,number,number,number,number,number][] = [
-        [2,0,13,10,138,130,114], [16,0,15,8,124,118,102],
-        [0,11,10,16,144,136,118], [14,10,16,18,130,122,106],
-        [2,27,10,5,136,128,112], [16,26,15,6,126,120,104],
+        // [sx, sy, sw, sh, br, bg, bb]
+        [1,  1,  10, 10, 140, 132, 116], [13, 1,  9, 10, 124, 116, 100], [24, 1,  7, 10, 136, 128, 112],
+        [1,  13,  9, 10, 128, 120, 104], [12, 13, 12, 10, 145, 137, 121], [26, 13,  5, 10, 118, 110,  96],
+        [1,  25, 13,  6, 132, 124, 108], [16, 25,  9,  6, 126, 118, 102], [27, 25,  4,  6, 138, 130, 114],
       ];
-      for (const [sx,sy,sw,sh,br,bg,bb] of stones) {
-        for (let py = 1; py < sh-1; py++) for (let px = 1; px < sw-1; px++) {
-          const v = (r() - 0.5) * 0.12;
-          pixel(1*S + sx+px, sy+py,
-            `rgb(${Math.max(0,Math.min(255,(br + v*255)|0))},${Math.max(0,Math.min(255,(bg + v*255)|0))},${Math.max(0,Math.min(255,(bb + v*255)|0))})`);
+      for (const [sx, sy, sw, sh, br, bg, bb] of stones) {
+        for (let py = 0; py < sh; py++) for (let px = 0; px < sw; px++) {
+          const v = (r() - 0.5) * 0.13;
+          pixel(1 * S + sx + px, sy + py,
+            `rgb(${Math.max(0, Math.min(255, (br + v * 255) | 0))},${Math.max(0, Math.min(255, (bg + v * 255) | 0))},${Math.max(0, Math.min(255, (bb + v * 255) | 0))})`);
         }
-        ctx.fillStyle = "rgba(255,255,255,0.14)";
-        ctx.fillRect(1*S + sx+1, sy+1, sw-2, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.22)";
-        ctx.fillRect(1*S + sx+1, sy+sh-2, sw-2, 1);
+        // 4-way bevel: top + left highlight, bottom + right shadow
+        ctx.fillStyle = "rgba(240,236,220,0.22)";
+        ctx.fillRect(1 * S + sx, sy, sw, 1);
+        ctx.fillRect(1 * S + sx, sy, 1, sh);
+        ctx.fillStyle = "rgba(12,10,8,0.38)";
+        ctx.fillRect(1 * S + sx, sy + sh - 1, sw, 1);
+        ctx.fillRect(1 * S + sx + sw - 1, sy, 1, sh);
       }
     }
     border(1 * S);
