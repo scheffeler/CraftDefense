@@ -97,3 +97,18 @@
 - **Block break particle color** matches block type (stone = grey, dirt = brown, etc.)
 - **Torch light halo** — emissive pointlight glow ring around placed torches
 - **Screen-shake** on heavy hits (orc, troll, troll_king) — a quick camera offset jolt
+
+---
+
+## 2026-05-28 — Additional block texture/water session (this run merged into previous)
+
+*Note: This session's Map.ts changes were superseded by the already-merged upstream version which had the same improvements in a 2D atlas format.*
+
+**Ideas for next time:**
+- Torch point lights: add THREE.PointLight near torch blocks for warm glow
+- Leaves translucency: make leaves slightly emissive at night or after rain
+- Enemy mesh upgrades: troll/orc with more detailed geometry
+- Particle improvements: splashing water when falling into water
+- Better cloud shapes: rounded puff cloud geometry instead of flat boxes
+- Sky gradient dome: replace solid sky color with gradient mesh (horizon glow)
+- Fog distance variants per biome (desert=clearer, ocean=misty)
