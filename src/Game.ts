@@ -167,6 +167,11 @@ export class Game {
     );
 
     this.particles = new ParticleSystem(this.scene.scene);
+
+    this.projectiles.trailCallback = (pos) => {
+      this.particles.spawnArrowTrail(pos.x, pos.y, pos.z);
+    };
+
     this.weather = new WeatherSystem(this.scene.scene);
     this.weather.onThunder = () => {
       this.audio.play("thunder", 0.85);

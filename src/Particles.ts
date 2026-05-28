@@ -90,6 +90,26 @@ export class ParticleSystem {
     }
   }
 
+  /** 1-2 tiny smoke puffs trailing behind a flying arrow. */
+  spawnArrowTrail(x: number, y: number, z: number): void {
+    const count = Math.random() < 0.45 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const size = 0.022 + Math.random() * 0.022;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.6 }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.08,
+        y + (Math.random() - 0.5) * 0.08,
+        z + (Math.random() - 0.5) * 0.08,
+      );
+      const spd = 0.08 + Math.random() * 0.12;
+      const theta = Math.random() * Math.PI * 2;
+      this.spawnParticle(mesh, Math.cos(theta) * spd, 0.05 + Math.random() * 0.15, Math.sin(theta) * spd, 0.14 + Math.random() * 0.1);
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

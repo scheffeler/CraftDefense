@@ -35,6 +35,9 @@ const ARROW_POWER_MULT = 22;
 export class ProjectileManager {
   private readonly pool: ProjectileData[] = [];
   private readonly playerArrows: PlayerArrow[] = [];
+  private _trailFrame = 0;
+
+  trailCallback: ((pos: THREE.Vector3) => void) | null = null;
 
   constructor(private readonly scene: THREE.Scene) {
     this.buildPool();
@@ -164,6 +167,8 @@ export class ProjectileManager {
     }
 
     // Player arrows (directional + gravity)
+    this._trailFrame++;
+    const emitTrail = this._trailFrame % 4 === 0 && this.trailCallback !== null;
     for (const a of this.playerArrows) {
       if (!a.active) continue;
 
@@ -180,6 +185,8 @@ export class ProjectileManager {
         a.mesh.lookAt(a.mesh.position.clone().add(dir));
         a.mesh.rotateX(Math.PI / 2);
       }
+
+      if (emitTrail) this.trailCallback!(a.mesh.position);
 
       // Hit detection vs all alive enemies
       if (getAliveEnemyIds) {
