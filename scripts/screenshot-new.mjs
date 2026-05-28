@@ -5,39 +5,78 @@ mkdirSync('screenshots', { recursive: true });
 
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  args: ['--disable-web-security', '--no-sandbox', '--use-gl=swiftshader', '--enable-webgl'],
+  args: ['--disable-web-security', '--no-sandbox', '--disable-setuid-sandbox'],
   headless: true,
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await context.newPage();
-page.on('pageerror', e => console.log('[error]', e.message));
 
-await page.goto('http://localhost:5175/', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5174/', { waitUntil: 'load', timeout: 15000 });
+await page.waitForSelector('canvas', { timeout: 10000 });
 await page.waitForTimeout(5000);
 
-// Hide title screen
+// Stop the title animation and move camera to close terrain view
 await page.evaluate(() => {
-  document.querySelectorAll('.fps-lock-prompt').forEach(el => { el.style.display = 'none'; });
+  const g = window.__game;
+  if (!g) return;
+  // Freeze title angle
+  g._titleAngle = 0;
+  // Move camera close to the ground to see blocks
+  const cam = g.scene.camera;
+  cam.position.set(32, 9, 48);
+  // Set rotation manually to look forward at fortress
+  cam.rotation.order = 'YXZ';
+  cam.rotation.x = -0.15;
+  cam.rotation.y = Math.PI;
+  cam.rotation.z = 0;
+  cam.updateMatrixWorld(true);
 });
 
-// Set to nighttime and check torch light count
-await page.evaluate(() => {
-  const game = window.__game;
-  if (!game || !game.scene) return;
-  // Set to midnight
-  game.scene._dayTime = 0.05;
-});
-await page.waitForTimeout(1500);
-await page.screenshot({ path: 'screenshots/night-torches.png' });
+// Force several renders
+await page.waitForTimeout(600);
 
-// Reset to day for daytime overview
-await page.evaluate(() => {
-  const game = window.__game;
-  if (!game || !game.scene) return;
-  game.scene._dayTime = 0.45;
+// Get canvas content
+const frameDataURL = await page.evaluate(() => {
+  const c = document.getElementById('game-canvas');
+  if (!c) {
+    const canvases = document.querySelectorAll('canvas');
+    for (const cv of canvases) {
+      if (cv.width > 500) try { return cv.toDataURL('image/png'); } catch(e) { return null; }
+    }
+    return null;
+  }
+  try { return c.toDataURL('image/png'); } catch(e) { return null; }
 });
-await page.waitForTimeout(1000);
-await page.screenshot({ path: 'screenshots/day-overview.png' });
+
+if (frameDataURL && frameDataURL.startsWith('data:image/png;base64,')) {
+  const base64 = frameDataURL.replace('data:image/png;base64,', '');
+  writeFileSync('screenshots/terrain-eye-level.png', Buffer.from(base64, 'base64'));
+  console.log('Eye-level view captured');
+}
+
+// Another angle: looking down at grass from above at close range
+await page.evaluate(() => {
+  const g = window.__game;
+  if (!g) return;
+  const cam = g.scene.camera;
+  cam.position.set(34, 12, 36);
+  cam.rotation.x = -1.2;
+  cam.rotation.y = 0;
+  cam.rotation.z = 0;
+  cam.updateMatrixWorld(true);
+});
+await page.waitForTimeout(400);
+const frame2 = await page.evaluate(() => {
+  const canvases = document.querySelectorAll('canvas');
+  for (const cv of canvases) {
+    if (cv.width > 500) try { return cv.toDataURL('image/png'); } catch(e) { return null; }
+  }
+  return null;
+});
+if (frame2 && frame2.startsWith('data:')) {
+  writeFileSync('screenshots/terrain-overhead-close.png', Buffer.from(frame2.split(',')[1], 'base64'));
+  console.log('Close overhead view captured');
+}
 
 await browser.close();
-console.log('Torch screenshots done!');
+console.log('Done.');
