@@ -803,6 +803,8 @@ export class Game {
       this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
       this.ui.showDamageVignette();
       this.audio.play("player_hurt", 0.5);
+      const cam = this.scene.camera;
+      this.particles.spawnArrowHit(cam.position.x, cam.position.y, cam.position.z);
       // Skeleton arrows apply Wither — 2 HP/s for 5 seconds
       this.player.applyEffect("wither", 5, 2);
       this.ui.showWitherIndicator();
@@ -890,6 +892,10 @@ export class Game {
         this.gameMap.world.rebuildDirtyChunks();
         this._doExplosion(bx + 0.5, by + 0.5, bz + 0.5, 4.5, 8);
       }
+    };
+
+    this.projectiles.onPlayerArrowHitEnemy = (x, y, z) => {
+      this.particles.spawnArrowHit(x, y, z);
     };
 
     // Player death
@@ -2084,6 +2090,7 @@ export class Game {
         this.enemies.damage(state.id, damage, 1, 0, true); // knockback on melee
         this.audio.play("hit", 0.4);
         this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
+        this.particles.spawnMeleeHit(pos.x, pos.y + 1.0, pos.z);
         hitSomething = true;
         if (hasFireAspect) {
           // Set enemy on fire for 4 seconds

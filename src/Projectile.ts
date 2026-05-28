@@ -183,6 +183,7 @@ export class ProjectileManager {
   }
 
   onPlayerArrowHitBlock: (bx: number, by: number, bz: number, blockId: string) => void = () => {};
+  onPlayerArrowHitEnemy: (x: number, y: number, z: number) => void = () => {};
 
   update(
     dt: number,
@@ -261,6 +262,7 @@ export class ProjectileManager {
           if (!epos) continue;
           if (a.mesh.position.distanceTo(epos) < ARROW_HIT_DIST) {
             damageEnemy(eid, a.damage, 1, 0);
+            this.onPlayerArrowHitEnemy(a.mesh.position.x, a.mesh.position.y, a.mesh.position.z);
             this.deactivateArrow(a);
             break;
           }
@@ -291,6 +293,7 @@ export class ProjectileManager {
           if (!epos) continue;
           if (b.mesh.position.distanceTo(epos) < BOLT_HIT_DIST) {
             damageEnemy(eid, b.damage, 1, 0);
+            this.onPlayerArrowHitEnemy(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z);
             this.deactivateBolt(b);
             break;
           }

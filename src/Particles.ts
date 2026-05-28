@@ -204,6 +204,57 @@ export class ParticleSystem {
     }
   }
 
+  /** 5-8 small impact splats when a melee weapon connects. */
+  spawnMeleeHit(x: number, y: number, z: number, color = 0xcc2222): void {
+    const altColor = color === 0xcc2222 ? 0xff3333 : color;
+    const count = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < count; i++) {
+      const c = i % 2 === 0 ? color : altColor;
+      const size = 0.04 + Math.random() * 0.05;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size * 1.6, size, size),
+        new THREE.MeshBasicMaterial({ color: c }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.3,
+        y + (Math.random() - 0.5) * 0.3,
+        z + (Math.random() - 0.5) * 0.3,
+      );
+      const theta = Math.random() * Math.PI * 2;
+      const phi = (Math.random() * 0.4 + 0.1) * Math.PI;
+      const spd = 1.5 + Math.random() * 2.5;
+      this.spawnParticle(mesh,
+        Math.sin(phi) * Math.cos(theta) * spd,
+        Math.abs(Math.cos(phi)) * spd + 0.8,
+        Math.sin(phi) * Math.sin(theta) * spd,
+        0.2 + Math.random() * 0.2,
+      );
+    }
+  }
+
+  /** 4-6 small white/gray shards when an arrow hits a target. */
+  spawnArrowHit(x: number, y: number, z: number): void {
+    const colors = [0xddddcc, 0xccccbb, 0xeeeedd];
+    const count = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < count; i++) {
+      const color = colors[i % colors.length];
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, 0.025, 0.12),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      mesh.position.set(x, y, z);
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.5;
+      const spd = 1.8 + Math.random() * 2.0;
+      this.spawnParticle(mesh,
+        Math.sin(phi) * Math.cos(theta) * spd,
+        Math.cos(phi) * spd + 0.5,
+        Math.sin(phi) * Math.sin(theta) * spd,
+        0.18 + Math.random() * 0.15,
+      );
+    }
+  }
+
   spawnLavaEmbers(x: number, y: number, z: number): void {
     const colors = [0xff6600, 0xff4400, 0xffaa00, 0xff8800];
     const count = 2 + Math.floor(Math.random() * 3);

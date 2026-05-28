@@ -38,3 +38,25 @@
 - Add **ambient occlusion** in corners and under overhangs (currently present but could be more dramatic)
 - Add **fog of war** / vignette post-processing
 - Better **torch/light halos** — pointlight emissive around placed torches
+
+---
+
+## Session 2026-05-28 — Combat Impact Particles
+
+**Goal:** Add visual particle feedback for melee and ranged combat hits.
+
+**Changes made:**
+- Added `spawnMeleeHit(x, y, z, color?)` to `Particles.ts`: 5–8 rectangular red splat particles exploding outward on sword/axe connect, each with slight random color variance between `0xcc2222` and `0xff3333`
+- Added `spawnArrowHit(x, y, z)` to `Particles.ts`: 4–6 slim white/gray shard particles on arrow or bolt impact, oriented like wood splinters
+- Added `onPlayerArrowHitEnemy` callback to `ProjectileManager` in `Projectile.ts`, fired on both arrow and crossbow bolt enemy hits; both arrow pool and bolt pool now call it
+- Wired `spawnMeleeHit` into `tryMeleeAttack()` in `Game.ts` at the hit confirmation point
+- Wired `spawnArrowHit` into `onSkeletonArrowHit` (skeleton arrows hitting player) and `onPlayerArrowHitEnemy` callback (player arrows/bolts hitting enemies)
+
+**Result:** Sword hits now spray red particle splats; arrows and crossbow bolts emit shard bursts on impact — much more satisfying combat feel.
+
+**Ideas for next time:**
+- Add particle trails to fired projectiles (faint smoke/motion trail)
+- Add screen-shake on heavy hits (orc, troll, troll_king) via camera position offset
+- Sword swing arc: brief translucent blade trail mesh
+- Death burst particles when enemy HP reaches 0 (already some particle logic, extend it)
+- Block break particle color matches block type (currently generic)
