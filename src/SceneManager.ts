@@ -99,6 +99,8 @@ export class SceneManager {
   private readonly armGroup: THREE.Group;
   private armSwingTimer = 0;
   private readonly ARM_SWING_DURATION = 0.25;
+  private _swingArcMesh!: THREE.Mesh;
+  private _swingWeaponEquipped = false;
 
   onPointerLockChange: (locked: boolean) => void = () => {};
 
@@ -144,6 +146,21 @@ export class SceneManager {
     this.armGroup.scale.setScalar(0.65);
     this.armScene.add(this.armGroup);
     this.buildArmMesh();
+
+    // Translucent swing arc — sits in armScene, shown during melee swings
+    {
+      const arcGeo = new THREE.PlaneGeometry(0.35, 0.55);
+      const arcMat = new THREE.MeshBasicMaterial({
+        color: 0xaaddff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      this._swingArcMesh = new THREE.Mesh(arcGeo, arcMat);
+      this.armScene.add(this._swingArcMesh);
+    }
 
     window.addEventListener("resize", () => this.onResize());
   }
@@ -315,10 +332,15 @@ export class SceneManager {
     while (this.armGroup.children.length > 1) {
       this.armGroup.remove(this.armGroup.children[1]);
     }
+    this._swingWeaponEquipped = false;
     if (!itemId) return;
 
     const def = ITEMS[itemId];
     if (!def) return;
+
+    this._swingWeaponEquipped =
+      (def.category === "weapon" && itemId !== "bow") ||
+      (def.category === "tool" && itemId.includes("_axe"));
 
     let itemMesh: THREE.Object3D | null;
     if (def.weaponType === "gun") {
@@ -921,6 +943,20 @@ export class SceneManager {
       new THREE.Euler(0.25 - swingAngle, -0.2, 0.12, "YXZ"),
     );
     this.armGroup.quaternion.copy(worldQuat).multiply(tiltQ);
+
+    // Swing arc: translucent blade-trail plane, peaks at mid-swing
+    const arcMat = this._swingArcMesh.material as THREE.MeshBasicMaterial;
+    if (this._swingWeaponEquipped && this.armSwingTimer > 0) {
+      arcMat.opacity = Math.sin(swingPct * Math.PI) * 0.45;
+      const arcOffset = new THREE.Vector3(0.22, -0.10, -0.80);
+      arcOffset.applyQuaternion(worldQuat);
+      this._swingArcMesh.position.copy(worldPos).add(arcOffset);
+      this._swingArcMesh.quaternion.copy(worldQuat).multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0.25, 0.0, 0.30)),
+      );
+    } else {
+      arcMat.opacity = 0;
+    }
 
     this.renderer.render(this.armScene, this.camera);
   }

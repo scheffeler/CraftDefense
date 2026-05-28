@@ -57,6 +57,27 @@
 **Ideas for next time:**
 - Add particle trails to fired projectiles (faint smoke/motion trail)
 - Add screen-shake on heavy hits (orc, troll, troll_king) via camera position offset
-- Sword swing arc: brief translucent blade trail mesh
+- ~~Sword swing arc: brief translucent blade trail mesh~~ ✓ done
 - Death burst particles when enemy HP reaches 0 (already some particle logic, extend it)
 - Block break particle color matches block type (currently generic)
+
+---
+
+## Session 2026-05-28 — Sword Swing Arc
+
+**Goal:** Add a translucent blade-trail plane to the first-person arm scene that flashes during melee weapon swings.
+
+**Changes made:**
+- Added `_swingArcMesh: THREE.Mesh` to `SceneManager` — a `PlaneGeometry(0.35, 0.55)` with `MeshBasicMaterial` using `AdditiveBlending`, `transparent: true`, `DoubleSide`, added directly to `armScene`
+- Added `_swingWeaponEquipped: boolean` field, set to `true` in `updateArmItem()` when a sword/melee weapon or axe is equipped (not bows, not guns)
+- In `renderArm()`, positions the arc mesh in camera-local space (slightly right and forward of center, aligned to blade area) and drives opacity via `sin(swingPct * π) * 0.45` — peaks at 45% opacity mid-swing, fully transparent at start/end
+- Arc color is pale blue-white (`0xaaddff`) with additive blending for a luminous trail effect
+
+**Result:** Sword and axe swings now show a brief ghost-plane trail at the blade tip, giving clear visual feedback that a swing is in progress. Bow, guns, tools, and empty hand produce no arc.
+
+**Ideas for next time:**
+- Add **particle trails** to fired projectiles (faint smoke/motion trail behind arrows and bolts)
+- Add **death burst** particles when enemy HP reaches 0 (colored by enemy type)
+- **Block break particle color** matches block type (stone = grey, dirt = brown, etc.)
+- **Torch light halo** — emissive pointlight glow ring around placed torches
+- **Screen-shake** on heavy hits (orc, troll, troll_king) — a quick camera offset jolt
