@@ -16,7 +16,7 @@ import { ParticleSystem } from "./Particles";
 import { BLOCK_BEHAVIORS } from "./config/blocks";
 import { BLOCK_DEFS } from "./Map";
 import { ITEMS, type ItemDef } from "./config/items";
-import { getSpawnPositions, DUNGEON_CHEST_POSITIONS } from "./WorldGen";
+import { getSpawnPositions, DUNGEON_CHEST_POSITIONS, getBiomeAt } from "./WorldGen";
 import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
@@ -113,6 +113,8 @@ export class Game {
   private _stepTimer  = 0;
   private _headBob    = 0;
   private _wasInWater       = false;
+  private _fogFarTarget  = 130;
+  private _fogFarCurrent = 130;
   private _nightSpawnTimer  = 0;
   private _flowUpdateTimer  = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
@@ -1338,7 +1340,11 @@ export class Game {
 
     // Water entry/exit effects
     const nowInWater = this.player.inWater;
-    if (nowInWater && !this._wasInWater) this.audio.play("splash", 0.8);
+    if (nowInWater && !this._wasInWater) {
+      this.audio.play("splash", 0.8);
+      const pp = this.player.position;
+      this.particles.spawnSplashEffect(pp.x, pp.y + 0.5, pp.z);
+    }
     this._wasInWater = nowInWater;
 
     // Lava damage — player takes 2 HP/s when in lava
@@ -1606,6 +1612,13 @@ export class Game {
     this.weather.update(dt, this.scene.camera);
     this.scene.setWeatherIntensity(this.weather.intensity);
     this.audio.setRainIntensity(this.weather.intensity);
+
+    // Biome-specific fog distance: desert=clearer, taiga=slightly mistier
+    const biome = getBiomeAt(this.player.position.x, this.player.position.z);
+    const biomeFogFar = biome === "desert" ? 165 : biome === "taiga" ? 115 : 130;
+    this._fogFarTarget = biomeFogFar;
+    this._fogFarCurrent += (this._fogFarTarget - this._fogFarCurrent) * Math.min(1, dt * 0.5);
+    this.scene.setFogFarBase(this._fogFarCurrent);
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);

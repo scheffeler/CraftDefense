@@ -86,6 +86,7 @@ export class SceneManager {
   // Underwater effect
   private _underwaterEffect  = false;
   private _nightVisionEffect = false;
+  private _fogFarBase = 130; // base far fog distance, overridden per biome
 
   // Block texture shared with the voxel world — used for the held-block cube
   private _blockTex: THREE.Texture | null = null;
@@ -201,7 +202,7 @@ export class SceneManager {
     } else {
       (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
       (this.scene.fog as THREE.Fog).near = 48;
-      (this.scene.fog as THREE.Fog).far  = 130;
+      (this.scene.fog as THREE.Fog).far  = this._fogFarBase;
       this.skyZenith.setHex(frame.sky);
       this.skyHorizon.setHex(frame.fog);
     }
@@ -318,7 +319,7 @@ export class SceneManager {
     const skyHex = lerpHex(frame.sky, rainy, t * 0.7);
     const fogHex = lerpHex(frame.fog, fogRainy, t * 0.7);
     (this.scene.fog as THREE.Fog).color.setHex(fogHex);
-    (this.scene.fog as THREE.Fog).far = 130 - t * 70; // rain reduces visibility
+    (this.scene.fog as THREE.Fog).far = this._fogFarBase - t * 70; // rain reduces visibility
     this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
     this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
     this.skyZenith.setHex(skyHex);
@@ -326,6 +327,9 @@ export class SceneManager {
   }
 
   setBlockTexture(tex: THREE.Texture): void { this._blockTex = tex; }
+
+  /** Set the base far fog distance (biome-dependent; 130 default, 165 desert, 115 taiga). */
+  setFogFarBase(far: number): void { this._fogFarBase = far; }
 
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
   updateArmItem(itemId: string | null): void {

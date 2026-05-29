@@ -47,6 +47,11 @@ function getBiome(x: number, z: number): Biome {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+/** Return the biome at world coordinates (for fog, audio, and atmosphere tuning). */
+export function getBiomeAt(x: number, z: number): "forest" | "desert" | "taiga" {
+  return getBiome(x, z);
+}
+
 /** Positions of pre-generated dungeon chests for Game.ts loot seeding. */
 export const DUNGEON_CHEST_POSITIONS: Array<[number, number, number]> = [
   [8,  3, 30], [55, 3, 25], [12, 3, 45], [50, 3, 48], [30, 3, 8],
