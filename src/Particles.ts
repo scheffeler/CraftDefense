@@ -273,6 +273,24 @@ export class ParticleSystem {
     this.spawnParticle(mesh, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, 0.18 + Math.random() * 0.12);
   }
 
+  /** Tiny water ring-splash when a raindrop hits a flat surface. */
+  spawnRainSplash(x: number, y: number, z: number): void {
+    const count = 4 + Math.floor(Math.random() * 3);
+    const colors = [0xb8d8ff, 0x88bbee, 0xaaccff];
+    for (let i = 0; i < count; i++) {
+      const color = colors[i % colors.length];
+      const size = 0.025 + Math.random() * 0.025;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size * 1.5, size * 0.4, size),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75 }),
+      );
+      mesh.position.set(x, y, z);
+      const theta = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+      const spd = 0.8 + Math.random() * 1.0;
+      this.spawnParticle(mesh, Math.cos(theta) * spd, 0.5 + Math.random() * 0.8, Math.sin(theta) * spd, 0.15 + Math.random() * 0.15);
+    }
+  }
+
   spawnLavaEmbers(x: number, y: number, z: number): void {
     const colors = [0xff6600, 0xff4400, 0xffaa00, 0xff8800];
     const count = 2 + Math.floor(Math.random() * 3);

@@ -117,6 +117,7 @@ export class Game {
   private _fogFarCurrent = 130;
   private _nightSpawnTimer  = 0;
   private _flowUpdateTimer  = 0;
+  private _rainSplashTimer  = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
   // Arrow dispensers: keyed by "wx,wy,wz", value = {x,y,z,timer}
   private readonly dispenserBlocks = new Map<string, { x: number; y: number; z: number; timer: number }>();
@@ -1616,6 +1617,23 @@ export class Game {
     this.weather.update(dt, this.scene.camera);
     this.scene.setWeatherIntensity(this.weather.intensity);
     this.audio.setRainIntensity(this.weather.intensity);
+
+    // Rain ground splashes — spawn tiny water-ring particles around the player when raining
+    if (this.weather.intensity > 0.1) {
+      this._rainSplashTimer -= dt;
+      if (this._rainSplashTimer <= 0) {
+        this._rainSplashTimer = 0.08 + Math.random() * 0.06;
+        const cx = this.player.position.x;
+        const cy = this.player.position.y - 1.7;
+        const cz = this.player.position.z;
+        const splashCount = Math.round(this.weather.intensity * 8);
+        for (let s = 0; s < splashCount; s++) {
+          const sx = cx + (Math.random() - 0.5) * 14;
+          const sz = cz + (Math.random() - 0.5) * 14;
+          this.particles.spawnRainSplash(sx, cy, sz);
+        }
+      }
+    }
 
     // Biome-specific fog distance: desert=clearer, taiga=slightly mistier
     const biome = getBiomeAt(this.player.position.x, this.player.position.z);

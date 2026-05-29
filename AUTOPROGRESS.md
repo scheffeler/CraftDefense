@@ -1,5 +1,21 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-29 — Rain ground splash particles
+
+**What was done:**
+- Added `spawnRainSplash(x, y, z)` to `ParticleSystem` in `Particles.ts`: spawns 4–6 tiny flat water-droplet particles per call. Each is a wide, thin box (aspect ~1.5×0.4×1.0) in rain-blue colors (`0xb8d8ff`, `0x88bbee`, `0xaaccff`), semi-transparent (opacity 0.75), ejected radially outward at low velocity with a small upward kick. Lifetime is 0.15–0.30 s; gravity curves them back down like real splash beads.
+- Added `_rainSplashTimer` field to `Game` class (initially 0).
+- In `Game.update()`, immediately after `this.weather.update(...)`, when `weather.intensity > 0.1`: decrements the timer each frame; when it fires (every ~0.08–0.14 s) samples `floor(intensity × 8)` random XZ positions within ±7 units of the player at feet level (`player.position.y − 1.7`) and calls `particles.spawnRainSplash()` for each. Splash density therefore scales naturally from drizzle to heavy downpour.
+
+**Ideas for next time:**
+- Screen-shake on heavy hits (orc, troll, troll_king): quick camera position jolt for impact feedback
+- Animated lava texture: scrolling UV or noise-based warp on the lava block surface
+- Torch/lava block glow: emissive sprite billboard halo ring with additive blending above placed torches
+- Dawn/dusk zenith warm tones: change `topSky` at dawn to warm maroon for more dramatic sky transition
+- Leaves translucency: make leaves slightly emissive at night or with slight glow around bright light sources
+
+---
+
 ## 2026-05-29 — Atmospheric horizon haze band + arrow/bolt particle trails
 
 **What was done:**
