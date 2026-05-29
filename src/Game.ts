@@ -659,7 +659,7 @@ export class Game {
     this.blockInteraction.onBlockBroken = (wx, wy, wz, id, yieldsDrops) => {
       this.audio.play("block_break", 0.55);
       const blockColor = BLOCK_DEFS[id]?.color ?? 0x888888;
-      this.particles.spawnBlockBreak(wx, wy, wz, blockColor);
+      this.particles.spawnBlockBreak(wx, wy, wz, blockColor, id);
 
       // Farming-specific drop handling
       if (id === "farmland" || id.startsWith("wheat_")) {
@@ -733,7 +733,8 @@ export class Game {
       if (pos) {
         // Elite deaths leave extra particles and a golden flash
         const deathColor = isElite ? 0xff8800 : state.config.color;
-        this.particles.spawnEnemyDeath(pos.x, pos.y, pos.z, deathColor);
+        const deathType  = isElite ? undefined : state.config.type;
+        this.particles.spawnEnemyDeath(pos.x, pos.y, pos.z, deathColor, deathType);
         if (state.config.xpReward) {
           this.particles.spawnXPOrbs(pos.x, pos.y, pos.z, Math.min(state.config.xpReward, 8));
         }

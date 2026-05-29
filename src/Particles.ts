@@ -14,13 +14,34 @@ export class ParticleSystem {
 
   constructor(private readonly scene: THREE.Scene) {}
 
-  spawnBlockBreak(wx: number, wy: number, wz: number, color: number): void {
+  spawnBlockBreak(wx: number, wy: number, wz: number, color: number, blockId?: string): void {
+    // Block-type-specific particle colors for visual accuracy
+    let colors: number[];
+    switch (blockId) {
+      case "grass":     colors = [0x5d9e3a, 0x4a8a28, 0x8b5c2a, 0x9e6a3a]; break;
+      case "dirt": case "farmland": colors = [0x8b5c2a, 0x7a4e20, 0xa06030, 0x6a3e18]; break;
+      case "stone":     colors = [0x888888, 0x777777, 0xaaaaaa, 0x666666]; break;
+      case "cobblestone": colors = [0x888070, 0x777060, 0x999888, 0x665050]; break;
+      case "wood":      colors = [0x8b5c2a, 0x9e6a3a, 0x7a4e20, 0xb0784a]; break;
+      case "planks":    colors = [0xc8a060, 0xb89050, 0xd8b070, 0xa08040]; break;
+      case "leaves":    colors = [0x3a7a25, 0x5d9e3a, 0x2a6015, 0x4a8a28]; break;
+      case "sand":      colors = [0xd4c484, 0xc8b870, 0xe0d090, 0xbaa860]; break;
+      case "iron_ore":  colors = [0x888888, 0xcc8844, 0x999999, 0xaa7733]; break;
+      case "coal_ore":  colors = [0x444444, 0x222222, 0x888888, 0x333333]; break;
+      case "gold_ore":  colors = [0x888888, 0xddaa00, 0x999999, 0xeebb22]; break;
+      case "diamond_ore": colors = [0x888888, 0x00cccc, 0x999999, 0x55ffff]; break;
+      case "obsidian":  colors = [0x1a0a2a, 0x2a1a3a, 0x331a44, 0x110820]; break;
+      case "snow":      colors = [0xeef4ff, 0xdde8ff, 0xffffff, 0xccddff]; break;
+      case "gravel":    colors = [0x888880, 0x777770, 0x999990, 0x666660]; break;
+      default:          colors = [color];
+    }
     const count = 8 + Math.floor(Math.random() * 5);
     for (let i = 0; i < count; i++) {
-      const size = 0.06 + Math.random() * 0.08;
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      const size = 0.05 + Math.random() * 0.08;
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(size, size, size),
-        new THREE.MeshLambertMaterial({ color }),
+        new THREE.MeshLambertMaterial({ color: c }),
       );
       mesh.position.set(
         wx + 0.5 + (Math.random() - 0.5) * 0.8,
@@ -34,23 +55,78 @@ export class ParticleSystem {
     }
   }
 
-  spawnEnemyDeath(x: number, y: number, z: number, color: number): void {
-    const count = 12 + Math.floor(Math.random() * 6);
-    for (let i = 0; i < count; i++) {
-      const size = 0.07 + Math.random() * 0.1;
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(size, size, size),
-        new THREE.MeshLambertMaterial({ color }),
-      );
-      mesh.position.set(
-        x + (Math.random() - 0.5) * 0.5,
-        y + (Math.random() - 0.5) * 0.5,
-        z + (Math.random() - 0.5) * 0.5,
-      );
-      const speed = 3 + Math.random() * 4;
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.random() * Math.PI;
-      this.spawnParticle(mesh, Math.sin(phi) * Math.cos(theta) * speed, Math.cos(phi) * speed + 2, Math.sin(phi) * Math.sin(theta) * speed, 0.5 + Math.random() * 0.4);
+  spawnEnemyDeath(x: number, y: number, z: number, color: number, enemyType?: string): void {
+    const r = () => Math.random();
+    const randPos = () => [x + (r() - 0.5) * 0.6, y + (r() - 0.5) * 0.6, z + (r() - 0.5) * 0.6] as const;
+    const randVel = (spd: number) => {
+      const theta = r() * Math.PI * 2, phi = r() * Math.PI;
+      return [Math.sin(phi) * Math.cos(theta) * spd, Math.cos(phi) * spd + 2, Math.sin(phi) * Math.sin(theta) * spd] as const;
+    };
+    const box = (w: number, h: number, d: number, c: number, basic = false): THREE.Mesh =>
+      new THREE.Mesh(new THREE.BoxGeometry(w, h, d), basic
+        ? new THREE.MeshBasicMaterial({ color: c })
+        : new THREE.MeshLambertMaterial({ color: c }));
+
+    if (enemyType === "skeleton") {
+      // Bone shards: elongated white/gray rectangles
+      for (let i = 0; i < 10; i++) {
+        const c = (i % 3 === 0) ? 0xcccccc : 0xeeeeee;
+        const mesh = box(0.03, 0.13 + r() * 0.07, 0.03, c);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(3.5 + r() * 4); this.spawnParticle(mesh, vx, vy, vz, 0.5 + r() * 0.4);
+      }
+    } else if (enemyType === "creeper") {
+      // Bright green sparks + sulfur flash
+      for (let i = 0; i < 14; i++) {
+        const c = (i % 3 === 0) ? 0xaaff00 : (i % 3 === 1) ? 0x22ee22 : 0x55cc22;
+        const s = 0.03 + r() * 0.04;
+        const mesh = box(s, s, s, c, true);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(4 + r() * 5); this.spawnParticle(mesh, vx, vy, vz, 0.3 + r() * 0.25);
+      }
+    } else if (enemyType === "spider") {
+      // Dark ichor drops: flat discs
+      for (let i = 0; i < 10; i++) {
+        const c = (i % 2 === 0) ? 0x111111 : 0x221111;
+        const s = 0.07 + r() * 0.06;
+        const mesh = box(s, s * 0.3, s, c);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(2.5 + r() * 3.5); this.spawnParticle(mesh, vx, vy, vz, 0.45 + r() * 0.35);
+      }
+    } else if (enemyType === "golem" || enemyType === "troll" || enemyType === "troll_king") {
+      // Large rock/stone chunks: slow, heavy
+      const rockCols = [0x888888, 0x666666, 0x9a8870, 0x554444];
+      for (let i = 0; i < 10; i++) {
+        const c = rockCols[Math.floor(r() * rockCols.length)];
+        const s = 0.10 + r() * 0.12;
+        const mesh = box(s, s * (0.7 + r() * 0.6), s, c);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(2 + r() * 3); this.spawnParticle(mesh, vx, vy, vz, 0.65 + r() * 0.5);
+      }
+    } else if (enemyType === "zombie") {
+      // Dark green/rotting flesh chunks with faint glow
+      const zombieCols = [0x2a5a2a, 0x3a7a3a, 0x1a4a1a, 0xc8b090];
+      for (let i = 0; i < 12; i++) {
+        const c = zombieCols[Math.floor(r() * zombieCols.length)];
+        const s = 0.06 + r() * 0.09;
+        const mesh = box(s, s, s, c);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(3 + r() * 4); this.spawnParticle(mesh, vx, vy, vz, 0.5 + r() * 0.4);
+      }
+    } else {
+      // Default: same-color cubes with slight hue variation
+      const cr = (color >> 16) & 0xff, cg = (color >> 8) & 0xff, cb = color & 0xff;
+      const count = 12 + Math.floor(r() * 6);
+      for (let i = 0; i < count; i++) {
+        const vr = (r() - 0.5) * 28, vg = (r() - 0.5) * 28, vb = (r() - 0.5) * 28;
+        const c = (Math.max(0, Math.min(255, cr + vr) | 0) << 16)
+                | (Math.max(0, Math.min(255, cg + vg) | 0) << 8)
+                |  Math.max(0, Math.min(255, cb + vb) | 0);
+        const size = 0.07 + r() * 0.10;
+        const mesh = box(size, size, size, c);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(3 + r() * 4); this.spawnParticle(mesh, vx, vy, vz, 0.5 + r() * 0.4);
+      }
     }
   }
 
