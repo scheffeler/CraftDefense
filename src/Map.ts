@@ -86,14 +86,15 @@ class Chunk {
 // ---------------------------------------------------------------------------
 // Block texture atlas index
 // ---------------------------------------------------------------------------
+const ATLAS_TILE_COUNT = 32;
+
 function getBlockTexIndex(id: BlockId, normalY: number): number {
   const isTop = normalY > 0;
   const isBot = normalY < 0;
   switch (id as string) {
     case "stone":        return 0;
     case "cobblestone":  return 1;
-    case "dirt":
-    case "farmland":     return 2;
+    case "dirt":         return 2;
     case "grass":        return isTop ? 3 : (isBot ? 2 : 4);
     case "sand":         return 5;
     case "wood":         return (isTop || isBot) ? 7 : 6;
@@ -104,6 +105,18 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "bedrock":      return 12;
     case "gold_ore":     return 14;
     case "diamond_ore":  return 15;
+    case "gravel":       return 16;
+    case "snow":         return 17;
+    case "iron_block":   return 18;
+    case "glass":        return 19;
+    case "water":        return 20;
+    case "farmland":     return isTop ? 21 : 2;
+    case "cactus":       return isTop ? 22 : 23;
+    case "bookshelf":    return isTop ? 8 : 24;
+    case "furnace":      return isTop ? 0 : 25;
+    case "chest":        return isTop ? 26 : 27;
+    case "obsidian":     return 28;
+    case "enchanting_table": return isTop ? 29 : 30;
     default:             return 13;
   }
 }
@@ -125,8 +138,8 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    // 32 textures × 16px wide = 512px atlas, 16px tall
+    const ATLAS_TILES = ATLAS_TILE_COUNT;
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -157,14 +170,32 @@ export class VoxelWorld {
     noise(0 * S, 136, 136, 136, 0.08, 1001);
     border(0 * S);
 
-    // 1: cobblestone — gray with stone shapes
-    noise(1 * S, 136, 128, 112, 0.1, 1002);
-    { const r = rng(2002);
-      for (let i = 0; i < 6; i++) {
-        const bx = (r() * 12 + 1) | 0, by = (r() * 12 + 1) | 0, bw = (r() * 3 + 2) | 0, bh = (r() * 2 + 2) | 0;
-        ctx.fillStyle = "rgba(80,72,60,0.35)"; ctx.fillRect(1 * S + bx, by, bw, bh);
-        ctx.fillStyle = "rgba(180,172,155,0.3)"; ctx.fillRect(1 * S + bx + 1, by + 1, bw, bh);
-      }
+    // 1: cobblestone — distinct stone cells with mortar
+    noise(1 * S, 130, 124, 110, 0.07, 1002);
+    { // Mortar lines (dark gaps between stones) — two-row layout offset like real cobblestone
+      const M = "rgba(45,42,36,0.80)";
+      ctx.fillStyle = M;
+      // horizontal mortar
+      ctx.fillRect(1*S, 7, S, 1); ctx.fillRect(1*S, 14, S, 1);
+      // top row vertical splits: 3 stones
+      ctx.fillRect(1*S+5, 0, 1, 7); ctx.fillRect(1*S+10, 0, 1, 7);
+      // bottom row vertical splits: offset (2.5 stones)
+      ctx.fillRect(1*S+3, 8, 1, 6); ctx.fillRect(1*S+8, 8, 1, 6); ctx.fillRect(1*S+13, 8, 1, 6);
+      // highlights (top+left edge of each stone) — 3 top-row stones
+      ctx.fillStyle = "rgba(200,192,175,0.50)";
+      ctx.fillRect(1*S+1, 1, 3, 1); ctx.fillRect(1*S+1, 1, 1, 5); // stone TL top-row
+      ctx.fillRect(1*S+6, 1, 3, 1); ctx.fillRect(1*S+6, 1, 1, 5); // stone TM
+      ctx.fillRect(1*S+11, 1, 4, 1); ctx.fillRect(1*S+11, 1, 1, 5); // stone TR
+      // highlights — bottom row stones
+      ctx.fillRect(1*S+1, 9, 1, 1); ctx.fillRect(1*S+1, 9, 1, 4); // BL
+      ctx.fillRect(1*S+4, 9, 3, 1); ctx.fillRect(1*S+4, 9, 1, 4); // BML
+      ctx.fillRect(1*S+9, 9, 3, 1); ctx.fillRect(1*S+9, 9, 1, 4); // BMR
+      ctx.fillRect(1*S+14, 9, 1, 1); ctx.fillRect(1*S+14, 9, 1, 4); // BR
+      // shadows (bottom+right edge) — top row
+      ctx.fillStyle = "rgba(50,46,38,0.45)";
+      ctx.fillRect(1*S+1, 5, 3, 1); ctx.fillRect(1*S+4, 1, 1, 5);
+      ctx.fillRect(1*S+6, 5, 3, 1); ctx.fillRect(1*S+9, 1, 1, 5);
+      ctx.fillRect(1*S+11, 5, 4, 1); ctx.fillRect(1*S+14, 2, 1, 4);
     }
     border(1 * S);
 
@@ -305,6 +336,259 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // 16: gravel — rounded pebbles of varying gray
+    noise(16 * S, 132, 130, 122, 0.09, 1016);
+    { const r = rng(2016);
+      const pebbles: [number,number,number,number][] = [];
+      for (let i = 0; i < 9; i++) {
+        const px = (r() * 10 + 1) | 0, py = (r() * 10 + 1) | 0;
+        const pw = (r() * 3 + 2) | 0,  ph = (r() * 2 + 2) | 0;
+        pebbles.push([px, py, pw, ph]);
+      }
+      for (const [px, py, pw, ph] of pebbles) {
+        const bright = 0.7 + r() * 0.5;
+        const br = (145 * bright) | 0, bg = (142 * bright) | 0, bb = (134 * bright) | 0;
+        ctx.fillStyle = `rgb(${br},${bg},${bb})`; ctx.fillRect(16*S+px, py, pw, ph);
+        ctx.fillStyle = "rgba(200,198,190,0.5)"; ctx.fillRect(16*S+px, py, pw, 1); ctx.fillRect(16*S+px, py, 1, ph);
+        ctx.fillStyle = "rgba(70,68,60,0.5)"; ctx.fillRect(16*S+px, py+ph-1, pw, 1); ctx.fillRect(16*S+px+pw-1, py, 1, ph);
+      }
+    }
+    border(16 * S);
+
+    // 17: snow — bright white with subtle blue-gray sheen
+    fill(17 * S, "#eef2fc");
+    { const r = rng(2017);
+      for (let y = 1; y < S-1; y++) for (let x = 1; x < S-1; x++) {
+        const v = r();
+        if (v > 0.85) pixel(17*S+x, y, "#ffffff");
+        else if (v < 0.08) pixel(17*S+x, y, "#d8e2f4");
+      }
+    }
+    border(17 * S);
+
+    // 18: iron block — metallic panels with grid seams
+    fill(18 * S, "#b4b4b8");
+    { // 4×4 grid of 4px panels with 1px dark seam
+      ctx.fillStyle = "rgba(60,60,65,0.6)";
+      ctx.fillRect(18*S+4, 0, 1, S); ctx.fillRect(18*S+9, 0, 1, S); ctx.fillRect(18*S+14, 0, 1, S);
+      ctx.fillRect(18*S, 4, S, 1);   ctx.fillRect(18*S, 9, S, 1);   ctx.fillRect(18*S, 14, S, 1);
+      // Panel highlights (top-left edge of each panel)
+      ctx.fillStyle = "rgba(210,210,215,0.7)";
+      for (let px = 0; px < S; px += 5) for (let py = 0; py < S; py += 5) {
+        ctx.fillRect(18*S+px, py, 3, 1);
+        ctx.fillRect(18*S+px, py, 1, 3);
+      }
+      // Panel shadows (bottom-right edge)
+      ctx.fillStyle = "rgba(80,80,85,0.5)";
+      for (let px = 0; px < S; px += 5) for (let py = 0; py < S; py += 5) {
+        ctx.fillRect(18*S+px+2, py+3, 1, 1);
+        ctx.fillRect(18*S+px+3, py, 1, 4);
+      }
+    }
+    border(18 * S);
+
+    // 19: glass — pale blue-white with corner marks
+    fill(19 * S, "#c8e8f8");
+    { // Slight inner highlight cross
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillRect(19*S+1, 1, S-2, 1); ctx.fillRect(19*S+1, 1, 1, S-2);
+      ctx.fillStyle = "rgba(80,140,200,0.3)";
+      ctx.fillRect(19*S+S-2, 2, 1, S-3); ctx.fillRect(19*S+2, S-2, S-3, 1);
+      // Corner ornaments
+      ctx.fillStyle = "rgba(60,120,180,0.5)";
+      ctx.fillRect(19*S+2, 2, 2, 2); ctx.fillRect(19*S+S-4, 2, 2, 2);
+      ctx.fillRect(19*S+2, S-4, 2, 2); ctx.fillRect(19*S+S-4, S-4, 2, 2);
+    }
+    border(19 * S);
+
+    // 20: water surface — blue with diagonal wave ripples
+    fill(20 * S, "#2e7ec0");
+    { const r = rng(2020);
+      // Lighter wave lines (diagonal)
+      ctx.fillStyle = "rgba(100,180,240,0.6)";
+      for (let d = -S; d < S*2; d += 4) {
+        for (let t = 0; t < S; t++) {
+          const wx = d + t, wy = t;
+          if (wx >= 0 && wx < S) pixel(20*S+wx, wy, `rgba(100,180,240,${0.4 + r()*0.3})`);
+        }
+      }
+      // Sparkle highlights
+      for (let i = 0; i < 6; i++) {
+        const sx = (r() * 14 + 1) | 0, sy = (r() * 14 + 1) | 0;
+        pixel(20*S+sx, sy, "#aaddff");
+      }
+      // Slight darker troughs
+      ctx.fillStyle = "rgba(10,50,120,0.3)";
+      for (let d = -S; d < S*2; d += 4) {
+        for (let t = 0; t < S; t++) {
+          const wx = d+2+t, wy = t;
+          if (wx >= 0 && wx < S) pixel(20*S+wx, wy, "rgba(10,50,120,0.25)");
+        }
+      }
+    }
+    border(20 * S);
+
+    // 21: farmland top — dark moist soil with crack lines
+    noise(21 * S, 90, 58, 28, 0.1, 1021);
+    { // Crack lines
+      ctx.fillStyle = "rgba(40,22,8,0.55)";
+      ctx.fillRect(21*S+3, 3, 1, 5); ctx.fillRect(21*S+3, 8, 4, 1);
+      ctx.fillRect(21*S+9, 5, 1, 6); ctx.fillRect(21*S+5, 11, 5, 1);
+      ctx.fillRect(21*S+11, 2, 1, 4); ctx.fillRect(21*S+11, 6, 3, 1);
+      // Moisture sheen
+      ctx.fillStyle = "rgba(60,40,20,0.25)";
+      for (let i = 0; i < 4; i++) ctx.fillRect(21*S+2+i*4, 1, 2, 1);
+    }
+    border(21 * S);
+
+    // 22: cactus top — circular green cross
+    fill(22 * S, "#2a7a2a");
+    { ctx.fillStyle = "#1a5a1a";
+      ctx.fillRect(22*S, 0, S, 5); ctx.fillRect(22*S, S-5, S, 5);
+      ctx.fillRect(22*S, 0, 5, S); ctx.fillRect(22*S+S-5, 0, 5, S);
+      ctx.fillStyle = "#3a9a3a";
+      ctx.fillRect(22*S+5, 5, 6, 6);
+    }
+    border(22 * S);
+
+    // 23: cactus side — green with vertical ribs and spine nubs
+    fill(23 * S, "#2a6a2a");
+    { const r = rng(2023);
+      // Vertical lighter ribs
+      for (let x = 2; x < S-1; x += 5) {
+        ctx.fillStyle = "rgba(70,160,70,0.5)"; ctx.fillRect(23*S+x, 0, 2, S);
+        ctx.fillStyle = "rgba(15,60,15,0.4)"; ctx.fillRect(23*S+x+2, 0, 1, S);
+      }
+      // Spine attachment nubs
+      ctx.fillStyle = "rgba(230,230,200,0.9)";
+      for (let y = 2; y < S-1; y += 4) {
+        for (let x = 0; x < S; x += 5) {
+          if (r() > 0.3) pixel(23*S+x+1, y, "#e0e0c0");
+        }
+      }
+    }
+    border(23 * S);
+
+    // 24: bookshelf side — wood frame with colorful book spines
+    noise(24 * S, 160, 126, 74, 0.05, 5024);
+    { const r = rng(2024);
+      const bookColors = ["#cc2222","#2244cc","#226622","#aa6600","#882288","#cc8800","#335599"];
+      let bx = 1;
+      for (let bi = 0; bi < 7; bi++) {
+        const bw = 1 + (r() * 1.2 | 0);
+        ctx.fillStyle = bookColors[bi % bookColors.length]; ctx.fillRect(24*S+bx, 2, bw, 12);
+        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(24*S+bx+bw, 2, 1, 12);
+        ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(24*S+bx, 5, bw, 1);
+        bx += bw + 1;
+        if (bx > S - 2) break;
+      }
+      // Wood strip overlaid at top/bottom
+      ctx.fillStyle = "rgba(180,140,80,0.9)"; ctx.fillRect(24*S, 0, S, 2); ctx.fillRect(24*S, S-2, S, 2);
+    }
+    border(24 * S);
+
+    // 25: furnace front — stone face with furnace opening
+    noise(25 * S, 118, 110, 100, 0.07, 1025);
+    { // Furnace opening (dark rectangle)
+      ctx.fillStyle = "#1a1008"; ctx.fillRect(25*S+4, 3, 8, 9);
+      // Orange glow around opening
+      ctx.fillStyle = "rgba(220,120,20,0.4)"; ctx.fillRect(25*S+3, 2, 10, 1);
+      ctx.fillStyle = "rgba(200,100,10,0.3)"; ctx.fillRect(25*S+2, 3, 1, 9); ctx.fillRect(25*S+13, 3, 1, 9);
+      ctx.fillStyle = "rgba(180,80,5,0.25)"; ctx.fillRect(25*S+3, 12, 10, 1);
+      // Glowing coals at bottom of opening
+      ctx.fillStyle = "#ff6600"; ctx.fillRect(25*S+5, 10, 2, 1); ctx.fillRect(25*S+9, 10, 2, 1);
+      ctx.fillStyle = "#ff9900"; ctx.fillRect(25*S+7, 9, 2, 2);
+    }
+    border(25 * S);
+
+    // 26: chest top — wood with lock
+    fill(26 * S, "#b07838");
+    { const r = rng(2026);
+      // Wood grain lines
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 18;
+        pixel(26*S+x, y, `rgb(${(176+v)|0},${(120+v*0.7)|0},${(56+v*0.4)|0})`);
+      }
+      // Seams
+      ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(26*S, 7, S, 1); ctx.fillRect(26*S+7, 0, 1, S);
+      // Iron lock
+      ctx.fillStyle = "#888888"; ctx.fillRect(26*S+6, 6, 4, 3);
+      ctx.fillStyle = "#aaaaaa"; ctx.fillRect(26*S+7, 6, 2, 1);
+      ctx.fillStyle = "#555555"; ctx.fillRect(26*S+7, 7, 2, 2);
+    }
+    border(26 * S);
+
+    // 27: chest side — oak planks with lock clasp
+    fill(27 * S, "#c08844");
+    { const r = rng(2027);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 16;
+        pixel(27*S+x, y, `rgb(${(192+v)|0},${(136+v*0.7)|0},${(68+v*0.4)|0})`);
+      }
+      // Horizontal plank lines
+      ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(27*S, 5, S, 1); ctx.fillRect(27*S, 10, S, 1);
+      // Iron clasp (center)
+      ctx.fillStyle = "#909090"; ctx.fillRect(27*S+6, 7, 4, 2);
+      ctx.fillStyle = "#bbbbbb"; ctx.fillRect(27*S+7, 7, 2, 1);
+      ctx.fillStyle = "#444444"; ctx.fillRect(27*S+7, 8, 2, 1);
+      // Corner metal trim
+      ctx.fillStyle = "#888888";
+      ctx.fillRect(27*S+1, 1, 2, 1); ctx.fillRect(27*S+1, 1, 1, 2);
+      ctx.fillRect(27*S+S-3, 1, 2, 1); ctx.fillRect(27*S+S-2, 1, 1, 2);
+      ctx.fillRect(27*S+1, S-2, 2, 1); ctx.fillRect(27*S+1, S-3, 1, 2);
+      ctx.fillRect(27*S+S-3, S-2, 2, 1); ctx.fillRect(27*S+S-2, S-3, 1, 2);
+    }
+    border(27 * S);
+
+    // 28: obsidian — very dark purple with crystal flecks
+    noise(28 * S, 26, 12, 42, 0.07, 1028);
+    { const r = rng(2028);
+      for (let i = 0; i < 6; i++) {
+        const ox2 = (r() * 13 + 1) | 0, oy2 = (r() * 13 + 1) | 0;
+        pixel(28*S+ox2, oy2, "#9944cc");
+        pixel(28*S+ox2+1, oy2, "#6622aa");
+        pixel(28*S+ox2, oy2+1, "#6622aa");
+      }
+      // Subtle deep purple sheen overlay
+      ctx.fillStyle = "rgba(60,20,80,0.25)";
+      for (let y = 0; y < S; y += 3) ctx.fillRect(28*S, y, S, 1);
+    }
+    border(28 * S);
+
+    // 29: enchanting table top — dark with arcane rune design
+    fill(29 * S, "#180a20");
+    { // Outer ring / book
+      ctx.fillStyle = "#660011"; ctx.fillRect(29*S+3, 2, 10, 12);
+      ctx.fillStyle = "#440008"; ctx.fillRect(29*S+4, 3, 8, 10);
+      ctx.fillStyle = "#cc0022"; ctx.fillRect(29*S+3, 2, 10, 1); ctx.fillRect(29*S+3, 13, 10, 1);
+      ctx.fillStyle = "#880011"; ctx.fillRect(29*S+3, 3, 1, 10); ctx.fillRect(29*S+12, 3, 1, 10);
+      // Arcane symbols on the book
+      ctx.fillStyle = "#ff4466";
+      pixel(29*S+7, 5, "#ff4466"); pixel(29*S+8, 5, "#ff4466");
+      pixel(29*S+6, 6, "#ff4466"); pixel(29*S+9, 6, "#ff4466");
+      pixel(29*S+6, 7, "#ff4466"); pixel(29*S+9, 7, "#ff4466");
+      pixel(29*S+7, 8, "#ff4466"); pixel(29*S+8, 8, "#ff4466");
+      pixel(29*S+7, 10, "#ff8844"); pixel(29*S+8, 11, "#ff8844");
+    }
+    border(29 * S);
+
+    // 30: enchanting table side — obsidian base with red gem
+    noise(30 * S, 26, 12, 42, 0.06, 1030);
+    { // Red gem/crystal
+      ctx.fillStyle = "#cc0022"; ctx.fillRect(30*S+6, 4, 4, 5);
+      ctx.fillStyle = "#ff2244"; ctx.fillRect(30*S+7, 4, 2, 1); ctx.fillRect(30*S+6, 5, 1, 3);
+      ctx.fillStyle = "#880011"; ctx.fillRect(30*S+7, 8, 2, 1); ctx.fillRect(30*S+9, 5, 1, 3);
+      // Subtle purple glow around gem
+      ctx.fillStyle = "rgba(180,0,40,0.25)";
+      ctx.fillRect(30*S+5, 3, 6, 1); ctx.fillRect(30*S+5, 9, 6, 1);
+      ctx.fillRect(30*S+5, 3, 1, 7); ctx.fillRect(30*S+10, 3, 1, 7);
+    }
+    border(30 * S);
+
+    // 31: spare — white (unused)
+    fill(31 * S, "#ffffff");
+    border(31 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -390,7 +674,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / ATLAS_TILE_COUNT, u1 = (texIdx + 1) / ATLAS_TILE_COUNT;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {
