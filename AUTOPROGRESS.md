@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-29 — Realistic dawn/dusk sky gradient + TS6 moduleResolution fix
+
+**What was done:**
+- Added `topSky` zenith color keyframes to `DayFrame` — separate from the horizon `sky` color. Previously both zenith and horizon turned orange at dawn/dusk; now the zenith stays dark blue (#1a2850) while the horizon turns orange (#ff8040), giving a true golden-hour gradient.
+- `sampleDayCycle()` interpolates `topSky` through the full 9-keyframe day cycle.
+- `updateDayNight()`: `skyZenith` now uses `frame.topSky`, `skyHorizon` uses `frame.sky` (was: both used `frame.sky`).
+- `setWeatherIntensity()`: zenith uses `topSky` blend to dark stormy grey, horizon uses `sky` blend to rain grey — maintains proper two-tone sky even in rain.
+- Sky dome shader transition widened from `smoothstep(-0.08, 0.38, vH)` to `smoothstep(-0.05, 0.70, vH)` with `t²` curve — keeps more of the horizon band and avoids the zenith color bleeding down too low.
+- Fixed `tsconfig.json` `moduleResolution` from deprecated "Node" to "bundler" (TypeScript 6.0 compat), resolving exit code 2 on `tsc -p tsconfig.emit.json`.
+
+**Ideas for next time:**
+- Block break particles colored by block type (stone=grey, dirt=brown, grass=green, wood=brown) — currently generic reddish
+- Arrow/crossbow particle trail: faint feather or smoke particles behind fired arrows
+- Death burst particle color by enemy type: goblin=green, orc=brown, skeleton=white bone shards, troll=dark grey stone
+- Torch/lava block glow: make placed torches emit a small emissive halo ring (additive blending plane) as a sprite above the block
+- Hostile mob night-eye glow: at night, enemies have a faint red/green emissive pixel on their eyes (already emissive but could be more dramatic at night)
+- Surface water reflection: a slight emissive tint on water surface faces when sky is bright (noon hours only)
+- Sky haze band: a narrow additive-blended glow ring at vH≈0 to simulate atmospheric scattering at the exact horizon
+
+---
+
 ## 2026-05-29 — Rain streaks, water splash particles, biome-specific fog
 
 **What was done:**
