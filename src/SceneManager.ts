@@ -8,20 +8,21 @@ import type { BlockId } from "./types";
 // Day/night cycle keyframes (t=0 midnight, t=0.5 noon, t=1 midnight)
 // ---------------------------------------------------------------------------
 interface DayFrame {
-  t: number; sky: number; fog: number;
+  t: number; sky: number; fog: number; topSky: number;
   ambientColor: number; ambientInt: number;
   sunInt: number; sunColor: number;
 }
+// topSky = zenith color — stays dark blue even when horizon turns orange at dawn/dusk
 const DAY_FRAMES: DayFrame[] = [
-  { t: 0.00, sky: 0x050510, fog: 0x060615, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
-  { t: 0.20, sky: 0x0a1535, fog: 0x0a1830, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
-  { t: 0.27, sky: 0xff8040, fog: 0xdd6030, ambientColor: 0xcc6633, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff9060 },
-  { t: 0.35, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.8,  sunInt: 1.6, sunColor: 0xffe8b0 },
-  { t: 0.50, sky: 0x5ab3dd, fog: 0x80ccee, ambientColor: 0xb8d8f0, ambientInt: 1.0,  sunInt: 1.9, sunColor: 0xfffde0 },
-  { t: 0.65, sky: 0x7ec8e3, fog: 0xaad4e8, ambientColor: 0xb0c8e8, ambientInt: 0.8,  sunInt: 1.6, sunColor: 0xffe8b0 },
-  { t: 0.73, sky: 0xff6020, fog: 0xcc4010, ambientColor: 0xcc5522, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff7040 },
-  { t: 0.80, sky: 0x0a1535, fog: 0x0a1830, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
-  { t: 1.00, sky: 0x050510, fog: 0x060615, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 0.00, sky: 0x050510, fog: 0x060615, topSky: 0x020208, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 0.20, sky: 0x0a1535, fog: 0x0a1830, topSky: 0x060e20, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 0.27, sky: 0xff8040, fog: 0xdd6030, topSky: 0x1a2850, ambientColor: 0xcc6633, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff9060 },
+  { t: 0.35, sky: 0x7ec8e3, fog: 0xaad4e8, topSky: 0x1a5090, ambientColor: 0xb0c8e8, ambientInt: 0.8,  sunInt: 1.6, sunColor: 0xffe8b0 },
+  { t: 0.50, sky: 0x5ab3dd, fog: 0x80ccee, topSky: 0x1255a8, ambientColor: 0xb8d8f0, ambientInt: 1.0,  sunInt: 1.9, sunColor: 0xfffde0 },
+  { t: 0.65, sky: 0x7ec8e3, fog: 0xaad4e8, topSky: 0x1a5090, ambientColor: 0xb0c8e8, ambientInt: 0.8,  sunInt: 1.6, sunColor: 0xffe8b0 },
+  { t: 0.73, sky: 0xff6020, fog: 0xcc4010, topSky: 0x1a2850, ambientColor: 0xcc5522, ambientInt: 0.5,  sunInt: 0.7, sunColor: 0xff7040 },
+  { t: 0.80, sky: 0x0a1535, fog: 0x0a1830, topSky: 0x060e20, ambientColor: 0x304070, ambientInt: 0.15, sunInt: 0.0, sunColor: 0xffffff },
+  { t: 1.00, sky: 0x050510, fog: 0x060615, topSky: 0x020208, ambientColor: 0x203050, ambientInt: 0.08, sunInt: 0.0, sunColor: 0xffffff },
 ];
 
 function lerpHex(a: number, b: number, t: number): number {
@@ -44,6 +45,7 @@ function sampleDayCycle(t: number): Omit<DayFrame, "t"> {
   return {
     sky:         lerpHex(lo.sky, hi.sky, f),
     fog:         lerpHex(lo.fog, hi.fog, f),
+    topSky:      lerpHex(lo.topSky, hi.topSky, f),
     ambientColor: lerpHex(lo.ambientColor, hi.ambientColor, f),
     ambientInt:  lo.ambientInt + (hi.ambientInt - lo.ambientInt) * f,
     sunInt:      lo.sunInt  + (hi.sunInt  - lo.sunInt)  * f,
@@ -203,8 +205,8 @@ export class SceneManager {
       (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
       (this.scene.fog as THREE.Fog).near = 48;
       (this.scene.fog as THREE.Fog).far  = this._fogFarBase;
-      this.skyZenith.setHex(frame.sky);
-      this.skyHorizon.setHex(frame.fog);
+      this.skyZenith.setHex(frame.topSky);
+      this.skyHorizon.setHex(frame.sky);
     }
 
     this.ambientLight.color.setHex(frame.ambientColor);
@@ -313,17 +315,17 @@ export class SceneManager {
   setWeatherIntensity(intensity: number): void {
     if (this._underwaterEffect || this._inLavaEffect || intensity < 0.01) return;
     const frame = sampleDayCycle(this._dayTime);
-    const rainy = 0x556677;
+    const rainyZenith = 0x2a3340;
+    const rainyHorizon = 0x556677;
     const fogRainy = 0x445566;
     const t = intensity;
-    const skyHex = lerpHex(frame.sky, rainy, t * 0.7);
     const fogHex = lerpHex(frame.fog, fogRainy, t * 0.7);
     (this.scene.fog as THREE.Fog).color.setHex(fogHex);
     (this.scene.fog as THREE.Fog).far = this._fogFarBase - t * 70; // rain reduces visibility
     this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
     this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
-    this.skyZenith.setHex(skyHex);
-    this.skyHorizon.setHex(fogHex);
+    this.skyZenith.setHex(lerpHex(frame.topSky, rainyZenith, t * 0.7));
+    this.skyHorizon.setHex(lerpHex(frame.sky, rainyHorizon, t * 0.7));
   }
 
   setBlockTexture(tex: THREE.Texture): void { this._blockTex = tex; }
@@ -688,7 +690,9 @@ export class SceneManager {
         uniform vec3 horizon;
         varying float vH;
         void main() {
-          float t = smoothstep(-0.08, 0.38, vH);
+          // smoothstep from near-horizon to zenith; power curve keeps horizon band wide
+          float t = smoothstep(-0.05, 0.70, vH);
+          t = t * t;
           gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
         }
       `,
