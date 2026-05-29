@@ -77,6 +77,8 @@ export class SceneManager {
   private readonly skyDome: THREE.Mesh;
   private readonly skyZenith  = new THREE.Color(0x5ab3dd);
   private readonly skyHorizon = new THREE.Color(0x80ccee);
+  private readonly _skyHazeColor   = new THREE.Color(0xffaa44);
+  private _skyHazeOpacity = 0.0;
 
   // Clouds
   private readonly cloudMeshes: THREE.Object3D[] = [];
@@ -208,6 +210,17 @@ export class SceneManager {
       this.skyZenith.setHex(frame.topSky);
       this.skyHorizon.setHex(frame.sky);
     }
+
+    // Horizon haze: warm golden at dawn/dusk, cool blue-white at noon, invisible at night
+    const dawnDusk = Math.max(0, Math.min(1,
+      1 - Math.abs(frame.ambientInt - 0.5) * 4.5)); // peaks at ambientInt≈0.5 (sunrise/sunset)
+    const hazeIntensity = frame.ambientInt * 0.55 + dawnDusk * 0.45;
+    // Dawn/dusk = warm orange; mid-day = pale yellow-white; night = off
+    const hazeR = lerpHex(0xffbb44, 0xfff0cc, 1 - dawnDusk);
+    this._skyHazeColor.setHex(hazeR);
+    this._skyHazeOpacity = hazeIntensity * (this._underwaterEffect || this._inLavaEffect ? 0 : 1);
+    const skyMat = this.skyDome.material as THREE.ShaderMaterial;
+    skyMat.uniforms["hazeOpacity"].value = this._skyHazeOpacity;
 
     this.ambientLight.color.setHex(frame.ambientColor);
     this.ambientLight.intensity = this._nightVisionEffect
@@ -675,8 +688,10 @@ export class SceneManager {
     const geo = new THREE.SphereGeometry(185, 24, 12);
     const mat = new THREE.ShaderMaterial({
       uniforms: {
-        zenith:  { value: this.skyZenith },
-        horizon: { value: this.skyHorizon },
+        zenith:      { value: this.skyZenith },
+        horizon:     { value: this.skyHorizon },
+        hazeColor:   { value: this._skyHazeColor },
+        hazeOpacity: { value: this._skyHazeOpacity },
       },
       vertexShader: `
         varying float vH;
@@ -688,12 +703,18 @@ export class SceneManager {
       fragmentShader: `
         uniform vec3 zenith;
         uniform vec3 horizon;
+        uniform vec3 hazeColor;
+        uniform float hazeOpacity;
         varying float vH;
         void main() {
-          // smoothstep from near-horizon to zenith; power curve keeps horizon band wide
+          // Base gradient: horizon to zenith with power curve
           float t = smoothstep(-0.05, 0.70, vH);
           t = t * t;
-          gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
+          vec3 sky = mix(horizon, zenith, t);
+          // Atmospheric horizon haze: narrow Gaussian band at vH=0
+          float hazeBand = exp(-abs(vH) * 18.0) * hazeOpacity;
+          sky = mix(sky, hazeColor, clamp(hazeBand, 0.0, 0.85));
+          gl_FragColor = vec4(sky, 1.0);
         }
       `,
       side: THREE.BackSide,

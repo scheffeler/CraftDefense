@@ -184,6 +184,7 @@ export class ProjectileManager {
 
   onPlayerArrowHitBlock: (bx: number, by: number, bz: number, blockId: string) => void = () => {};
   onPlayerArrowHitEnemy: (x: number, y: number, z: number) => void = () => {};
+  onArrowTrail: (x: number, y: number, z: number, isBolt: boolean) => void = () => {};
 
   update(
     dt: number,
@@ -233,6 +234,7 @@ export class ProjectileManager {
 
       a.velocity.y -= GRAVITY * dt;
       a.mesh.position.addScaledVector(a.velocity, dt);
+      this.onArrowTrail(a.mesh.position.x, a.mesh.position.y, a.mesh.position.z, false);
 
       // Orient along velocity
       const speed = a.velocity.length();
@@ -279,6 +281,7 @@ export class ProjectileManager {
 
       b.velocity.y -= BOLT_GRAVITY * dt;
       b.mesh.position.addScaledVector(b.velocity, dt);
+      this.onArrowTrail(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, true);
 
       const spd = b.velocity.length();
       if (spd > 0.1) {

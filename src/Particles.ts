@@ -255,6 +255,24 @@ export class ParticleSystem {
     }
   }
 
+  /** Tiny feather/air puff behind a flying arrow or bolt. Call every frame per active projectile. */
+  spawnArrowTrail(x: number, y: number, z: number, isBolt = false): void {
+    if (Math.random() > 0.45) return; // sparse trail
+    const color = isBolt ? 0x88aacc : 0xddcc88;
+    const size = 0.025 + Math.random() * 0.025;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(size, size * 0.5, size),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }),
+    );
+    mesh.position.set(
+      x + (Math.random() - 0.5) * 0.08,
+      y + (Math.random() - 0.5) * 0.08,
+      z + (Math.random() - 0.5) * 0.08,
+    );
+    const spd = 0.2 + Math.random() * 0.3;
+    this.spawnParticle(mesh, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, 0.18 + Math.random() * 0.12);
+  }
+
   spawnLavaEmbers(x: number, y: number, z: number): void {
     const colors = [0xff6600, 0xff4400, 0xffaa00, 0xff8800];
     const count = 2 + Math.floor(Math.random() * 3);

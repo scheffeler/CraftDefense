@@ -900,6 +900,10 @@ export class Game {
       this.particles.spawnArrowHit(x, y, z);
     };
 
+    this.projectiles.onArrowTrail = (x, y, z, isBolt) => {
+      this.particles.spawnArrowTrail(x, y, z, isBolt);
+    };
+
     // Player death
     this.player.onDeath = () => {
       this.phase = "gameover";

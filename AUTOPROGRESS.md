@@ -1,5 +1,23 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-29 — Atmospheric horizon haze band + arrow/bolt particle trails
+
+**What was done:**
+- **Horizon haze band**: Added a Gaussian atmospheric scattering glow at the exact horizon (vH=0) in the sky dome shader. Uses `exp(-abs(vH) * 18.0) * hazeOpacity` for a narrow warm band that peaks at dawn/dusk (golden #ffbb44) and fades to pale cream (#fff0cc) at noon, with zero haze at night and when underwater/in-lava.
+- **Haze intensity computation** in `updateDayNight()`: combines ambient intensity (0.55× weight) with a dawn/dusk resonance function (`1 - |ambientInt - 0.5| * 4.5`) (0.45× weight) — ensures peak glow during golden hours and fade at night.
+- **Arrow particle trails**: Added `spawnArrowTrail()` to `ParticleSystem` — sparse (45% chance per frame) tiny dust/feather flecks that spawn behind fired arrows (warm tan #ddcc88) and crossbow bolts (cool blue-grey #88aacc). Size 0.025–0.05 units, lifetime ~0.18–0.30s.
+- **Trail wiring**: Added `onArrowTrail` callback to `ProjectileManager`, called each frame inside the player-arrow and player-bolt update loops. Wired to `particles.spawnArrowTrail()` in `Game.ts`.
+
+**Ideas for next time:**
+- Block break particles colored by block type (stone=grey, dirt=brown, grass=green) — currently uses block.color which is close but could be more specific
+- Death burst particles by enemy type: goblin=green, orc=brown, skeleton=white bone shards
+- Torch/lava block glow: placed torches already have a PointLight but could add a sprite billboard halo ring with additive blending
+- Screen-shake on heavy hits (orc, troll, troll_king): quick camera position jolt for impact feedback
+- Rain ground splash particles: when rain hits a flat surface, spawn tiny ring-splash particles periodically
+- Animated lava texture: scrolling UV or noise-based warp on the lava block surface
+
+---
+
 ## 2026-05-29 — Realistic dawn/dusk sky gradient + TS6 moduleResolution fix
 
 **What was done:**
