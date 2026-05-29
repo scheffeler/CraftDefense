@@ -1,5 +1,29 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-29 — Type-specific enemy death particles + block-accurate break particles
+
+**What was done:**
+- Extended `spawnEnemyDeath(x, y, z, color, enemyType?)` in `Particles.ts` with 5 new type-specific burst patterns:
+  - **Skeleton**: 10 thin elongated bone shards (0.03×0.13–0.20×0.03 BoxGeometry, white/light-gray)
+  - **Creeper**: 14 bright green sparks (MeshBasicMaterial, fast 0.3–0.55 s fade, sulfurous greens)
+  - **Spider**: 10 flat dark ichor drops (s×0.3s×s disc shape, near-black)
+  - **Golem/Troll/Troll King**: 10 large stone chunks (0.10–0.22 unit cubes, slow heavy arc, 4 stone grays)
+  - **Zombie**: 12 green/flesh cubes (four zombie-appropriate colors)
+  - **Default**: same-color cubes with ±28 per-channel hue jitter per particle
+- Added `enemyType` to the `spawnEnemyDeath` call in `Game.ts` (`state.config.type`; elites stay undefined for golden burst)
+- Upgraded `spawnBlockBreak(wx, wy, wz, color, blockId?)` with a 14-case color palette switch:
+  - Grass: green top-soil + brown dirt tones; Stone/cobblestone: 4 gray shades; Wood: brown-tan chips; Leaves: multi-green confetti; Sand: tan/gold dust; Ores (iron/coal/gold/diamond): stone base + ore-accent; Obsidian: deep purple-black; Snow/glass: icy blue-white; Gravel: warm gray
+- Updated `onBlockBroken` callback in `Game.ts` to pass `id` as `blockId` to `spawnBlockBreak`
+
+**Ideas for next time:**
+- Animated lava: the lava texture already scrolls, but could add per-frame hotspot ripple by updating the canvas pixels near bright spots
+- Leaves light-scattering: add a subtle emissive green tint to leaf blocks during daytime (vertex color override or second material on the leaf geometry)
+- Enemy mob upgrades: troll/uruk-hai could have a raised weapon arm, Uruk Captain needs a banner prop on its back
+- Hotbar item texture: currently block items show a textured cube — food/material items could show a flat canvas sprite with actual art
+- Night-vision potion: already in code; could add a green vignette + luminance boost post-effect via a full-screen quad in armScene
+- Moon phase cycle that visually changes the shadow disc offset each game-day (currently static unless days tracked)
+- Particle pooling: current approach creates new Mesh+Material per particle (GC pressure); a shared material pool per color would reduce churn during large battles
+
 ## 2026-05-29 — Rain ground splash particles
 
 **What was done:**
