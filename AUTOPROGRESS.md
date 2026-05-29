@@ -1,5 +1,23 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-29 — Rain streaks, water splash particles, biome-specific fog
+
+**What was done:**
+- **Rain overhaul**: Replaced 2500 `PointsMaterial` dot-rain with 2000 `LineSegments` streaks. Each streak is a 0.55-unit tall tilted line (wind_x=4 m/s gives realistic angle). Both vertices travel together. Rain color is `b8d8ff` (light blue-white). The difference from dots is dramatic — rain now looks like actual falling rain instead of floating specks.
+- **Water splash particles**: When the player enters water (falls or walks in), `spawnSplashEffect()` now fires 18 blue water-droplet particles at the surface level, supplementing the existing audio cue. Was audio-only before.
+- **Biome-specific fog**: `SceneManager` gains `_fogFarBase` + `setFogFarBase()`. `WorldGen` exports `getBiomeAt()`. Each frame the game smoothly lerps fog-far toward 165 (desert = clearer air, can see farther), 115 (taiga = slightly dense misty forest), or 130 (forest = default). Weather and underwater fog overrides still work correctly.
+
+**Ideas for next time:**
+- Arrow/projectile particle trails — faint feather or smoke particles behind fired arrows
+- Death burst particle color by enemy type (goblin=green, orc=brown, skeleton=white) — already uses `state.config.color` but could add specific spawn shapes
+- Block break particles: currently uses block.color; could be improved to use the block's actual texture sample color
+- TNT explosion: add a brief emissive flash / screen-white effect on detonation
+- Face-specific textures for crafting table (workbench grid top) and furnace (glowing front face) — requires passing full face normal to getBlockTexIndex
+- Screen-space fog vignette that intensifies at night (already have a static vignette but could animate it)
+- Rain ground splash: when rain hits a flat surface, spawn tiny ring-splash particles periodically
+
+---
+
 ## 2026-05-28 — Higher-resolution block texture atlas (32×32)
 
 **What was done:**
