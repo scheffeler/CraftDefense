@@ -1,5 +1,21 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-30 — 3-D crossbow viewmodel (first-person)
+
+**What was done:**
+- Added `buildCrossbowMesh()` private method to `SceneManager`: a forward-pointing T-frame crossbow constructed from 11 BoxGeometry pieces (tiller, limb, bolt-rail, two limb-tip metal caps, two angled string segments in a V-shape, pistol grip, trigger guard, trigger blade, butt stock). Materials: warm brown wood, dark brown wood, dark metal, off-white string.
+- Wired it into `buildItemMesh()` dispatch so crossbow no longer falls through to `buildSwordMesh()`.
+- Excluded crossbow from the sword-swing animation arc in `_swingWeaponEquipped` (ranged weapons shouldn't melee-swipe).
+- Verified with Playwright screenshot at 1920×1080 in freeplay mode: crossbow viewmodel renders in lower-right corner.
+
+**Ideas for next time:**
+- Crossbow bolt nocked in the rail: add a thin dark cylinder along the rail when crossbow is the held item
+- Bow draw animation: lerp the bow-string segment offset when the player is "charging" a ranged shot
+- Arrow/bolt flight trail: add a small white LineSegments particle trail to projectile meshes
+- Animated lava hotspot: per-frame brighten/darken bright pixels in the lava canvas for a bubbling effect
+- Troll / orc enemy with raised weapon arm, Uruk Captain with a banner-pole prop
+- Rain puddle darkening: gradually darken top-face vertex colors of dirt/stone when rain is active
+
 ## 2026-05-30 — Leaf light-scattering + distinct leaf-cluster texture
 
 **What was done:**
