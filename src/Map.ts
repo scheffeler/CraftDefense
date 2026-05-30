@@ -84,27 +84,44 @@ class Chunk {
 }
 
 // ---------------------------------------------------------------------------
-// Block texture atlas index
+// Block texture atlas — 32 tiles × 16 px wide = 512 px
 // ---------------------------------------------------------------------------
+const ATLAS_TILES = 32;
+
 function getBlockTexIndex(id: BlockId, normalY: number): number {
   const isTop = normalY > 0;
   const isBot = normalY < 0;
   switch (id as string) {
-    case "stone":        return 0;
-    case "cobblestone":  return 1;
-    case "dirt":
-    case "farmland":     return 2;
-    case "grass":        return isTop ? 3 : (isBot ? 2 : 4);
-    case "sand":         return 5;
-    case "wood":         return (isTop || isBot) ? 7 : 6;
-    case "planks":       return 8;
-    case "leaves":       return 9;
-    case "iron_ore":     return 10;
-    case "coal_ore":     return 11;
-    case "bedrock":      return 12;
-    case "gold_ore":     return 14;
-    case "diamond_ore":  return 15;
-    default:             return 13;
+    // ---- original 16 tiles ----
+    case "stone":            return 0;
+    case "cobblestone":      return 1;
+    case "dirt":             return 2;
+    case "grass":            return isTop ? 3 : (isBot ? 2 : 4);
+    case "sand":             return 5;
+    case "wood":             return (isTop || isBot) ? 7 : 6;
+    case "planks":           return 8;
+    case "leaves":           return 9;
+    case "iron_ore":         return 10;
+    case "coal_ore":         return 11;
+    case "bedrock":          return 12;
+    case "gold_ore":         return 14;
+    case "diamond_ore":      return 15;
+    // ---- new dedicated tiles ----
+    case "glass":            return 16;
+    case "obsidian":         return 17;
+    case "water":            return 18;
+    case "torch":            return 19;
+    case "chest":            return isTop ? 20 : 21;
+    case "gravel":           return 22;
+    case "iron_block":       return 23;
+    case "crafting_table":   return isTop ? 24 : 25;
+    case "furnace":          return isTop ? 0 : 26;  // top=stone, front=furnace
+    case "snow":             return 27;
+    case "cactus":           return 28;
+    case "bookshelf":        return isTop ? 8 : 29;  // top=planks, side=books
+    case "enchanting_table": return isTop ? 30 : 17; // top=rune glyph, side=obsidian
+    case "farmland":         return 31;
+    default:                 return 13;
   }
 }
 
@@ -125,8 +142,7 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
-    const ATLAS_TILES = 16;
+    // 32 textures × 16px wide = 512px atlas, 16px tall
     const S = 16;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
@@ -305,6 +321,186 @@ export class VoxelWorld {
     }
     border(15 * S);
 
+    // 16: glass — pale blue-gray with frame border and pane dividers
+    fill(16 * S, "#b8d4e0");
+    for (let i = 0; i < S; i++) {
+      pixel(16 * S + i, 0, "#6699aa"); pixel(16 * S + i, S - 1, "#6699aa");
+      pixel(16 * S, i, "#6699aa");     pixel(16 * S + S - 1, i, "#6699aa");
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(16 * S + 7, 1, 1, S - 2);
+    ctx.fillRect(16 * S + 1, 7, S - 2, 1);
+
+    // 17: obsidian — very dark purple-black with shimmer flecks
+    fill(17 * S, "#130820");
+    { const r = rng(2017);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = r();
+        if      (v > 0.97) pixel(17 * S + x, y, "#8844cc");
+        else if (v > 0.94) pixel(17 * S + x, y, "#3a1155");
+        else if (v > 0.88) pixel(17 * S + x, y, "#0e0418");
+      }
+    }
+
+    // 18: water — deep blue with lighter ripple waves
+    noise(18 * S, 40, 120, 200, 0.06, 1018);
+    { const r = rng(2018);
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          if (y % 5 === 1 && ((x + y) % 7 < 3))
+            pixel(18 * S + x, y, "#88ccff");
+          else if (r() > 0.88)
+            pixel(18 * S + x, y, "#1a6ab0");
+        }
+      }
+    }
+    border(18 * S);
+
+    // 19: torch — dark background, orange/yellow flame over brown stick
+    fill(19 * S, "#1e1008");
+    for (let y = 8; y < S; y++) {
+      pixel(19 * S + 7, y, "#8b6914");
+      pixel(19 * S + 8, y, "#6b4c2a");
+    }
+    for (let y = 0; y < 9; y++) for (let x = 4; x < 12; x++) {
+      const dist = Math.abs(x - 7.5) + y * 0.45;
+      if      (dist < 2.2) pixel(19 * S + x, y, "#ffee44");
+      else if (dist < 3.4) pixel(19 * S + x, y, "#ff8800");
+      else if (dist < 4.5) pixel(19 * S + x, y, "#882200");
+    }
+
+    // 20: chest top — warm oak with centered gold latch band
+    noise(20 * S, 138, 92, 45, 0.08, 1020);
+    ctx.fillStyle = "rgba(70,44,16,0.45)"; ctx.fillRect(20 * S, 7, S, 2);
+    ctx.fillStyle = "#c8a020"; ctx.fillRect(20 * S + 5, 7, 6, 2);
+    ctx.fillStyle = "#ffe055"; ctx.fillRect(20 * S + 7, 7, 2, 1);
+    border(20 * S);
+
+    // 21: chest side — warm oak with visible gold clasp
+    noise(21 * S, 135, 88, 42, 0.08, 1021);
+    ctx.fillStyle = "rgba(70,44,16,0.35)"; ctx.fillRect(21 * S, 4, S, 8);
+    ctx.fillStyle = "#c8a020"; ctx.fillRect(21 * S + 5, 6, 6, 4);
+    ctx.fillStyle = "#ffe055"; ctx.fillRect(21 * S + 7, 7, 2, 2);
+    ctx.fillStyle = "#8b6010"; ctx.fillRect(21 * S + 6, 7, 1, 2); ctx.fillRect(21 * S + 11, 7, 1, 2);
+    border(21 * S);
+
+    // 22: gravel — gray-brown with rounded pebble shapes
+    noise(22 * S, 130, 125, 115, 0.1, 1022);
+    { const r = rng(2022);
+      for (let i = 0; i < 9; i++) {
+        const px2 = (r() * 11 + 1) | 0, py2 = (r() * 11 + 1) | 0, sz = (r() * 2 + 1) | 0;
+        ctx.fillStyle = "rgba(95,88,78,0.45)";  ctx.fillRect(22 * S + px2, py2, sz + 1, sz + 1);
+        ctx.fillStyle = "rgba(162,155,142,0.35)"; ctx.fillRect(22 * S + px2 + 1, py2 + 1, sz, sz);
+      }
+    }
+    border(22 * S);
+
+    // 23: iron block — silver with crosshatch grid
+    { const r = rng(2023);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 22;
+        pixel(23 * S + x, y, `rgb(${(192 + v) | 0},${(192 + v) | 0},${(195 + v) | 0})`);
+      }
+      ctx.fillStyle = "rgba(145,145,150,0.75)";
+      for (let i = 0; i <= S; i += 4) {
+        ctx.fillRect(23 * S, i % S, S, 1);
+        ctx.fillRect(23 * S + (i % S), 0, 1, S);
+      }
+    }
+
+    // 24: crafting table top — oak brown with 3×3 slot grid
+    { const r = rng(2024);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 28;
+        pixel(24 * S + x, y, `rgb(${(160 + v) | 0},${(96 + v) | 0},${(48 + v) | 0})`);
+      }
+      ctx.fillStyle = "rgba(55,28,8,0.6)";
+      for (let i = 5; i < S; i += 5) { ctx.fillRect(24 * S, i, S, 1); ctx.fillRect(24 * S + i, 0, 1, S); }
+    }
+    border(24 * S);
+
+    // 25: crafting table side — oak planks with cross-mark
+    noise(25 * S, 185, 145, 85, 0.06, 1025);
+    ctx.fillStyle = "rgba(0,0,0,0.2)";  ctx.fillRect(25 * S, 7, S, 1); ctx.fillRect(25 * S, 8, S, 1);
+    ctx.fillStyle = "rgba(55,28,8,0.8)";
+    ctx.fillRect(25 * S + 4, 4, 6, 1); ctx.fillRect(25 * S + 4, 11, 6, 1); ctx.fillRect(25 * S + 3, 4, 1, 8);
+    border(25 * S);
+
+    // 26: furnace front — stone base with fire opening and orange glow
+    noise(26 * S, 122, 118, 114, 0.08, 1026);
+    ctx.fillStyle = "#111111"; ctx.fillRect(26 * S + 3, 5, 10, 8);
+    ctx.fillStyle = "#ff6600"; ctx.fillRect(26 * S + 4, 11, 8, 2);
+    ctx.fillStyle = "#ffaa00"; ctx.fillRect(26 * S + 5, 10, 6, 1);
+    ctx.fillStyle = "#ff4400"; ctx.fillRect(26 * S + 6, 9,  4, 1);
+    border(26 * S);
+
+    // 27: snow — white-blue with subtle depth and sparkle
+    { const r = rng(2027);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 14;
+        pixel(27 * S + x, y, `rgb(${(240 + v) | 0},${(244 + v) | 0},${(252 + v * 1.5) | 0})`);
+      }
+      for (let i = 0; i < 5; i++) {
+        pixel(27 * S + ((r() * 13 + 1) | 0), (r() * 13 + 1) | 0, "#ffffff");
+      }
+    }
+    border(27 * S);
+
+    // 28: cactus — green with central highlight and spine dots on edges
+    { const r = rng(2028);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 30;
+        pixel(28 * S + x, y, `rgb(${(42 + v) | 0},${(106 + v) | 0},${(42 + v) | 0})`);
+      }
+      ctx.fillStyle = "rgba(80,160,60,0.4)"; ctx.fillRect(28 * S + 6, 0, 4, S);
+      for (let y = 2; y < S; y += 4) {
+        pixel(28 * S + 1,     y,     "#dde0a0");
+        pixel(28 * S + S - 2, y,     "#dde0a0");
+        pixel(28 * S + 1,     y + 2, "#c8cb88");
+        pixel(28 * S + S - 2, y + 2, "#c8cb88");
+      }
+    }
+    border(28 * S);
+
+    // 29: bookshelf — oak base with colorful book spine stripes
+    noise(29 * S, 180, 140, 80, 0.06, 1029);
+    ctx.fillStyle = "rgba(75,48,18,0.55)";
+    ctx.fillRect(29 * S, 0, S, 2); ctx.fillRect(29 * S, S - 2, S, 2); ctx.fillRect(29 * S, 7, S, 2);
+    { const bookColors = ["#cc3333","#3355cc","#33aa33","#cc8822","#883388","#338888","#ddaa22","#aa3333"];
+      for (let row = 0; row < 2; row++) {
+        let bx = 0;
+        for (let bi = 0; bi < 5; bi++) {
+          const bw = 2 + (bi % 2);
+          ctx.fillStyle = bookColors[(row * 5 + bi) % bookColors.length];
+          ctx.fillRect(29 * S + bx, row === 0 ? 2 : 9, bw, 5);
+          bx += bw + 1;
+        }
+      }
+    }
+    border(29 * S);
+
+    // 30: enchanting table top — dark purple with glowing rune glyph
+    { const r = rng(2030);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = (r() - 0.5) * 20;
+        pixel(30 * S + x, y, `rgb(${(34 + v) | 0},${(10 + v * 0.3) | 0},${(58 + v) | 0})`);
+      }
+      ctx.fillStyle = "#aa44ff";
+      ctx.fillRect(30 * S + 4, 4, 8, 1); ctx.fillRect(30 * S + 4, S - 5, 8, 1);
+      ctx.fillRect(30 * S + 4, 4, 1, 8); ctx.fillRect(30 * S + S - 5, 4, 1, 8);
+      ctx.fillRect(30 * S + 7, 6, 2, 4);
+      ctx.fillStyle = "#dd88ff"; ctx.fillRect(30 * S + 7, 7, 2, 2);
+    }
+    border(30 * S);
+
+    // 31: farmland — moist brown with horizontal furrow lines
+    noise(31 * S, 100, 72, 38, 0.1, 1031);
+    for (let y = 0; y < S; y += 3) {
+      ctx.fillStyle = "rgba(55,35,12,0.4)"; ctx.fillRect(31 * S, y, S, 1);
+    }
+    ctx.fillStyle = "rgba(45,28,8,0.18)"; ctx.fillRect(31 * S, 0, S / 2, S);
+    border(31 * S);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -390,7 +586,7 @@ export class VoxelWorld {
         r*s*ao2, g*s*ao2, b*s*ao2,
         r*s*ao3, g*s*ao3, b*s*ao3,
       );
-      const u0 = texIdx / 16, u1 = (texIdx + 1) / 16;
+      const u0 = texIdx / ATLAS_TILES, u1 = (texIdx + 1) / ATLAS_TILES;
       uvs.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
       // Flip quad diagonal when AO values require it to avoid seam artifacts
       if (ao0 + ao3 > ao1 + ao2) {
