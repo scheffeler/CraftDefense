@@ -497,11 +497,7 @@ export class SceneManager {
       return mesh;
     }
     if (category === "food" || category === "material" || category === "armor") {
-      const mat = new THREE.MeshLambertMaterial({ color });
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.08), mat);
-      mesh.position.set(-0.04, 0.22, 0.0);
-      mesh.rotation.set(0.2, 0.4, 0.1);
-      return mesh;
+      return this.buildItemSprite(itemId, color);
     }
     if (category === "weapon") {
       if (itemId === "bow") return this.buildBowMesh();
@@ -514,6 +510,246 @@ export class SceneManager {
       if (itemId.includes("hoe"))     return this.buildHoeMesh(color);
     }
     return null;
+  }
+
+  private buildItemSprite(itemId: string, color: number): THREE.Object3D {
+    const S = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, S, S);
+
+    const hasArt = SceneManager.drawItemPixelArt(ctx, itemId, S);
+    if (!hasArt) {
+      // fallback: plain color quad
+      const r = (color >> 16) & 0xff, g = (color >> 8) & 0xff, b = color & 0xff;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(2, 2, S - 4, S - 4);
+      ctx.fillStyle = `rgba(255,255,255,0.25)`;
+      ctx.fillRect(2, 2, S - 4, 2);
+      ctx.fillRect(2, 2, 2, S - 4);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, alphaTest: 0.05,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), mat);
+    mesh.position.set(-0.04, 0.20, 0.0);
+    // Slight tilt toward the player like a held card
+    mesh.rotation.set(0.15, 0.35, 0.10);
+    return mesh;
+  }
+
+  private static drawItemPixelArt(ctx: CanvasRenderingContext2D, itemId: string, _S: number): boolean {
+    const p = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
+    const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+    const shade = (x: number, y: number, w: number, h: number, base: [number,number,number], v: number) => {
+      const [r,g,b] = base;
+      const d = (v - 0.5) * 60;
+      ctx.fillStyle = `rgb(${Math.min(255,(r+d)|0)},${Math.min(255,(g+d)|0)},${Math.min(255,(b+d)|0)})`;
+      ctx.fillRect(x, y, w, h);
+    };
+
+    switch (itemId) {
+      case "apple": {
+        // Red apple body
+        rect(5, 4, 6, 1, "#cc1111"); rect(4, 5, 8, 5, "#dd2222"); rect(5, 10, 6, 1, "#cc1111");
+        rect(5, 4, 6, 1, "#ee3333"); // highlight row
+        p(5,5,"#ff4444"); p(6,5,"#ff5555");
+        // Stem
+        rect(7, 2, 2, 2, "#4a2a0a");
+        // Leaf
+        rect(9, 2, 2, 1, "#228822"); rect(9, 1, 1, 1, "#228822");
+        // Dark shadow side
+        rect(10, 5, 2, 5, "#aa1111");
+        return true;
+      }
+      case "bread": {
+        // Golden-brown loaf shape
+        rect(3, 7, 10, 1, "#8b5c20"); // bottom
+        rect(2, 5, 12, 2, "#c8860a"); // lower body
+        rect(3, 3, 10, 2, "#e8a020"); // upper body
+        rect(4, 2, 8, 1, "#d4900a"); // top rounded
+        rect(5, 1, 6, 1, "#c07800"); // very top
+        // Score lines
+        rect(7, 3, 1, 4, "#a06808");
+        // Highlights
+        rect(4, 3, 3, 1, "#f0c040"); rect(4, 2, 2, 1, "#f4cc44");
+        // Crust
+        rect(2, 7, 12, 1, "#7a4a10");
+        return true;
+      }
+      case "raw_beef":
+      case "raw_porkchop":
+      case "raw_chicken": {
+        const isChicken = itemId === "raw_chicken";
+        const base: [number,number,number] = isChicken ? [230, 180, 140] : [200, 100, 80];
+        // Irregular meat shape
+        rect(3, 4, 10, 7, `rgb(${base[0]},${base[1]},${base[2]})`);
+        shade(3, 4, 5, 3, base, 0.7); shade(3, 7, 10, 2, base, 1.3);
+        rect(4, 3, 8, 1, `rgb(${base[0]-20},${base[1]-10},${base[2]-10})`);
+        rect(4, 11, 8, 1, `rgb(${base[0]-30},${base[1]-20},${base[2]-20})`);
+        // Fat/marbling
+        rect(6, 5, 2, 2, "#ffddcc");
+        return true;
+      }
+      case "cooked_beef":
+      case "cooked_porkchop":
+      case "cooked_chicken": {
+        // Darker browned meat
+        const base: [number,number,number] = [140, 70, 30];
+        rect(3, 4, 10, 7, `rgb(${base[0]},${base[1]},${base[2]})`);
+        shade(3, 4, 5, 3, base, 0.75); shade(3, 7, 10, 2, base, 1.3);
+        rect(4, 3, 8, 1, "#8b4010"); rect(4, 11, 8, 1, "#5a2a08");
+        // Char marks
+        rect(5, 6, 3, 1, "#1a0800"); rect(8, 8, 3, 1, "#1a0800");
+        return true;
+      }
+      case "iron_ingot": {
+        // Silver trapezoid
+        rect(4, 3, 8, 2, "#cccccc"); // top
+        rect(3, 5, 10, 6, "#aaaaaa"); // body
+        rect(3, 11, 10, 2, "#888888"); // bottom/shadow
+        // Highlight
+        rect(4, 5, 3, 2, "#dddddd"); rect(4, 3, 3, 1, "#eeeeee");
+        // Side sheen
+        rect(11, 6, 2, 4, "#666666");
+        return true;
+      }
+      case "gold_ingot": {
+        rect(4, 3, 8, 2, "#ffee44"); // top
+        rect(3, 5, 10, 6, "#ddaa00"); // body
+        rect(3, 11, 10, 2, "#aa7700"); // bottom
+        rect(4, 5, 3, 2, "#ffee88"); rect(4, 3, 3, 1, "#ffff88");
+        rect(11, 6, 2, 4, "#886600");
+        return true;
+      }
+      case "diamond": {
+        // Cyan diamond gem shape
+        rect(7, 2, 2, 1, "#66ffff"); // tip
+        rect(5, 3, 6, 2, "#44eeff"); rect(3, 5, 10, 4, "#22ccee");
+        rect(4, 9, 8, 2, "#11aabb"); rect(5, 11, 6, 1, "#0099aa");
+        rect(7, 12, 2, 1, "#008899"); // bottom point
+        // Facet highlights
+        rect(5, 3, 2, 1, "#aaffff"); rect(5, 5, 2, 2, "#88eeff");
+        p(12,5,"#005566"); p(3,9,"#001122");
+        return true;
+      }
+      case "coal_ore": {
+        // Dark coal chunk - rough shape
+        rect(4, 3, 8, 10, "#222222");
+        rect(3, 5, 10, 6, "#111111");
+        // Coal veins/highlights
+        p(5,5,"#333333"); p(7,4,"#2a2a2a"); p(10,8,"#2a2a2a");
+        p(6,10,"#333333"); p(9,6,"#333333");
+        // Shiny edges
+        rect(4, 3, 1, 2, "#444444"); rect(4, 3, 4, 1, "#444444");
+        return true;
+      }
+      case "iron_ore": {
+        // Stone with orange-brown flecks
+        rect(3, 3, 10, 10, "#888888");
+        rect(5, 2, 6, 1, "#777777"); rect(3, 12, 10, 1, "#666666");
+        // Ore flecks
+        rect(5, 5, 2, 2, "#cc7744"); p(5,5,"#dd8855");
+        rect(9, 8, 2, 2, "#cc7744"); p(9,8,"#dd8855");
+        rect(7, 4, 1, 1, "#bb6633");
+        // Stone noise
+        p(4,6,"#999999"); p(10,5,"#777777"); p(6,10,"#aaaaaa");
+        return true;
+      }
+      case "gold_ore": {
+        rect(3, 3, 10, 10, "#888888");
+        rect(5, 2, 6, 1, "#777777"); rect(3, 12, 10, 1, "#666666");
+        rect(5, 5, 2, 2, "#ddaa00"); p(5,5,"#eebb22");
+        rect(9, 8, 2, 2, "#ddaa00"); p(9,8,"#eebb22");
+        rect(7, 4, 1, 1, "#cc9900");
+        p(4,6,"#999999"); p(10,5,"#777777");
+        return true;
+      }
+      case "diamond_ore": {
+        rect(3, 3, 10, 10, "#888888");
+        rect(5, 5, 1, 2, "#00cccc"); p(6,6,"#44ffff");
+        rect(5, 6, 1, 1, "#00cccc"); p(5,5,"#55ffff");
+        rect(9, 7, 1, 2, "#00cccc"); p(9,7,"#44ffff");
+        p(4,6,"#999999"); p(10,9,"#777777");
+        return true;
+      }
+      case "wheat": {
+        // Wheat stalk with grains
+        rect(7, 1, 2, 12, "#c8a030"); // stalk
+        // Grain heads on sides
+        for (let i = 0; i < 5; i++) {
+          const y = 2 + i * 2;
+          rect(4, y, 3, 1, "#e8c840"); // left grain
+          rect(9, y+1, 3, 1, "#e8c840"); // right grain
+        }
+        p(7,13,"#c8a030"); // bottom
+        return true;
+      }
+      case "wheat_seeds": {
+        // Small seed dots
+        rect(4, 5, 2, 2, "#8b8b3a"); rect(8, 4, 2, 2, "#8b8b3a");
+        rect(5, 9, 2, 2, "#8b8b3a"); rect(10, 8, 2, 2, "#8b8b3a");
+        rect(3, 11, 2, 2, "#8b8b3a");
+        p(5,5,"#aabb44"); p(9,4,"#aabb44"); p(6,9,"#aabb44");
+        return true;
+      }
+      case "flint": {
+        // Dark gray chip with sharp edges
+        rect(5, 3, 6, 8, "#555555");
+        rect(4, 5, 8, 5, "#444444");
+        rect(6, 2, 4, 2, "#666666"); // top edge
+        rect(6, 11, 4, 2, "#333333"); // bottom
+        // Sharp highlight
+        rect(5, 3, 1, 4, "#777777"); rect(5, 3, 3, 1, "#777777");
+        return true;
+      }
+      case "stick": {
+        // Diagonal brown stick
+        rect(10, 2, 2, 2, "#8b6914"); rect(9, 4, 2, 2, "#7a5a10");
+        rect(8, 6, 2, 2, "#8b6914"); rect(7, 8, 2, 2, "#7a5a10");
+        rect(6, 10, 2, 2, "#8b6914"); rect(5, 12, 2, 2, "#7a5a10");
+        // Highlight
+        p(10,2,"#c8a060"); p(9,4,"#c8a060");
+        return true;
+      }
+      case "arrow_item": {
+        // Arrow: head + shaft + fletch
+        rect(11, 4, 2, 3, "#888888"); // metal head
+        p(12,3,"#999999"); p(11,3,"#888888"); // tip
+        rect(4, 5, 7, 1, "#c8a060"); // shaft
+        rect(4, 6, 7, 1, "#a07040"); // shaft shadow
+        // Fletch
+        rect(2, 4, 2, 1, "#dd4444"); rect(2, 6, 2, 1, "#dd4444");
+        rect(3, 5, 1, 1, "#ff5555");
+        return true;
+      }
+      case "paper": {
+        rect(3, 2, 10, 12, "#f0eedd");
+        rect(3, 2, 10, 1, "#e0ddc8"); // top edge
+        rect(3, 2, 1, 12, "#e0ddc8"); // left edge
+        // Ruled lines
+        for (let y = 5; y < 13; y += 2) rect(5, y, 7, 1, "#d8d5c0");
+        return true;
+      }
+      case "book": {
+        rect(3, 2, 10, 12, "#c8a060"); // cover
+        rect(3, 2, 1, 12, "#8b5a20"); // spine
+        rect(4, 3, 9, 10, "#f0e8d0"); // pages
+        // Page lines
+        for (let y = 5; y < 13; y += 2) rect(5, y, 7, 1, "#d8d0b8");
+        rect(3, 14, 10, 1, "#a07030"); // bottom
+        return true;
+      }
+      default:
+        return false;
+    }
   }
 
   private buildSwordMesh(color: number): THREE.Object3D {
