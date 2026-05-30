@@ -247,3 +247,28 @@
 - Better cloud shapes: rounded puff cloud geometry instead of flat boxes
 - Sky gradient dome: replace solid sky color with gradient mesh (horizon glow)
 - Fog distance variants per biome (desert=clearer, ocean=misty)
+
+## 2026-05-30 — Potion visibility fix + armor/material pixel-art sprites
+
+**What was done:**
+- **Bug fix**: Potions (category="potion") were completely invisible when held — `buildItemMesh` had no branch for "potion" so it returned `null`. Added "potion" to the sprite-render path so they now show up.
+- Added `drawItemPixelArt` 4th parameter `color` (default `0xffffff`) so sprites that need the item's runtime colour (potions, armour) can shade themselves correctly. Updated the single call-site in `buildItemSprite` to pass `color`.
+- **New pixel-art sprites for 30+ items** that previously showed a plain coloured square:
+  - *Potions* (8 variants): classic potion bottle shape — cork, neck, rounded body, highlight shine — tinted by potion colour (red/pink/blue/orange/etc.)
+  - *Armour helmets*: crown + cheek guards + visor slit
+  - *Armour chestplates*: shoulder pads + riveted torso + centre seam
+  - *Armour leggings*: waist band + split leg panels
+  - *Armour boots*: ankle cuff + toe cap + sole
+  - *Wool*: white fluffy square with sine-wave texture lines
+  - *Gunpowder*: dark heap with grain dots and a top-spark highlight
+  - *Bullet*: silver cylinder with tip, casing seam, and body highlight
+  - *Glass bottle*: pale-blue transparent bottle with glass-shine patch
+  - *Nether wart*: bumpy red fungus clusters with stem
+
+**Ideas for next time:**
+- Animated lava hotspot: per-frame brighten/darken bright pixels in the lava canvas (store canvas context in VoxelWorld, update in `tickFluidAnimation`)
+- Crossbow viewmodel: currently uses `buildSwordMesh` since it's category="weapon" but not "bow" — should have its own geometry (T-shape stock + rail + string)
+- Enemy mesh upgrades: Uruk Captain with a flagpole banner prop on its back, Troll King with crown
+- Passive mob improvements: chicken flapping wing animation, pig wider snout
+- Moon phase visual: change the shadow disc offset each game-day for visual night variety
+- Rain puddle darkening: when rain is active, gradually darken top-face vertex colors of dirt/stone by ~12%
