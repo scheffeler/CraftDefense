@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-30 — Pixel-art item sprites for held food/material/armor items
+
+**What was done:**
+- Replaced the plain flat colored quad for food/material/armor held items with per-item 16×16 canvas-based pixel-art sprites rendered via `MeshBasicMaterial` (no lighting dependency, `depthWrite:false`)
+- Added `buildItemSprite(itemId, color)` and `drawItemPixelArt(ctx, itemId, _S)` as private methods on `SceneManager`
+- Custom pixel art for 18+ items: apple (red with green leaf+stem), bread (golden loaf), raw/cooked meats (beef/pork/chicken with char marks), iron ingot (silver trapezoid), gold ingot (golden bar), diamond (cyan gem with facets), coal ore (dark chunk), iron/gold/diamond ore (stone with colored flecks), wheat stalk, wheat seeds, flint chip, stick (diagonal), arrow (shaft+head+feathers), paper, book
+- Items without custom art fall back to a colored square with a highlight strip
+- Sprites use `NearestFilter` for crisp pixelated appearance; positioned as a slight forward-facing tilt (like a held card) rather than 3D rotation
+
+**Notes on this session:**
+- The remote `auto-iterate` branch was 9+ commits ahead; I reset --hard to origin/auto-iterate before making changes
+- Previous sessions have already done: sky gradient dome, rain streaks, water/lava animated meshes, expanded 32px block atlas, torch point lights, enemy face/body textures, puff clouds, sword arc, moon phases, rain ground splash, type-specific particles, atmospheric haze
+
+**Ideas for next time:**
+- Uruk Captain banner prop on its back (flagpole + cloth banner — dramatic boss visual)
+- Leaves light-scattering: make leaf block faces slightly brighter (boost shade multiplier in chunk builder for leaf block faces to simulate diffuse transmission)
+- Animated lava per-frame hotspot update: randomly brighten/darken bright pixels in the lava canvas at runtime
+- Night-vision vignette: green overlay + gamma-lift in armScene when night-vision potion is active
+- Passive mob improvements: chicken could have better wing geometry, pig could have a snout
+- Goblin miner: add a helmet/hard-hat prop to distinguish from regular goblin
+
 ## 2026-05-29 — Type-specific enemy death particles + block-accurate break particles
 
 **What was done:**
