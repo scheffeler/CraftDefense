@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-30 — Passive mob visual overhaul (distinctive props + diagonal gait)
+
+**What was done:**
+- Replaced simple Y-bob leg animation with **pivot-based diagonal gait**: front-left/back-right leg pivots swing together (opposite phase from front-right/back-left), replicating how real quadrupeds walk. Leg pivot objects sit at body-attachment height; leg mesh is a child offset downward so rotation naturally swings forward/back.
+- Added **per-species detail props** in `PassiveMob.ts`:
+  - **Chicken**: yellow beak (already had), red comb on top of head, red wattle below beak, white wing panels on body sides. Wings flap up/down at 1.6× walk frequency during movement.
+  - **Pig**: pink protruding snout box with two dark nostril dots, two angled ear flaps, curly pink tail angled backward.
+  - **Cow**: two beige angled horns on head, pink udder box under rear body, four teat nubs hanging below udder.
+  - **Sheep**: enlarged wool puff covering head as well as body, dark face strip visible through wool at front of head, two wool-colored ear flaps on head sides.
+
+**Notes on this session:**
+- Previous sessions had already done: sky dome, biome tinting, animated water/lava, torch flames+lights, enemy face textures (zombie/goblin/orc/troll/skeleton/creeper/golem), pixel-art item sprites, crossbow viewmodel, leaf light-scattering, type-specific particles.
+- The remote auto-iterate branch was already at a very high-quality state; this run adds refinement to the passive mob world population.
+
+**Ideas for next time:**
+- Enemy mesh upgrade: orc and zombie arms swing during walk — currently arms are static. Add arm pivot animation synchronized with leg gait (opposite phase from legs on same side).
+- Troll and uruk_captain raised-weapon arm pose: instead of arms hanging, rotate the weapon-holding arm ~40° forward to look more threatening.
+- Sheep color variety: randomly pick one of 8 wool colors (white, tan, gray, brown, black, red, blue, yellow) at spawn to give herds visual variety.
+- Chicken could have a brief "pecking" animation when idle: bob head forward/back every few seconds.
+- Passive mob shadow: currently castShadow=true on body but not all parts. Make sure each prop also casts shadow.
+- Rain puddle darkening on wet ground: when weather is rainy, gradually darken dirt/stone top-face vertex colors to simulate wet ground (needs chunk re-dirty on weather change).
+- Animated lava hotspot: randomly update bright pixel positions in the lava canvas each second for a bubbling effect.
+
 ## 2026-05-30 — 3-D crossbow viewmodel (first-person)
 
 **What was done:**
