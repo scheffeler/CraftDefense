@@ -358,7 +358,7 @@ export class SceneManager {
     if (!def) return;
 
     this._swingWeaponEquipped =
-      (def.category === "weapon" && itemId !== "bow") ||
+      (def.category === "weapon" && itemId !== "bow" && itemId !== "crossbow" && def.weaponType !== "gun") ||
       (def.category === "tool" && itemId.includes("_axe"));
 
     let itemMesh: THREE.Object3D | null;
@@ -500,7 +500,8 @@ export class SceneManager {
       return this.buildItemSprite(itemId, color);
     }
     if (category === "weapon") {
-      if (itemId === "bow") return this.buildBowMesh();
+      if (itemId === "bow")       return this.buildBowMesh();
+      if (itemId === "crossbow")  return this.buildCrossbowMesh();
       return this.buildSwordMesh(color);
     }
     if (category === "tool") {
@@ -1081,6 +1082,75 @@ export class SceneManager {
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
     return tex;
+  }
+
+  private buildCrossbowMesh(): THREE.Object3D {
+    const g = new THREE.Group();
+    const woodMat   = new THREE.MeshLambertMaterial({ color: 0x5c3a1a });
+    const darkWood  = new THREE.MeshLambertMaterial({ color: 0x3d2410 });
+    const metalMat  = new THREE.MeshLambertMaterial({ color: 0x444444 });
+    const stringMat = new THREE.MeshLambertMaterial({ color: 0xe8e0cc });
+    const b = (w: number, h: number, d: number, mat: THREE.Material) =>
+      new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+
+    // Tiller (main body stock, pointing forward into screen in -z)
+    const tiller = b(0.09, 0.065, 0.34, woodMat);
+    tiller.position.set(0, 0.28, -0.07);
+    g.add(tiller);
+
+    // Limb (horizontal bow piece at front — the T-bar)
+    const limb = b(0.30, 0.042, 0.042, darkWood);
+    limb.position.set(0, 0.28, -0.22);
+    g.add(limb);
+
+    // Metal rail/prod channel on top of tiller
+    const rail = b(0.038, 0.026, 0.26, metalMat);
+    rail.position.set(0, 0.317, -0.09);
+    g.add(rail);
+
+    // Prod nock tips (metal end caps on limb tips)
+    const tipL = b(0.018, 0.058, 0.018, metalMat);
+    tipL.position.set(-0.14, 0.28, -0.22);
+    g.add(tipL);
+    const tipR = b(0.018, 0.058, 0.018, metalMat);
+    tipR.position.set( 0.14, 0.28, -0.22);
+    g.add(tipR);
+
+    // Bowstring: two diagonal segments from limb tips to center front
+    const strL = b(0.006, 0.006, 0.17, stringMat);
+    strL.position.set(-0.075, 0.28, -0.145);
+    strL.rotation.y = 0.42;
+    g.add(strL);
+    const strR = b(0.006, 0.006, 0.17, stringMat);
+    strR.position.set( 0.075, 0.28, -0.145);
+    strR.rotation.y = -0.42;
+    g.add(strR);
+
+    // Trigger housing / pistol grip
+    const grip = b(0.070, 0.15, 0.068, woodMat);
+    grip.position.set(0, 0.18, 0.06);
+    grip.rotation.x = 0.18;
+    g.add(grip);
+
+    // Trigger guard (thin metal loop)
+    const guard = b(0.013, 0.06, 0.04, metalMat);
+    guard.position.set(0, 0.21, 0.0);
+    guard.rotation.x = 0.3;
+    g.add(guard);
+
+    // Butt plate
+    const butt = b(0.09, 0.085, 0.055, darkWood);
+    butt.position.set(0, 0.256, 0.20);
+    g.add(butt);
+
+    // Trigger lever
+    const trigger = b(0.012, 0.07, 0.016, metalMat);
+    trigger.position.set(0, 0.215, 0.02);
+    trigger.rotation.x = 0.4;
+    g.add(trigger);
+
+    g.position.set(0.02, 0.06, 0.0);
+    return g;
   }
 
   private buildArmMesh(): void {
