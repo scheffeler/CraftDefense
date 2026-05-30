@@ -1,5 +1,22 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-30 — Leaf light-scattering + distinct leaf-cluster texture
+
+**What was done:**
+- Redesigned atlas tile 9 (leaves, 32×32px): replaced simple mottled noise with 24 distinct elliptical leaf clusters (4×3 px each) in 8 green tones, each with a central vein highlight. Dark green base fill creates canopy depth without black holes. 7 sunlit-tip bright highlights for filtered-light feel.
+- Added `leafSSS=1.48` shade multiplier in `rebuildChunkMesh` for leaf blocks: bottom face 0.45→0.67, sides 0.60–0.80→0.89–1.0. Forests now look uniformly bright — undersides of canopies no longer artificially dark.
+- This run first merged origin/auto-iterate (which had the 2-row 32×32px atlas + biome tinting, torch lights, sky dome, etc.) before adding the leaf improvements on top.
+
+**Ideas for next time:**
+- Animated lava hotspot: per-frame brighten/darken bright pixels in the lava canvas at runtime for a bubbling effect
+- Leaves emissive night glow: add a very faint green tint to leaf blocks at night to simulate bioluminescence or moonlit leaves
+- Tree shape variety: some trees could be taller/narrower (jungle), some rounder (oak), right now all trees look similar
+- Enemy mesh upgrades: troll/orc with a raised weapon arm, Uruk Captain with flagpole banner prop
+- Passive mob improvements: chicken with flapping wing animation, pig with wider snout geometry
+- Goblin miner: add a small hard-hat prop on its head
+- Rain puddle darkening: when rain is active, gradually darken top-face vertex colors of dirt/stone by ~15% to simulate wet ground (requires marking dirty chunks on weather change)
+- Vignette on near-death: semi-transparent red border overlay in UI when HP < 20%
+
 ## 2026-05-30 — Pixel-art item sprites for held food/material/armor items
 
 **What was done:**
