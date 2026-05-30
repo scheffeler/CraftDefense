@@ -496,7 +496,7 @@ export class SceneManager {
       mesh.rotation.set(0.3, 0.5, 0.2);
       return mesh;
     }
-    if (category === "food" || category === "material" || category === "armor") {
+    if (category === "food" || category === "material" || category === "armor" || category === "potion") {
       return this.buildItemSprite(itemId, color);
     }
     if (category === "weapon") {
@@ -519,7 +519,7 @@ export class SceneManager {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, S, S);
 
-    const hasArt = SceneManager.drawItemPixelArt(ctx, itemId, S);
+    const hasArt = SceneManager.drawItemPixelArt(ctx, itemId, S, color);
     if (!hasArt) {
       // fallback: plain color quad
       const r = (color >> 16) & 0xff, g = (color >> 8) & 0xff, b = color & 0xff;
@@ -545,7 +545,7 @@ export class SceneManager {
     return mesh;
   }
 
-  private static drawItemPixelArt(ctx: CanvasRenderingContext2D, itemId: string, _S: number): boolean {
+  private static drawItemPixelArt(ctx: CanvasRenderingContext2D, itemId: string, _S: number, color = 0xffffff): boolean {
     const p = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
     const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
     const shade = (x: number, y: number, w: number, h: number, base: [number,number,number], v: number) => {
@@ -747,6 +747,188 @@ export class SceneManager {
         rect(3, 14, 10, 1, "#a07030"); // bottom
         return true;
       }
+
+      // ---- Potions (bottle silhouette, color-coded by effect) ----
+      case "potion_healing":
+      case "potion_regeneration":
+      case "potion_speed":
+      case "potion_strength":
+      case "potion_fire_resistance":
+      case "potion_slowness":
+      case "potion_night_vision":
+      case "potion_haste": {
+        const pr = (color >> 16) & 0xff, pg = (color >> 8) & 0xff, pb = color & 0xff;
+        const lighter = `rgb(${Math.min(255,pr+60)},${Math.min(255,pg+60)},${Math.min(255,pb+60)})`;
+        const darker  = `rgb(${Math.max(0,pr-40)},${Math.max(0,pg-40)},${Math.max(0,pb-40)})`;
+        const base    = `rgb(${pr},${pg},${pb})`;
+        // Cork / stopper
+        rect(6, 1, 4, 2, "#8b6914");
+        rect(7, 0, 2, 1, "#6b4c10");
+        // Neck
+        rect(6, 3, 4, 2, "#cccccc");
+        // Bottle body (rounded trapezoid)
+        rect(4, 5, 8, 1, base);
+        rect(3, 6, 10, 6, base);
+        rect(4, 12, 8, 1, base);
+        rect(5, 13, 6, 1, darker);
+        // Liquid highlight
+        rect(5, 6, 3, 4, lighter);
+        p(5, 6, "#ffffff"); p(6, 6, "rgba(255,255,255,0.7)");
+        // Shadow side
+        rect(11, 6, 2, 6, darker);
+        return true;
+      }
+
+      // ---- Misc materials ----
+      case "wool": {
+        // Fluffy white square with wavy texture
+        rect(2, 2, 12, 12, "#eeeeee");
+        // Wavy texture lines
+        for (let wy = 3; wy < 13; wy += 3) {
+          for (let wx2 = 2; wx2 < 14; wx2++) {
+            const cy2 = wy + Math.round(Math.sin(wx2 * 0.9 + wy * 0.5) * 0.5);
+            p(wx2, cy2, "#cccccc");
+          }
+        }
+        // Highlight
+        rect(2, 2, 12, 1, "#ffffff"); rect(2, 2, 1, 12, "#ffffff");
+        return true;
+      }
+      case "gunpowder": {
+        // Dark gray heap with grain dots
+        rect(4, 4, 8, 8, "#444444");
+        rect(3, 6, 10, 4, "#333333");
+        rect(5, 3, 6, 10, "#3a3a3a");
+        // Grain dots
+        const gpColors = ["#555555","#2a2a2a","#4a4a4a","#606060"];
+        for (let gi = 0; gi < 12; gi++) {
+          const gx = 3 + (gi * 7 + gi * gi * 3) % 10;
+          const gy = 3 + (gi * 11 + gi * 5) % 10;
+          p(gx, gy, gpColors[gi % 4]);
+        }
+        // Spark highlight at top
+        p(7, 3, "#ddcc44"); p(8, 2, "#ffee88"); p(9, 3, "#ddcc44");
+        return true;
+      }
+      case "bullet": {
+        // Small silver cylindrical bullet
+        rect(6, 2, 4, 1, "#dddddd"); // tip
+        rect(5, 3, 6, 7, "#aaaaaa"); // body
+        rect(5, 10, 6, 2, "#888888"); // base
+        // Highlight
+        rect(6, 3, 2, 5, "#eeeeee");
+        p(6, 3, "#ffffff");
+        // Casing seam
+        rect(5, 9, 6, 1, "#999999");
+        return true;
+      }
+      case "glass_bottle": {
+        // Clear bottle (glassy)
+        rect(6, 3, 4, 2, "#ccddee"); // neck
+        rect(7, 1, 2, 2, "#aabbcc"); // mouth
+        rect(4, 5, 8, 1, "#aaccee");
+        rect(3, 6, 10, 5, "#99bbdd");
+        rect(4, 11, 8, 1, "#aaccee");
+        rect(5, 12, 6, 1, "#88aacc");
+        // Highlight (glass shine)
+        rect(5, 6, 3, 3, "#ddeeff");
+        p(5, 6, "#ffffff"); p(6, 6, "#eef8ff");
+        return true;
+      }
+      case "nether_wart": {
+        // Bumpy red fungus
+        rect(4, 8, 8, 4, "#881111");
+        rect(3, 9, 10, 3, "#aa1111");
+        rect(4, 5, 3, 3, "#cc2222"); // left knob
+        rect(9, 6, 3, 4, "#cc2222"); // right knob
+        rect(6, 4, 4, 2, "#dd3333"); // center top
+        // Highlight dots
+        p(5, 5, "#ff4444"); p(10, 7, "#ff4444"); p(7, 4, "#ff5555");
+        // Stem
+        rect(7, 11, 2, 3, "#551100");
+        return true;
+      }
+
+      // ---- Armor items (each slot has a recognisable silhouette) ----
+      case "gold_helmet":
+      case "iron_helmet":
+      case "diamond_helmet": {
+        const hr = (color >> 16) & 0xff, hg = (color >> 8) & 0xff, hb = color & 0xff;
+        const hBase = `rgb(${hr},${hg},${hb})`;
+        const hDark = `rgb(${Math.max(0,hr-40)},${Math.max(0,hg-40)},${Math.max(0,hb-40)})`;
+        const hLight= `rgb(${Math.min(255,hr+50)},${Math.min(255,hg+50)},${Math.min(255,hb+50)})`;
+        // Crown
+        rect(3, 3, 10, 5, hBase);
+        rect(2, 5, 12, 3, hBase);
+        rect(2, 8, 12, 2, hDark); // cheek guards
+        // Visor slit
+        rect(4, 7, 8, 1, "#111111");
+        // Highlights
+        rect(3, 3, 8, 1, hLight);
+        rect(3, 3, 1, 5, hLight);
+        return true;
+      }
+      case "gold_chestplate":
+      case "iron_chestplate":
+      case "diamond_chestplate": {
+        const cr = (color >> 16) & 0xff, cg = (color >> 8) & 0xff, cb = color & 0xff;
+        const cBase = `rgb(${cr},${cg},${cb})`;
+        const cDark = `rgb(${Math.max(0,cr-40)},${Math.max(0,cg-40)},${Math.max(0,cb-40)})`;
+        const cLight= `rgb(${Math.min(255,cr+50)},${Math.min(255,cg+50)},${Math.min(255,cb+50)})`;
+        // Shoulder pads
+        rect(2, 2, 4, 3, cBase); rect(10, 2, 4, 3, cBase);
+        // Torso plate
+        rect(3, 5, 10, 9, cBase);
+        rect(3, 14, 10, 1, cDark);
+        // Center line
+        rect(7, 5, 2, 9, cDark);
+        // Rivet dots at shoulders
+        p(4, 3, cDark); p(11, 3, cDark);
+        // Highlight
+        rect(3, 5, 4, 1, cLight); rect(3, 5, 1, 9, cLight);
+        return true;
+      }
+      case "gold_leggings":
+      case "iron_leggings":
+      case "diamond_leggings": {
+        const lr = (color >> 16) & 0xff, lg = (color >> 8) & 0xff, lb = color & 0xff;
+        const lBase = `rgb(${lr},${lg},${lb})`;
+        const lDark = `rgb(${Math.max(0,lr-40)},${Math.max(0,lg-40)},${Math.max(0,lb-40)})`;
+        const lLight= `rgb(${Math.min(255,lr+50)},${Math.min(255,lg+50)},${Math.min(255,lb+50)})`;
+        // Waist band
+        rect(2, 2, 12, 3, lBase);
+        // Left leg
+        rect(2, 5, 5, 9, lBase);
+        rect(2, 14, 5, 1, lDark);
+        // Right leg
+        rect(9, 5, 5, 9, lBase);
+        rect(9, 14, 5, 1, lDark);
+        // Gap between legs
+        rect(7, 5, 2, 3, "#00000000");
+        // Highlights
+        rect(2, 2, 12, 1, lLight); rect(2, 5, 1, 9, lLight);
+        return true;
+      }
+      case "gold_boots":
+      case "iron_boots":
+      case "diamond_boots": {
+        const br = (color >> 16) & 0xff, bg2 = (color >> 8) & 0xff, bb = color & 0xff;
+        const bBase = `rgb(${br},${bg2},${bb})`;
+        const bDark = `rgb(${Math.max(0,br-40)},${Math.max(0,bg2-40)},${Math.max(0,bb-40)})`;
+        const bLight= `rgb(${Math.min(255,br+50)},${Math.min(255,bg2+50)},${Math.min(255,bb+50)})`;
+        // Ankle cuff
+        rect(3, 3, 10, 3, bBase);
+        // Boot body
+        rect(3, 6, 10, 6, bBase);
+        // Toe cap — extends forward
+        rect(3, 12, 11, 3, bBase);
+        // Sole (dark)
+        rect(3, 15, 11, 1, bDark);
+        // Highlight
+        rect(3, 3, 8, 1, bLight); rect(3, 3, 1, 6, bLight);
+        return true;
+      }
+
       default:
         return false;
     }
