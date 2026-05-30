@@ -597,21 +597,42 @@ export class VoxelWorld {
     }
     border(8 * S);
 
-    // ── 9: Leaves — transparent mottled multi-shade green ───────────────────────
+    // ── 9: Leaves — distinct elliptical leaf clusters with veins ────────────────
     { const rl = rng(2009);
-      const lp: [number,number,number][] = [
-        [46, 104, 28], [60, 128, 40], [72, 150, 52], [40, 92, 22], [85, 165, 54],
-      ];
+      // Dark base — deep green so gaps between leaf shapes read as depth
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const v = rl();
-        const bright = 0.74 + rl() * 0.36;
-        if (v < 0.12) continue;
-        const [lr, lg, lb] = lp[(rl() * lp.length) | 0];
-        pixel(9 * S + x, y, `rgb(${(lr * bright)|0},${(lg * bright)|0},${(lb * bright)|0})`);
+        const d = 0.38 + rl() * 0.14;
+        pixel(9 * S + x, y, `rgb(${(28 * d)|0},${(68 * d)|0},${(14 * d)|0})`);
       }
-      for (let i = 0; i < 6; i++) {
-        const hx = (rl() * 24 + 4) | 0, hy = (rl() * 24 + 4) | 0;
-        ctx.fillStyle = "rgba(100,192,62,0.30)"; ctx.fillRect(9 * S + hx, hy, 3, 2);
+      // 24 overlapping leaf ellipses (4 wide × 3 tall) in 8 distinct greens
+      const leafPalette: [number, number, number][] = [
+        [52, 138, 34], [72, 162, 48], [40, 106, 24], [88, 184, 58],
+        [60, 150, 40], [44, 118, 28], [80, 174, 52], [96, 200, 66],
+      ];
+      for (let i = 0; i < 24; i++) {
+        const lx = (rl() * 30) | 0;
+        const ly = (rl() * 30) | 0;
+        const [lr, lg, lb] = leafPalette[i % leafPalette.length];
+        const bright = 0.82 + rl() * 0.38;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -3; dx <= 3; dx++) {
+            if (dx * dx * 0.36 + dy * dy > 4.2) continue;
+            const fade = 1.0 - (dx * dx * 0.36 + dy * dy) / 4.2 * 0.22;
+            const tx = (lx + dx + S) % S, ty = (ly + dy + S) % S;
+            pixel(9 * S + tx, ty,
+              `rgb(${(lr * bright * fade)|0},${(lg * bright * fade)|0},${(lb * bright * fade)|0})`);
+          }
+        }
+        // Leaf vein — one pixel brighter along the mid-axis
+        const tx0 = (lx + S) % S, ty0 = (ly + S) % S;
+        const vb = Math.min(1.4, bright * 1.18);
+        pixel(9 * S + tx0, ty0, `rgb(${(lr * vb)|0},${(lg * vb * 1.08)|0},${(lb * vb)|0})`);
+      }
+      // Sunlit tips — bright yellow-green highlights
+      for (let i = 0; i < 7; i++) {
+        const hx = (rl() * 28 + 2) | 0, hy = (rl() * 28 + 2) | 0;
+        ctx.fillStyle = "rgba(122, 218, 72, 0.60)";
+        ctx.fillRect(9 * S + hx, hy, 2, 2);
       }
     }
     border(9 * S);
@@ -1118,13 +1139,16 @@ export class VoxelWorld {
           const nNegZ = hn(6, 0, 0);
 
           const neighbors: [number,number,number][] = [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]];
+          // Leaves scatter light — boost non-top face brightness to simulate SSS through foliage
+          const leafSSS = (id === "leaves") ? 1.48 : 1.0;
+          const cap = (v: number) => Math.min(1.0, v);
           const faces = [
-            { n:[0,1,0],  a:[1,0,0], b:[0,0,1], shade:1.0,  cr:clamp(tr+nTop),  cg:clamp(tg+nTop),  cb:clamp(tb+nTop)  },
-            { n:[0,-1,0], a:[0,0,1], b:[1,0,0], shade:0.45, cr:clamp(r+nBot),   cg:clamp(g+nBot),   cb:clamp(b+nBot)   },
-            { n:[1,0,0],  a:[0,0,1], b:[0,1,0], shade:0.8,  cr:clamp(r+nPosX),  cg:clamp(g+nPosX),  cb:clamp(b+nPosX)  },
-            { n:[-1,0,0], a:[0,1,0], b:[0,0,1], shade:0.7,  cr:clamp(r+nNegX),  cg:clamp(g+nNegX),  cb:clamp(b+nNegX)  },
-            { n:[0,0,1],  a:[0,1,0], b:[1,0,0], shade:0.6,  cr:clamp(r+nPosZ),  cg:clamp(g+nPosZ),  cb:clamp(b+nPosZ)  },
-            { n:[0,0,-1], a:[1,0,0], b:[0,1,0], shade:0.6,  cr:clamp(r+nNegZ),  cg:clamp(g+nNegZ),  cb:clamp(b+nNegZ)  },
+            { n:[0,1,0],  a:[1,0,0], b:[0,0,1], shade:1.0,                  cr:clamp(tr+nTop),  cg:clamp(tg+nTop),  cb:clamp(tb+nTop)  },
+            { n:[0,-1,0], a:[0,0,1], b:[1,0,0], shade:cap(0.45 * leafSSS),  cr:clamp(r+nBot),   cg:clamp(g+nBot),   cb:clamp(b+nBot)   },
+            { n:[1,0,0],  a:[0,0,1], b:[0,1,0], shade:cap(0.80 * leafSSS),  cr:clamp(r+nPosX),  cg:clamp(g+nPosX),  cb:clamp(b+nPosX)  },
+            { n:[-1,0,0], a:[0,1,0], b:[0,0,1], shade:cap(0.70 * leafSSS),  cr:clamp(r+nNegX),  cg:clamp(g+nNegX),  cb:clamp(b+nNegX)  },
+            { n:[0,0,1],  a:[0,1,0], b:[1,0,0], shade:cap(0.60 * leafSSS),  cr:clamp(r+nPosZ),  cg:clamp(g+nPosZ),  cb:clamp(b+nPosZ)  },
+            { n:[0,0,-1], a:[1,0,0], b:[0,1,0], shade:cap(0.60 * leafSSS),  cr:clamp(r+nNegZ),  cg:clamp(g+nNegZ),  cb:clamp(b+nNegZ)  },
           ];
 
           for (let fi = 0; fi < 6; fi++) {
