@@ -115,6 +115,7 @@ class Chunk {
   waterMesh: THREE.Mesh | null = null;
   lavaMesh: THREE.Mesh | null = null;
   wheatMesh: THREE.Mesh | null = null;
+  floraMesh: THREE.Mesh | null = null;
   dirty = true;
 
   constructor(cx: number, cz: number) {
@@ -204,6 +205,7 @@ export class VoxelWorld {
   private readonly waterMat: THREE.MeshLambertMaterial;
   private readonly lavaMat: THREE.MeshLambertMaterial;
   private readonly wheatMat: THREE.MeshLambertMaterial;
+  private readonly floraMat: THREE.MeshLambertMaterial;
   private _fluidTime = 0;
 
   constructor(scene: THREE.Scene) {
@@ -214,6 +216,7 @@ export class VoxelWorld {
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
     this.wheatMat = VoxelWorld.makeWheatMaterial();
+    this.floraMat = VoxelWorld.makeFloraMaterial();
   }
 
   getBlockTexture(): THREE.Texture { return this.blockTex; }
@@ -387,6 +390,108 @@ export class VoxelWorld {
     };
 
     for (let s = 0; s < STAGES; s++) drawStage(s * S, s);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    return new THREE.MeshLambertMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.4,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  private static makeFloraMaterial(): THREE.MeshLambertMaterial {
+    // 4-type flora sprite sheet: 64×32 canvas, each 16×32 tile is one flora type.
+    // Type 0: tall grass, Type 1: fern/bush, Type 2: dandelion, Type 3: poppy.
+    const TYPES = 4, W = 16, H = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = TYPES * W; canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, TYPES * W, H);
+
+    const px = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
+
+    // Type 0: Tall grass — thin blades spreading outward
+    { const ox = 0;
+      const greens = ["#4a9a20","#3a8818","#5aaa28","#2d7010"];
+      // Centre blades
+      for (let y = 8; y < H; y++) { px(ox + 7, y, greens[0]); px(ox + 8, y, greens[1]); }
+      // Left blade
+      for (let y = 12; y < H; y++) {
+        const x = ox + 7 - Math.floor((H - y) * 0.22);
+        px(x, y, greens[2]);
+      }
+      // Right blade
+      for (let y = 12; y < H; y++) {
+        const x = ox + 9 + Math.floor((H - y) * 0.22);
+        px(x, y, greens[3]);
+      }
+      // Tip curl — top 6px slightly curved
+      for (let y = 0; y < 8; y++) { px(ox + 7 + Math.floor(y * 0.3), y, greens[0]); }
+    }
+
+    // Type 1: Short fern / shrub — wider bushy shape
+    { const ox = W;
+      const col1 = "#358020", col2 = "#267018", col3 = "#48a028";
+      // Base stem
+      for (let y = H - 8; y < H; y++) { px(ox + 7, y, col1); px(ox + 8, y, col2); }
+      // Fronds spreading left and right
+      for (let i = 0; i < 5; i++) {
+        const fy = H - 14 - i * 3;
+        const spread = 3 + i;
+        for (let x = ox + 7 - spread; x <= ox + 8 + spread; x++) {
+          px(x, fy, i % 2 === 0 ? col1 : col3);
+          px(x, fy + 1, col2);
+        }
+      }
+    }
+
+    // Type 2: Dandelion — yellow flower head on green stem
+    { const ox = W * 2;
+      const stemCol = "#3a8818";
+      // Stem
+      for (let y = 10; y < H; y++) { px(ox + 7, y, stemCol); px(ox + 8, y, "#2d7010"); }
+      // Small leaves mid-stem
+      for (let x = ox + 4; x <= ox + 6; x++) px(x, H - 8, stemCol);
+      for (let x = ox + 9; x <= ox + 11; x++) px(x, H - 10, stemCol);
+      // Flower head — round yellow cluster
+      const yCentre = 5;
+      for (const [dx, dy] of [[-3,0],[-2,-1],[-1,-2],[0,-3],[1,-2],[2,-1],[3,0],
+                              [-3,1],[-2,2],[-1,3],[0,4],[1,3],[2,2],[3,1]] as [number,number][]) {
+        px(ox + 7 + dx, yCentre + dy, "#f0d010");
+      }
+      // Bright centre
+      for (const [dx, dy] of [[-1,0],[0,-1],[1,0],[0,1],[0,0]] as [number,number][]) {
+        px(ox + 7 + dx, yCentre + dy, "#f8e840");
+      }
+    }
+
+    // Type 3: Red poppy — red petals on green stem
+    { const ox = W * 3;
+      const stemCol = "#3a8818";
+      // Stem
+      for (let y = 10; y < H; y++) { px(ox + 7, y, stemCol); px(ox + 8, y, "#2d7010"); }
+      // Leaves
+      for (let x = ox + 4; x <= ox + 6; x++) px(x, H - 9, stemCol);
+      for (let x = ox + 9; x <= ox + 11; x++) px(x, H - 12, stemCol);
+      // Bud top (dark before petals)
+      px(ox + 7, 8, "#114400"); px(ox + 8, 8, "#114400");
+      // Petals — four red petals arranged around centre
+      const yCentre2 = 4;
+      for (const [dx, dy] of [[-3,0],[-2,-1],[-1,-2],[0,-3],[1,-2],[2,-1],[3,0],
+                              [-3,1],[-2,2],[-1,3],[0,4],[1,3],[2,2],[3,1]] as [number,number][]) {
+        px(ox + 7 + dx, yCentre2 + dy, "#cc1111");
+      }
+      // Brighter inner petals
+      for (const [dx, dy] of [[-2,0],[-1,-1],[0,-2],[1,-1],[2,0],
+                              [-2,1],[-1,2],[0,3],[1,2],[2,1]] as [number,number][]) {
+        px(ox + 7 + dx, yCentre2 + dy, "#ee2222");
+      }
+      // Dark centre
+      px(ox + 7, yCentre2 + 1, "#111111"); px(ox + 8, yCentre2 + 1, "#222200");
+    }
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
@@ -1050,6 +1155,11 @@ export class VoxelWorld {
       chunk.wheatMesh.geometry.dispose();
       chunk.wheatMesh = null;
     }
+    if (chunk.floraMesh) {
+      this.chunkMeshGroup.remove(chunk.floraMesh);
+      chunk.floraMesh.geometry.dispose();
+      chunk.floraMesh = null;
+    }
 
     const positions: number[] = [];
     const normals: number[]   = [];
@@ -1064,6 +1174,8 @@ export class VoxelWorld {
 
     // Wheat cross geometry: collect positions during main pass, build at end
     const wheatEntries: [number, number, number, number][] = []; // [wx, wy, wz, stage]
+    // Flora cross geometry (grass/flowers on grass tops)
+    const floraEntries: [number, number, number, number][] = []; // [wx, wy, wz, type 0-3]
 
     const isSolidAO = (bx: number, by: number, bz: number): boolean => {
       const bid = this.getBlock(bx, by, bz);
@@ -1120,6 +1232,16 @@ export class VoxelWorld {
             const stage = id === "wheat_0" ? 0 : id === "wheat_1" ? 1 : id === "wheat_2" ? 2 : 3;
             wheatEntries.push([wx, wy, wz, stage]);
             continue;
+          }
+          // Flora: grass blocks with air above spawn decorative cross-plane sprites
+          if (id === "grass") {
+            const aboveId = this.getBlock(wx, wy + 1, wz);
+            if (aboveId === "air") {
+              const h = (((wx * 374761393) ^ (wz * 1234567)) >>> 0);
+              if ((h % 3) === 0) { // ~33% of grass tops get flora
+                floraEntries.push([wx, wy + 1, wz, (h >> 2) % 4]);
+              }
+            }
           }
           const def = BLOCK_DEFS[id];
 
@@ -1302,6 +1424,41 @@ export class VoxelWorld {
       chunk.wheatMesh = new THREE.Mesh(wGeo, this.wheatMat);
       chunk.wheatMesh.receiveShadow = false;
       this.chunkMeshGroup.add(chunk.wheatMesh);
+    }
+
+    // Build flora cross geometry (grass/flower sprites above grass blocks)
+    if (floraEntries.length > 0) {
+      const fpPos: number[] = [], fpNorm: number[] = [], fpUV: number[] = [], fpIdx: number[] = [];
+      let fpi = 0;
+      const DIAG2 = 1 / Math.SQRT2;
+      const FHW = 0.46, FYB = 0.0, FYT = 0.9; // half-width, y-bottom, y-top
+
+      const addFloraQuad = (cx: number, cy: number, cz: number, dx: number, dz: number, type: number) => {
+        const x0 = cx - dx * FHW, z0 = cz - dz * FHW;
+        const x1 = cx + dx * FHW, z1 = cz + dz * FHW;
+        const y0 = cy + FYB, y1 = cy + FYT;
+        fpPos.push(x0, y0, z0,  x1, y0, z1,  x0, y1, z0,  x1, y1, z1);
+        for (let i = 0; i < 4; i++) fpNorm.push(0, 1, 0);
+        const u0 = type / 4, u1 = (type + 1) / 4;
+        fpUV.push(u0, 0,  u1, 0,  u0, 1,  u1, 1);
+        fpIdx.push(fpi, fpi+1, fpi+2, fpi+1, fpi+3, fpi+2);
+        fpi += 4;
+      };
+
+      for (const [wx, wy, wz, type] of floraEntries) {
+        const cx = wx + 0.5, cy = wy, cz = wz + 0.5;
+        addFloraQuad(cx, cy, cz,  DIAG2,  DIAG2, type); // 45° diagonal
+        addFloraQuad(cx, cy, cz,  DIAG2, -DIAG2, type); // 135° diagonal
+      }
+
+      const fGeo = new THREE.BufferGeometry();
+      fGeo.setAttribute("position", new THREE.Float32BufferAttribute(fpPos, 3));
+      fGeo.setAttribute("normal",   new THREE.Float32BufferAttribute(fpNorm, 3));
+      fGeo.setAttribute("uv",       new THREE.Float32BufferAttribute(fpUV, 2));
+      fGeo.setIndex(fpIdx);
+      chunk.floraMesh = new THREE.Mesh(fGeo, this.floraMat);
+      chunk.floraMesh.receiveShadow = false;
+      this.chunkMeshGroup.add(chunk.floraMesh);
     }
   }
 

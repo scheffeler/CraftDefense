@@ -1,5 +1,29 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-31 — Terrain flora system (cross-plane grass/flower sprites)
+
+**What was done:**
+- Added `floraMesh: THREE.Mesh | null` to the `Chunk` class alongside existing `wheatMesh`.
+- Added `floraMat: THREE.MeshLambertMaterial` to `VoxelWorld` — created once via new `makeFloraMaterial()`.
+- `makeFloraMaterial()` generates a 4-column × 32px tall canvas sprite sheet with pixel-art sprites:
+  - **Type 0**: Tall grass — three overlapping blades with natural bend at the tips
+  - **Type 1**: Short fern/bush — radial fronds spreading from centre stem, 5 layers
+  - **Type 2**: Dandelion — round yellow flower head on green stem with side leaves
+  - **Type 3**: Red poppy — red petals with dark centre on green stem with leaves
+- In `rebuildChunkMesh`, after the main block scan loop: grass blocks with air above are checked with a deterministic hash — ~33% get flora, hash selects which of the 4 types.
+- Flora is rendered as cross-plane cross geometry (two quads at 90°, same approach as wheat).
+- Material uses `alphaTest: 0.4` and `DoubleSide` for crisp sprite cutout visible from all angles.
+- Flora is purely decorative (not a BlockId, no interaction), so block breaking isn't affected.
+- Note: This session initially generated a local commit expanding the block atlas from 16→32 tiles, but the remote `auto-iterate` already had a more advanced 2-row 32×32 atlas — local commit was discarded and the remote state was adopted instead.
+
+**Ideas for next time:**
+- Chicken pecking animation: bob head forward/back every 3–5s when idle (needs headGroup pivot refactor in PassiveMob.ts)
+- Snow biome flora: replace flowers with snow/ice sprites for snowy areas; desert biome gets cactus flower sprites
+- Biome-filtered flora: check biome type at spawn position and pick appropriate flora types (green plains → current; taiga → ferns; meadow → more flowers)
+- Wind sway animation: update flora geometry UV offset each frame (or jitter vertex Y) for grass sway effect
+- Idle mob head turn: add headGroup pivot to passive mob buildMesh so the head can rotate independently
+- Animated lava canvas hotspot: store lava ctx, every 0.15s putImageData blob updates for pixel-level bubbling
+
 ## 2026-05-31 — Near-death vignette (pulsing red screen edge at low HP)
 
 **What was done:**
