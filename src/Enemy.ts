@@ -1054,6 +1054,7 @@ export class EnemyManager {
     group.add(crownBand);
 
     // Massive arms
+    let trollRightArmPivot: THREE.Object3D | null = null;
     for (const [ax, i] of [[-0.48, 0], [0.48, 1]] as [number, number][]) {
       const armPivot = new THREE.Object3D();
       armPivot.position.set(ax, 1.0, 0);
@@ -1063,6 +1064,7 @@ export class EnemyManager {
       arm.castShadow = true;
       armPivot.add(arm);
       group.add(armPivot);
+      if (i === 1) trollRightArmPivot = armPivot;
     }
 
     // Shoulder pads
@@ -1072,14 +1074,14 @@ export class EnemyManager {
       group.add(pad);
     }
 
-    // War club in right hand
+    // War club parented to right arm pivot so it swings with the arm
     const clubMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1a });
     const club    = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.70, 0.12), clubMat);
-    club.position.set(0.56, 0.55, 0.20);
-    group.add(club);
+    club.position.set(0.08, -0.45, 0.20);
+    trollRightArmPivot!.add(club);
     const clubHead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), clubMat);
-    clubHead.position.set(0.56, 0.22, 0.20);
-    group.add(clubHead);
+    clubHead.position.set(0.08, -0.78, 0.20);
+    trollRightArmPivot!.add(clubHead);
 
     // Thick legs
     for (const [lx, i] of [[-0.18, 0], [0.18, 1]] as [number, number][]) {
@@ -1209,6 +1211,7 @@ export class EnemyManager {
 
     // Arms
     const armMat = new THREE.MeshLambertMaterial({ color: cfg.headColor });
+    let humanoidRightArmPivot: THREE.Object3D | null = null;
     for (const [ax, i] of [[-0.36, 0], [0.36, 1]] as [number, number][]) {
       const armPivot = new THREE.Object3D();
       armPivot.position.set(ax, 0.9, 0);
@@ -1217,6 +1220,7 @@ export class EnemyManager {
       arm.position.y = -0.22;
       armPivot.add(arm);
       group.add(armPivot);
+      if (i === 1) humanoidRightArmPivot = armPivot;
     }
 
     // Extra details per type
@@ -1252,11 +1256,11 @@ export class EnemyManager {
     }
 
     if (type === "orc" || type === "zombie") {
-      // Club/weapon
+      // Club parented to right arm pivot so it swings with the arm
       const wepMat = new THREE.MeshLambertMaterial({ color: 0x5c3a1a });
       const club = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.4, 0.08), wepMat);
-      club.position.set(0.38, 0.65, 0.15);
-      group.add(club);
+      club.position.set(0.02, -0.25, 0.15);
+      humanoidRightArmPivot!.add(club);
     }
   }
 
@@ -1309,6 +1313,7 @@ export class EnemyManager {
     }
 
     // Arms
+    let urukRightArmPivot: THREE.Object3D | null = null;
     for (const [ax, i] of [[-0.42, 0], [0.42, 1]] as [number, number][]) {
       const armPivot = new THREE.Object3D();
       armPivot.position.set(ax, 0.92, 0);
@@ -1317,31 +1322,35 @@ export class EnemyManager {
       arm.position.y = -0.24;
       armPivot.add(arm);
       group.add(armPivot);
+      if (i === 1) urukRightArmPivot = armPivot;
     }
 
-    // Greatsword (held on right side)
+    // Greatsword parented to right arm pivot so it swings with the arm
     const swordGrip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 0.06), goldMat);
-    swordGrip.position.set(0.55, 0.55, 0.10); group.add(swordGrip);
+    swordGrip.position.set(0.13, -0.37, 0.10); urukRightArmPivot!.add(swordGrip);
     const crossguard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.06), goldMat);
-    crossguard.position.set(0.55, 0.72, 0.10); group.add(crossguard);
+    crossguard.position.set(0.13, -0.20, 0.10); urukRightArmPivot!.add(crossguard);
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.70, 0.04), bladeMat);
-    blade.position.set(0.55, 1.12, 0.10); group.add(blade);
-    // Blade tip
+    blade.position.set(0.13, 0.20, 0.10); urukRightArmPivot!.add(blade);
     const tip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.03), bladeMat);
-    tip.position.set(0.55, 1.56, 0.10); group.add(tip);
+    tip.position.set(0.13, 0.64, 0.10); urukRightArmPivot!.add(tip);
   }
 
   private animateLegs(id: number, phase: number): void {
     const group = this.meshes.get(id);
     if (!group) return;
+    const type = this.enemies.get(id)?.config.type;
     group.traverse(c => {
       if (c.name.startsWith("legpivot_")) {
         const idx = parseInt(c.name.split("_")[1]);
         (c as THREE.Object3D).rotation.x = Math.sin(phase + idx * Math.PI) * 0.55;
       } else if (c.name.startsWith("armpivot_")) {
         const idx = parseInt(c.name.split("_")[1]);
-        // Arms swing opposite to legs
-        (c as THREE.Object3D).rotation.x = Math.sin(phase + (1 - idx) * Math.PI) * 0.45;
+        // Boss right arms hold weapons raised forward
+        const isWeaponArm = idx === 1 && (type === "uruk_captain" || type === "troll_king");
+        const isOrcArm = idx === 1 && (type === "orc" || type === "zombie");
+        const base = isWeaponArm ? -0.55 : isOrcArm ? -0.28 : 0;
+        (c as THREE.Object3D).rotation.x = base + Math.sin(phase + (1 - idx) * Math.PI) * 0.45;
       }
     });
     // Slight walk bob — only at ground level (preserved by caller for climbing)

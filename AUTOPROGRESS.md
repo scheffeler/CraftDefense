@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-31 — Enemy weapon-arm parenting (weapons swing with arm animation)
+
+**What was done:**
+- Reparented all enemy weapons from the group root to their respective right-arm pivot objects so weapons swing naturally with the walking animation:
+  - **Uruk Captain**: greatsword (grip + crossguard + blade + tip) moved from `group` to `armpivot_1` (right arm) with pivot-local offsets recalculated from world positions
+  - **Troll King**: war club + club head moved from `group` to `armpivot_1` with pivot-local offsets
+  - **Orc / Zombie**: wooden club moved from `group` to `armpivot_1` (saved `humanoidRightArmPivot` reference in the arm construction loop)
+- Updated `animateLegs()` to look up the enemy type and apply a base forward rotation to weapon-holding arms:
+  - Boss right arms (uruk_captain, troll_king): −0.55 rad base (arm raised forward in combat pose)
+  - Orc/zombie right arm: −0.28 rad base (slight raised threat pose)
+  - All arms then swing ±0.45 rad on top of the base angle
+
+**Notes on this session:**
+- TypeScript compile clean (`npx tsc -p tsconfig.emit.json` zero errors)
+- All weapon mesh positions recalculated as pivot-local offsets (world_pos − pivot_pos)
+
+**Ideas for next time:**
+- Sheep color variety: randomly pick one of 8 wool colors (white, tan, gray, brown, black, red, blue, yellow) at spawn
+- Animated lava hotspot: randomly update bright pixel positions in the lava canvas each second for a bubbling effect
+- Rain puddle darkening: gradually darken dirt/stone top-face vertex colors when weather is rainy
+- Chicken pecking animation: bob head forward/back every few seconds when idle
+- Crossbow bolt nocked in the rail: thin dark box along the rail when crossbow is held
+
 ## 2026-05-30 — Passive mob visual overhaul (distinctive props + diagonal gait)
 
 **What was done:**
