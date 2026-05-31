@@ -1,5 +1,20 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-31 — Near-death vignette (pulsing red screen edge at low HP)
+
+**What was done:**
+- Added a `near-death-vignette` element permanently in the DOM (`z-index: 55`, below damage flash at 60).
+- Element uses `radial-gradient(ellipse at center, transparent 50%, rgba(200,0,0,0.88) 100%)` — a red ring that darkens screen edges without obscuring the crosshair or center gameplay.
+- `updatePlayerHealth()` (called every frame) drives opacity via `performance.now()`: when HP ≤ 30%, a cosine-wave pulse powers up. Rate increases linearly from 0.8 Hz (at exactly 30%) to 2.8 Hz (at 10% or below), giving an escalating "heartbeat" urgency. Max opacity scales from 0.30 at threshold to 0.85 near death.
+- Above 30% HP the element stays at `opacity: 0` — zero overhead, no flicker.
+
+**Ideas for next time:**
+- Chicken pecking animation: bob head forward/back every 3–5s when idle
+- Crossbow bolt nocked in the rail: add thin dark mesh along rail when crossbow is active item
+- Moon phase visual: shift shadow-disc offset on moon mesh each game-day
+- Rain puddle darkening: darken dirt/stone top-face vertex colors in rain chunks
+- Animated lava hotspot (pixel-level): every 0.15s `putImageData` 3–4 glowing blobs on lava canvas tile
+
 ## 2026-05-31 — Sheep wool color variety + animated lava pulsing glow
 
 **What was done:**
