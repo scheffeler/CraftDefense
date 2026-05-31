@@ -166,6 +166,7 @@ export class UI {
   private deathOverlay!: HTMLElement;
   private endOverlay!: HTMLElement;
   private floatingContainer!: HTMLElement;
+  private _nearDeathVignette!: HTMLElement;
 
   // Inventory slot elements
   private backpackSlotEls: HTMLElement[] = [];
@@ -223,6 +224,18 @@ export class UI {
       if (hp >= 2)     el.style.backgroundImage = `url("${HEART_FULL}")`;
       else if (hp === 1) el.style.backgroundImage = `url("${HEART_HALF}")`;
       else               el.style.backgroundImage = `url("${HEART_EMPTY}")`;
+    }
+    // Near-death pulsing vignette
+    const fraction = max > 0 ? current / max : 0;
+    if (fraction > 0.30) {
+      this._nearDeathVignette.style.opacity = "0";
+    } else {
+      const danger = Math.min(1, (0.30 - fraction) / 0.20);
+      const pulseCyclesPerSec = 0.8 + danger * 2.0;
+      const t = performance.now() / 1000;
+      const pulse = Math.max(0, Math.pow(Math.cos(t * pulseCyclesPerSec * Math.PI), 4));
+      const maxOpacity = 0.30 + danger * 0.55;
+      this._nearDeathVignette.style.opacity = (pulse * maxOpacity).toFixed(3);
     }
   }
 
@@ -567,6 +580,9 @@ export class UI {
     // Screen vignette
     const vignette = div("fps-vignette");
     this.container.appendChild(vignette);
+
+    this._nearDeathVignette = div("near-death-vignette");
+    this.container.appendChild(this._nearDeathVignette);
 
     this.crosshair = div("fps-crosshair");
     this.crosshair.innerHTML = `<span class="fps-ch-h"></span><span class="fps-ch-v"></span>`;
@@ -2280,6 +2296,15 @@ const FPS_CSS = `
   0%   { opacity: 1; }
   30%  { opacity: 0.9; }
   100% { opacity: 0; }
+}
+.near-death-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 55;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(200,0,0,0.88) 100%);
+  opacity: 0;
+  transition: none;
 }
 .thunder-flash {
   position: absolute;
