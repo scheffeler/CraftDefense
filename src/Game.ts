@@ -17,7 +17,7 @@ import { BLOCK_BEHAVIORS } from "./config/blocks";
 import { BLOCK_DEFS } from "./Map";
 import { ITEMS } from "./config/items";
 import { getSpawnPositions, DUNGEON_CHEST_POSITIONS } from "./WorldGen";
-import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z } from "./config/map";
+import { FORTRESS_CENTER_X, FORTRESS_CENTER_Z, GROUND_OFFSET } from "./config/map";
 import type { ItemStack } from "./Inventory";
 import { Crafting } from "./Crafting";
 import { PassiveMobManager } from "./PassiveMob";
@@ -237,6 +237,17 @@ export class Game {
       }
       return "bedrock";
     });
+
+    // Seed torch lights for all torches pre-placed by world generation
+    for (let x = 0; x < 64; x++) {
+      for (let z = 0; z < 64; z++) {
+        for (let y = GROUND_OFFSET; y <= GROUND_OFFSET + 14; y++) {
+          if (this.gameMap.world.getBlock(x, y, z) === "torch") {
+            this.addTorchLight(x, y, z);
+          }
+        }
+      }
+    }
 
     this.wireCallbacks();
     this.refreshHUD();
