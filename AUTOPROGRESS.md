@@ -1,5 +1,32 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-31 — Flora wind sway (GPU-side vertex displacement for grass/flowers)
+
+**What was done:**
+- Added GPU-side wind sway to all terrain flora (grass blades, ferns, dandelions, poppies).
+- Uses `MeshLambertMaterial.onBeforeCompile` to inject a custom GLSL snippet into Three.js's
+  `begin_vertex` hook — no JS per-frame vertex updates, runs entirely on GPU.
+- Wind displacement scales with `uv.y` (0 at root, 1 at tip) so plants bend from their tops
+  while remaining rooted at the base — physically correct "flagpole" sway.
+- Phase = `worldX * 1.73 + worldZ * 2.31 + time * 1.1`, giving each plant a slightly different
+  oscillation so nearby flora sways out of sync rather than in lockstep.
+- Primary sway is in X (sin), secondary sway in Z at 0.71× frequency for natural-looking motion.
+- Max tip displacement ≈ ±5.5cm in X, ±3cm in Z — subtle and wind-speed realistic.
+- `_floraWindUniforms.uTime` is advanced each frame by piggybacking on the existing
+  `updateFluidAnimation(dt)` call — zero additional call sites required.
+
+**Ideas for next time:**
+- Wheat sway: apply the same `onBeforeCompile` wind trick to `wheatMat` so growing crops also
+  sway in the wind (possibly at a slightly lower amplitude than tall grass).
+- Biome-filtered flora types: taiga chunks spawn fewer flowers and more fern types; desert gets
+  sparse flora only in transition zones. Currently all biomes use the same 4-type pool.
+- Chicken idle peck: `group.userData.idleTimer` countdown; on expiry rotate `headGroup` forward
+  −0.4 rad then spring back over 0.3s — piggyback on `updateMobs()` dt loop in PassiveMob.ts.
+- Moon phase: each new game-day offset the shadow disc (`moonShadow.position.x += 0.5`) to cycle
+  through 8 phases over 8 days; reset at day 9.
+- Rain puddle darkening: in `rebuildChunkMesh` read `WeatherSystem.intensity` and slightly reduce
+  grass/dirt face brightness for wet-ground appearance during rain.
+
 ## 2026-05-31 — Terrain flora system (cross-plane grass/flower sprites)
 
 **What was done:**
