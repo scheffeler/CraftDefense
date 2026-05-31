@@ -1,5 +1,20 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-05-31 — Sheep wool color variety + animated lava pulsing glow
+
+**What was done:**
+- **Sheep color variety**: Added `SHEEP_WOOL_COLORS` const array of 8 colors (white, tan, gray, brown, black, red, blue, yellow) to `PassiveMob.ts`. `spawn()` picks a random color for each sheep; `buildMesh()` gained a `woolColor` parameter wired to both the body wool mesh AND the ear flap material so ears match the fleece. Herds now look naturally varied.
+- **Animated lava**: Added UV micro-wobble to lava scroll (two overlapping sin waves at 0.38/0.29 Hz) so the surface shifts irregularly instead of linearly. Added three-frequency pulsing emissive (2.10/1.30/0.71 Hz) that ranges from intensity 0.28–0.78 for an irregular "bubbling breathing" look. Added 1.73 Hz color cycle shifting between deep orange and yellow-orange at peaks.
+- Note: the session also initially attempted a block texture atlas expansion, but the remote `auto-iterate` branch had already done this (commits `cefb020` and `5815121`) in a more complete 2-row 32×32 format — the local commit was rebased away.
+
+**Ideas for next time:**
+- Chicken pecking animation: bob head forward/back every 3–5s when idle (use `group.userData.idleTimer`, trigger a brief `headPivot` rotation)
+- Animated lava canvas hotspot: store lava canvas context, every 0.15s `putImageData` the base + redraw 3–4 glowing blobs at random positions for pixel-level bubbling (complements the emissive pulse)
+- Crossbow bolt nocked in the rail: add a thin dark box along the rail when crossbow is the active item
+- Moon phase visual: change the shadow-disc offset on the moon mesh each game-day for night variety
+- Sheep drop wool with matching color (currently always drops default "wool" item regardless of color — could set a colored wool drop matching the spawn color)
+- Rain puddle darkening: set dirty flag on affected chunks and slightly darken dirt/stone top-face vertex colors when rain is active
+
 ## 2026-05-31 — Enemy weapon-arm parenting (weapons swing with arm animation)
 
 **What was done:**
