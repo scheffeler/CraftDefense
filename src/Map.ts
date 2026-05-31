@@ -226,10 +226,19 @@ export class VoxelWorld {
     const wMap = this.waterMat.map!;
     wMap.offset.x = (t * 0.04) % 1;
     wMap.offset.y = (t * 0.06 + Math.sin(t * 0.7) * 0.008) % 1;
-    // Lava: slow counter-diagonal scroll
+    // Lava: slow counter-diagonal scroll + UV micro-wobble
     const lMap = this.lavaMat.map!;
-    lMap.offset.x = (t * -0.018) % 1;
-    lMap.offset.y = (t * 0.012) % 1;
+    lMap.offset.x = (t * -0.018 + Math.sin(t * 0.38) * 0.006) % 1;
+    lMap.offset.y = (t *  0.012 + Math.sin(t * 0.29) * 0.007) % 1;
+    // Pulsing emissive glow: three overlapping frequencies give irregular "bubbling" breathing
+    const lavaGlow = 0.48
+      + Math.sin(t * 2.10) * 0.11
+      + Math.sin(t * 1.30 + 1.10) * 0.08
+      + Math.sin(t * 0.71 + 2.40) * 0.05;
+    this.lavaMat.emissiveIntensity = Math.max(0.28, Math.min(0.78, lavaGlow));
+    // Color shifts: more yellow-white at intensity peaks (hottest), deeper orange at troughs
+    const heat = Math.max(0, Math.sin(t * 1.73) * 0.5 + 0.5);
+    this.lavaMat.emissive.setRGB(1.0, 0.18 + heat * 0.28, 0.0);
   }
 
   private static makeFluidMaterial(type: "water" | "lava"): THREE.MeshLambertMaterial {

@@ -3,6 +3,18 @@ import { GROUND_OFFSET } from "./config/map";
 
 export type PassiveMobType = "cow" | "sheep" | "pig" | "chicken";
 
+// Sheep spawn with one of these wool colors at random for herd visual variety
+const SHEEP_WOOL_COLORS = [
+  0xeeeeee, // white
+  0xccaa88, // tan
+  0x999999, // gray
+  0x665544, // brown
+  0x221c18, // black
+  0xcc3333, // red
+  0x3366bb, // blue
+  0xddcc22, // yellow
+] as const;
+
 interface MobDef {
   bodyColor: number;
   headColor: number;
@@ -63,7 +75,10 @@ export class PassiveMobManager {
   spawn(type: PassiveMobType, x: number, z: number): void {
     const def = DEFS[type];
     const id = this.idCounter++;
-    const group = this.buildMesh(type, def);
+    const woolColor = type === "sheep"
+      ? SHEEP_WOOL_COLORS[Math.floor(Math.random() * SHEEP_WOOL_COLORS.length)]
+      : 0xeeeeee;
+    const group = this.buildMesh(type, def, woolColor);
     const y = GROUND_OFFSET + 1;
     group.position.set(x, y, z);
     group.scale.setScalar(def.scale);
@@ -169,7 +184,7 @@ export class PassiveMobManager {
     });
   }
 
-  private buildMesh(type: PassiveMobType, def: MobDef): THREE.Group {
+  private buildMesh(type: PassiveMobType, def: MobDef, woolColor = 0xeeeeee): THREE.Group {
     const group = new THREE.Group();
     const bodyMat = new THREE.MeshLambertMaterial({ color: def.bodyColor });
     const headMat = new THREE.MeshLambertMaterial({ color: def.headColor });
@@ -300,7 +315,7 @@ export class PassiveMobManager {
 
     if (type === "sheep") {
       // Fluffy wool overlay on body (slightly larger than body)
-      const woolMat = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+      const woolMat = new THREE.MeshLambertMaterial({ color: woolColor });
       const wool = new THREE.Mesh(new THREE.BoxGeometry(def.bodyW + 0.13, def.bodyH + 0.11, def.bodyD + 0.13), woolMat);
       wool.position.copy(body.position);
       group.add(wool);
@@ -316,8 +331,8 @@ export class PassiveMobManager {
       face.position.set(0, headY - 0.02, headZ + def.headSz * 0.52);
       group.add(face);
 
-      // Ears — flat flaps on sides of head
-      const earMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+      // Ears — flat flaps on sides of head, tinted slightly toward wool color
+      const earMat = new THREE.MeshLambertMaterial({ color: woolColor });
       for (const [ex, rot] of [[-1, 0.5], [1, -0.5]] as [number, number][]) {
         const ear = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.13, 0.10), earMat);
         ear.position.set(ex * (def.headSz * 0.6), headY - 0.03, headZ - 0.02);
