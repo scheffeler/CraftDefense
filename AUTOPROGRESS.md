@@ -1,5 +1,31 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-01 — Per-enemy hue variation + biome-filtered flora
+
+**What was done:**
+- **Enemy hue variation** (`src/Enemy.ts`): goblin, goblin_miner, orc, and zombie meshes now
+  receive a deterministic ±10% HSL hue shift seeded by their unique enemy ID. Every wave the
+  goblins range from yellow-green to teal-green with no two individuals identical. Zombies
+  additionally get ±5% lightness variation (fresh vs decomposed). Canvas face/body textures
+  are skipped via `mat.map` check so painted features stay crisp.
+- **Biome-filtered flora** (`src/Map.ts`): taiga-biome grass blocks now only spawn flora types
+  0 (tall grass) and 1 (fern/shrub) — no dandelions or poppies. Forest biome is unchanged
+  (all 4 types). Desert already produces no grass flora since surfaces are sand.
+
+**Ideas for next time:**
+- Moon phases: cycle moon texture through 8 phases over 8 game-days using dayNumber % 8 to
+  pick one of 8 pre-rendered crescent silhouettes drawn on the moon CanvasTexture
+- Rain puddle darkening: when weather intensity > 0.5, rebuild nearby chunk top-face vertex
+  colors with -12% brightness for stone/cobblestone/dirt blocks
+- Chicken wing flap: `userData.flapTimer` countdown in PassiveMob, rotate wing pivots ±0.5 rad
+  over 0.15 s when flapTimer > 0; retrigger on random 2–4 s interval
+- Troll/uruk_captain emissive eyes: add small emissive red eye meshes in buildUrukCaptainMesh
+  and buildTrollKingMesh (already have a golem eye pattern to copy from)
+- Particle trail on arrows: in Projectile.ts update loop, spawn 1-2 tiny smoke/dust quads
+  behind the arrow position each frame while it's airborne
+
+---
+
 ## 2026-06-01 — Wheat wind sway (GPU-side vertex displacement for crops)
 
 **What was done:**
