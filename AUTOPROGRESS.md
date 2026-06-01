@@ -1,5 +1,33 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-01 — Wheat wind sway (GPU-side vertex displacement for crops)
+
+**What was done:**
+- Extended the `onBeforeCompile` wind-sway technique (already applied to flora) to wheat crops.
+- All four wheat growth stages (sprout → ready) now bend gently in the wind on the GPU.
+- Parameters tuned to feel distinct from nearby flora: slower base speed (0.85× vs 1.1×), lower
+  tip amplitude (0.038 vs 0.055), different spatial phase (1.91×x + 2.63×z vs 1.73/2.31) so
+  crops sway out-of-sync with surrounding grass — natural-looking variation across the field.
+- `makeWheatMaterial()` now returns `{mat, uniforms}` matching `makeFloraMaterial()`. The
+  `_wheatWindUniforms.uTime` is advanced inside `updateFluidAnimation` alongside flora — zero
+  additional call sites needed.
+- Confirmed via dev-server screenshots: water animations, torch glow, puffy clouds, farmland
+  wheat sprites, wood-grain textures all render correctly with no regressions.
+
+**Ideas for next time:**
+- Moon phases: cycle the moon through 8 shapes over 8 game-days by updating a shader uniform
+  that masks a disc on a fullscreen quad, giving each night a distinct moon silhouette.
+- Rain puddle darkening: in `setWeatherIntensity`, loop over the 4 closest chunks to the player
+  and reduce top-face vertex-color brightness by 12% for dirt/stone when rain is heavy.
+- Biome-filtered flora: pass `biome` to `addFloraQuad` and for desert use only type-2 (dead
+  grass) + skip flowers; for taiga use fern (type-1) and fewer sprites per chunk.
+- Chicken flap: add `userData.flapTimer` to each chicken group in PassiveMob; on countdown,
+  rotate the wing pivots ±0.5 rad over 0.15 s using a lerp in `updateMobs`.
+- Enemy visual variety: randomise a ±10% hue shift on goblin body color using HSL, so no two
+  goblins look identical; apply the same trick to zombie skin tone.
+- Crossbow viewmodel: give the crossbow its own T-shaped geometry in `SceneManager` (separate
+  branch in `buildItemMesh`) with a dark stock, lighter rail, and thin string line.
+
 ## 2026-05-31 — Flora wind sway (GPU-side vertex displacement for grass/flowers)
 
 **What was done:**
