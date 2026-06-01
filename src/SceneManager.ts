@@ -1156,6 +1156,23 @@ export class SceneManager {
     trigger.rotation.x = 0.4;
     g.add(trigger);
 
+    // Nocked bolt — dark shaft, grey arrowhead, red-orange fletching
+    const boltShaftMat = new THREE.MeshLambertMaterial({ color: 0x2a1a08 });
+    const boltTipMat   = new THREE.MeshLambertMaterial({ color: 0x666666 });
+    const fletchMat    = new THREE.MeshLambertMaterial({ color: 0xcc4422 });
+    const boltShaft = b(0.012, 0.012, 0.190, boltShaftMat);
+    boltShaft.position.set(0, 0.317, -0.082);
+    g.add(boltShaft);
+    const boltTip = b(0.016, 0.016, 0.022, boltTipMat);
+    boltTip.position.set(0, 0.317, -0.179);
+    g.add(boltTip);
+    const fletchH = b(0.030, 0.007, 0.038, fletchMat);
+    fletchH.position.set(0, 0.317, 0.012);
+    g.add(fletchH);
+    const fletchV = b(0.007, 0.030, 0.038, fletchMat);
+    fletchV.position.set(0, 0.317, 0.012);
+    g.add(fletchV);
+
     g.position.set(0.02, 0.06, 0.0);
     return g;
   }

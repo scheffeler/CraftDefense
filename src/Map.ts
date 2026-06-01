@@ -1424,6 +1424,8 @@ export class VoxelWorld {
             }
             // Lava and fire self-illuminate: boost HDR above 1.0 so ACES tone mapping glows
             if (id === "lava" || id === "fire") { fr = 2.8; fg = 1.1; fb = 0.1; }
+            // Farmland top: dark moist-soil tint so tilled ground is distinct from regular dirt
+            if (id === "farmland" && f.n[1] > 0) { fr *= 0.60; fg *= 0.54; fb *= 0.58; }
 
             // Per-vertex AO: check adjacent blocks in tangent directions only
             // Emissive blocks skip AO so glow doesn't get darkened by corners

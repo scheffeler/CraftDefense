@@ -1,5 +1,42 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-01 — Farmland moist-soil tint + crossbow nocked bolt
+
+**What was done:**
+- **Farmland vertex tint** (`src/Map.ts`): After the lava/fire emissive boost line in
+  `rebuildChunkMesh`, added a vertex-color multiplier for `id === "farmland"` top faces
+  (`f.n[1] > 0`): `fr *= 0.60; fg *= 0.54; fb *= 0.58`. This darkens tilled soil by ~40%
+  with a slightly cool, earthy tone — making farmland clearly distinguishable from adjacent
+  dirt blocks without requiring a new atlas tile slot. All 32 existing tile slots are occupied
+  so atlas expansion was not an option.
+- **Crossbow nocked bolt** (`src/SceneManager.ts`): Added 4 BoxGeometry pieces to
+  `buildCrossbowMesh()` just before the final `g.position.set` call — a dark wooden shaft
+  (0.012×0.012×0.190, `0x2a1a08`) centered on the rail at y=0.317, a grey metal tip
+  (0.016×0.016×0.022, `0x666666`) at the forward end, and two perpendicular red-orange
+  fletching fins (0.030×0.007×0.038 horizontal + 0.007×0.030×0.038 vertical, `0xcc4422`)
+  at the rear end. The bolt sits exactly on the existing rail geometry (y=0.317 matches rail
+  y-center) so it looks nocked and ready to fire.
+
+**Notes on this session:**
+- TypeScript compile clean (`npx tsc -p tsconfig.emit.json` zero errors).
+- Farmland tinting uses the existing biome-tint infrastructure; the multiplier runs after
+  `blockBiomeTint` so biome variation is preserved and further darkened for farmland.
+
+**Ideas for next time:**
+- Skeleton arrow trail density: `isBolt=true` particles in `spawnArrowTrail` currently spawn
+  at 45% chance — could bump to 70% for bolts to make the crossbow feel heavier
+- Lava ambient light pulse: add a `PointLight` above each lava-containing chunk that syncs
+  its intensity to the existing `_lavaEmissivePulse` value in `updateFluidAnimation`
+- Depth-of-field vignette: `armScene` camera renders the held-item; could overlay a radial
+  blur at screen edges by rendering a second fullscreen quad in `renderArm` using canvas 2D
+  `radialGradient` with a low-opacity dark ring
+- Water surface reflection tint: during midday (ambient > 0.8), multiply water top-face
+  vertex colors by a sky-blue tint to simulate reflected sky light
+- Goblin miner hard-hat: add a yellow `BoxGeometry` helmet prop on the miner goblin's head
+  in `buildGoblinMesh` (check the type name when building to conditionally add the hat)
+
+---
+
 ## 2026-06-01 — Moon corona glow + animated lava canvas hotspots
 
 **What was done:**
