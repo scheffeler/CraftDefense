@@ -208,6 +208,7 @@ export class VoxelWorld {
   private readonly floraMat: THREE.MeshLambertMaterial;
   private _fluidTime = 0;
   private _floraWindUniforms!: { uTime: THREE.IUniform<number> };
+  private _wheatWindUniforms!: { uTime: THREE.IUniform<number> };
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -216,7 +217,9 @@ export class VoxelWorld {
     this.blockTex = VoxelWorld.makeBlockTexture();
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
-    this.wheatMat = VoxelWorld.makeWheatMaterial();
+    const { mat: wMat, uniforms: wheatWind } = VoxelWorld.makeWheatMaterial();
+    this.wheatMat = wMat;
+    this._wheatWindUniforms = wheatWind;
     const { mat: floraMat, uniforms: floraWind } = VoxelWorld.makeFloraMaterial();
     this.floraMat = floraMat;
     this._floraWindUniforms = floraWind;
@@ -245,8 +248,9 @@ export class VoxelWorld {
     // Color shifts: more yellow-white at intensity peaks (hottest), deeper orange at troughs
     const heat = Math.max(0, Math.sin(t * 1.73) * 0.5 + 0.5);
     this.lavaMat.emissive.setRGB(1.0, 0.18 + heat * 0.28, 0.0);
-    // Advance flora wind time
+    // Advance flora and wheat wind time
     this._floraWindUniforms.uTime.value = t;
+    this._wheatWindUniforms.uTime.value = t;
   }
 
   private static makeFluidMaterial(type: "water" | "lava"): THREE.MeshLambertMaterial {
@@ -333,7 +337,7 @@ export class VoxelWorld {
     return mat;
   }
 
-  private static makeWheatMaterial(): THREE.MeshLambertMaterial {
+  private static makeWheatMaterial(): { mat: THREE.MeshLambertMaterial; uniforms: { uTime: THREE.IUniform<number> } } {
     // 4-stage wheat sprite sheet: 64×16 canvas, each 16×16 tile is one growth stage.
     // Sprites drawn with transparent backgrounds; cross geometry uses alphaTest:0.5.
     const STAGES = 4, S = 16;
@@ -399,12 +403,28 @@ export class VoxelWorld {
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
-    return new THREE.MeshLambertMaterial({
+    const windUniforms: { uTime: THREE.IUniform<number> } = { uTime: { value: 0.0 } };
+    const mat = new THREE.MeshLambertMaterial({
       map: tex,
       transparent: true,
       alphaTest: 0.4,
       side: THREE.DoubleSide,
     });
+    // GPU wind sway: crops bend at the tips, stay rooted at the base (uv.y = 0 → root, 1 → tip).
+    // Slightly slower and lower amplitude than flora, with a different spatial phase.
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = windUniforms.uTime;
+      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        float windPhase = position.x * 1.91 + position.z * 2.63 + uTime * 0.85;
+        float sway = uv.y * 0.038;
+        transformed.x += sin(windPhase) * sway;
+        transformed.z += cos(windPhase * 0.83) * sway * 0.45;`,
+      );
+    };
+    return { mat, uniforms: windUniforms };
   }
 
   private static makeFloraMaterial(): { mat: THREE.MeshLambertMaterial; uniforms: { uTime: THREE.IUniform<number> } } {
