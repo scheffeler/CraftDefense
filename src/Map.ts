@@ -206,6 +206,9 @@ export class VoxelWorld {
   private readonly lavaMat: THREE.MeshLambertMaterial;
   private readonly wheatMat: THREE.MeshLambertMaterial;
   private readonly floraMat: THREE.MeshLambertMaterial;
+  // Shared opaque-block material — all chunk meshes share it so wetness is one uniform
+  private readonly _chunkMat: THREE.MeshLambertMaterial;
+  private readonly _chunkWetUniforms: { uWetness: THREE.IUniform<number> } = { uWetness: { value: 0.0 } };
   private _fluidTime = 0;
   private _floraWindUniforms!: { uTime: THREE.IUniform<number> };
   private _wheatWindUniforms!: { uTime: THREE.IUniform<number> };
@@ -215,6 +218,7 @@ export class VoxelWorld {
     this.chunkMeshGroup = new THREE.Group();
     scene.add(this.chunkMeshGroup);
     this.blockTex = VoxelWorld.makeBlockTexture();
+    this._chunkMat = VoxelWorld.makeChunkMaterial(this.blockTex, this._chunkWetUniforms);
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
     const { mat: wMat, uniforms: wheatWind } = VoxelWorld.makeWheatMaterial();
@@ -226,6 +230,11 @@ export class VoxelWorld {
   }
 
   getBlockTexture(): THREE.Texture { return this.blockTex; }
+
+  /** 0 = dry, 1 = fully wet — darkens top-facing block surfaces to simulate rain puddles. */
+  setWetness(t: number): void {
+    this._chunkWetUniforms.uWetness.value = Math.max(0, Math.min(1, t));
+  }
 
   /** Advance fluid animation — call every frame with elapsed seconds. */
   updateFluidAnimation(dt: number): void {
@@ -251,6 +260,36 @@ export class VoxelWorld {
     // Advance flora and wheat wind time
     this._floraWindUniforms.uTime.value = t;
     this._wheatWindUniforms.uTime.value = t;
+  }
+
+  /** Shared material for all opaque chunk meshes. Injects a uWetness uniform that
+   *  darkens top-face vertex colours to simulate rain-soaked ground. */
+  private static makeChunkMaterial(
+    blockTex: THREE.Texture,
+    wetUniforms: { uWetness: THREE.IUniform<number> },
+  ): THREE.MeshLambertMaterial {
+    const mat = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      map: blockTex,
+      side: THREE.FrontSide,
+      alphaTest: 0.1,
+    });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uWetness = wetUniforms.uWetness;
+      // Inject uniform declaration at the top of the vertex shader
+      shader.vertexShader = 'uniform float uWetness;\n' + shader.vertexShader;
+      // After color_vertex assigns vColor from the attribute, darken top-facing vertices
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <color_vertex>',
+        `#include <color_vertex>
+        #ifdef USE_COLOR
+          float _wv = max(0.0, normal.y);
+          vColor.xyz *= 1.0 - uWetness * 0.28 * _wv;
+          vColor.xyz = mix(vColor.xyz, vec3(0.34, 0.39, 0.46), uWetness * _wv * 0.10);
+        #endif`,
+      );
+    };
+    return mat;
   }
 
   private static makeFluidMaterial(type: "water" | "lava"): THREE.MeshLambertMaterial {
@@ -1179,7 +1218,7 @@ export class VoxelWorld {
     if (chunk.mesh) {
       this.chunkMeshGroup.remove(chunk.mesh);
       chunk.mesh.geometry.dispose();
-      (chunk.mesh.material as THREE.Material).dispose();
+      // Do NOT dispose _chunkMat — it is shared across all chunk meshes
       chunk.mesh = null;
     }
     if (chunk.waterMesh) {
@@ -1400,13 +1439,7 @@ export class VoxelWorld {
     geo.setIndex(indices);
     geo.computeBoundsTree();
 
-    const mat = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      map: this.blockTex,
-      side: THREE.FrontSide,
-      alphaTest: 0.1,
-    });
-    chunk.mesh = new THREE.Mesh(geo, mat);
+    chunk.mesh = new THREE.Mesh(geo, this._chunkMat);
     chunk.mesh.receiveShadow = true;
     chunk.mesh.castShadow = true;
     this.chunkMeshGroup.add(chunk.mesh);

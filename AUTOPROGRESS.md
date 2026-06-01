@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-01 — Rain puddle darkening via GPU wetness shader
+
+**What was done:**
+- Refactored `VoxelWorld` chunk material from per-chunk allocations to a single shared
+  `_chunkMat` (`MeshLambertMaterial`) with an `onBeforeCompile` GLSL injection.
+- The injected vertex-shader snippet reads a `uWetness` uniform (0→1) and — for
+  top-facing geometry (`normal.y > 0`) — darkens vertex colours by up to 28% and blends
+  them toward a cool blue-gray `vec3(0.34, 0.39, 0.46)` by up to 10%.
+- Added `VoxelWorld.setWetness(t)` public method; `Game.ts` calls it every frame after
+  the existing `setWeatherIntensity` call, passing `weather.intensity` directly.
+- Sharing the material also removes ~4 KB of per-chunk `MeshLambertMaterial` allocations
+  and their subsequent `dispose()` calls during chunk rebuilds — minor GC win.
+- Visually: during rain, all top-facing block surfaces (cobblestone floor, grass, sand,
+  stone roofs) become noticeably darker and slightly cool-toned. No chunk rebuilds needed —
+  the uniform is updated once per frame.
+
+**Ideas for next time:**
+- Animated lava hotspot: per-frame shift random pixels in the lava CanvasTexture slightly
+  brighter/darker (±20%) to simulate bubbling. Only update the subset near the camera.
+- Particle trail on skeleton/player arrows already has `spawnArrowTrail` called; consider
+  increasing trail density for bolts (isBolt=true) to make crossbow feel heavier.
+- Fog of war / shadow volumes: at night, areas far from torches get extra fog darkening
+  (multiply fog `near`/`far` by 0.6 in torch-free radius). Already have torch positions.
+- Depth-of-field post effect: blur via MRT + convolution when looking far (scoped rifle view).
+- Moon phase glow: add an emissive corona sphere around the moon that scales with moon phase
+  (full moon = large soft bloom, new moon = no corona).
+
+---
+
 ## 2026-06-01 — Uruk Captain animated war banner
 
 **What was done:**

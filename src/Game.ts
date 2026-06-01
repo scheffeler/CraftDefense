@@ -1618,6 +1618,7 @@ export class Game {
     this.weather.update(dt, this.scene.camera);
     this.scene.setWeatherIntensity(this.weather.intensity);
     this.audio.setRainIntensity(this.weather.intensity);
+    this.gameMap.world.setWetness(this.weather.intensity);
 
     // Rain ground splashes — spawn tiny water-ring particles around the player when raining
     if (this.weather.intensity > 0.1) {
