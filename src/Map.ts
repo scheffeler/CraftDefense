@@ -212,6 +212,8 @@ export class VoxelWorld {
   private _fluidTime = 0;
   private _floraWindUniforms!: { uTime: THREE.IUniform<number> };
   private _wheatWindUniforms!: { uTime: THREE.IUniform<number> };
+  private _lavaHotTimer = 0;
+  private _lavaOrigData: ImageData | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -221,6 +223,9 @@ export class VoxelWorld {
     this._chunkMat = VoxelWorld.makeChunkMaterial(this.blockTex, this._chunkWetUniforms);
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
+    // Snapshot the lava canvas pixels so we can restore them between hotspot updates
+    const _lavaCanvas = this.lavaMat.map!.image as HTMLCanvasElement;
+    this._lavaOrigData = _lavaCanvas.getContext("2d")!.getImageData(0, 0, _lavaCanvas.width, _lavaCanvas.height);
     const { mat: wMat, uniforms: wheatWind } = VoxelWorld.makeWheatMaterial();
     this.wheatMat = wMat;
     this._wheatWindUniforms = wheatWind;
@@ -260,6 +265,27 @@ export class VoxelWorld {
     // Advance flora and wheat wind time
     this._floraWindUniforms.uTime.value = t;
     this._wheatWindUniforms.uTime.value = t;
+
+    // Animated lava hotspots: every ~0.13s restore original pixels then splat 4 bright
+    // yellow-white blobs at random positions to simulate rising molten bubbles.
+    this._lavaHotTimer += dt;
+    if (this._lavaHotTimer >= 0.13 && this._lavaOrigData) {
+      this._lavaHotTimer -= 0.13;
+      const canvas = this.lavaMat.map!.image as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d")!;
+      const S = canvas.width; // 32
+      ctx.putImageData(this._lavaOrigData, 0, 0);
+      for (let i = 0; i < 4; i++) {
+        const hx = Math.floor(Math.random() * (S - 2));
+        const hy = Math.floor(Math.random() * (S - 2));
+        const g = Math.floor(180 + Math.random() * 70);
+        ctx.fillStyle = `rgba(255,${g},0,0.75)`;
+        ctx.fillRect(hx, hy, 2, 2);
+        ctx.fillStyle = `rgba(255,255,${Math.floor(Math.random() * 80)},0.65)`;
+        ctx.fillRect(hx, hy, 1, 1);
+      }
+      this.lavaMat.map!.needsUpdate = true;
+    }
   }
 
   /** Shared material for all opaque chunk meshes. Injects a uWetness uniform that

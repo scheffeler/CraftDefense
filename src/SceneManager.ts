@@ -73,6 +73,7 @@ export class SceneManager {
   private _starTime = 0;
   private readonly moon: THREE.Mesh;
   private readonly moonShadow: THREE.Mesh;
+  private readonly moonGlow: THREE.Mesh;
   private readonly sun:  THREE.Mesh;
   private readonly skyDome: THREE.Mesh;
   private readonly skyZenith  = new THREE.Color(0x5ab3dd);
@@ -137,7 +138,7 @@ export class SceneManager {
     this.skyDome = this.buildSkyDome();
     this.buildClouds();
     this.starGroups = this.buildStars();
-    [this.moon, this.moonShadow] = this.buildMoon();
+    [this.moon, this.moonShadow, this.moonGlow] = this.buildMoon();
     this.sun   = this.buildSun();
 
     // Arm scene — rendered after main scene with depth cleared
@@ -279,6 +280,12 @@ export class SceneManager {
       .addScaledVector(camFwd, -0.5);
     this.moonShadow.quaternion.copy(this.camera.quaternion);
     (this.moonShadow.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
+
+    // Moon corona glow: strongest at full moon (phase≈0 or 1), zero at new moon (phase≈0.5).
+    const moonFullness = Math.abs(1 - moonPhase * 2); // 1=full, 0=new
+    (this.moonGlow.material as THREE.MeshBasicMaterial).opacity = nightness * moonFullness * 0.28;
+    this.moonGlow.position.copy(this.moon.position).addScaledVector(camFwd, -0.3);
+    this.moonGlow.quaternion.copy(this.camera.quaternion);
 
     // Sun: follows sun light direction
     const sunOpacity = Math.min(1, Math.max(0, frame.ambientInt * 1.8 - 0.4));
@@ -1243,7 +1250,7 @@ export class SceneManager {
     return groups;
   }
 
-  private buildMoon(): [THREE.Mesh, THREE.Mesh] {
+  private buildMoon(): [THREE.Mesh, THREE.Mesh, THREE.Mesh] {
     const geo = new THREE.PlaneGeometry(14, 14);
     const tex = SceneManager.makeMoonTexture();
     const mat = new THREE.MeshBasicMaterial({
@@ -1261,7 +1268,18 @@ export class SceneManager {
     });
     const shadow = new THREE.Mesh(shadowGeo, shadowMat);
     this.scene.add(shadow);
-    return [mesh, shadow];
+
+    // Soft corona glow ring — additive blending, blue-white, strongest at full moon.
+    const glowGeo = new THREE.RingGeometry(7.5, 22, 32);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xaaccff, transparent: true, opacity: 0,
+      fog: false, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    this.scene.add(glow);
+
+    return [mesh, shadow, glow];
   }
 
   private static makeMoonTexture(): THREE.CanvasTexture {
