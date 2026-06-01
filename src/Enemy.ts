@@ -1359,6 +1359,41 @@ export class EnemyManager {
     blade.position.set(0.13, 0.20, 0.10); urukRightArmPivot!.add(blade);
     const tip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.03), bladeMat);
     tip.position.set(0.13, 0.64, 0.10); urukRightArmPivot!.add(tip);
+
+    // War banner on the back — distinguishes the captain from a distance
+    const poleMat2 = new THREE.MeshLambertMaterial({ color: 0x3a2810 });
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.055, 1.55, 0.055), poleMat2);
+    pole.position.set(0, 1.28, -0.22);
+    pole.castShadow = true;
+    group.add(pole);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.055), poleMat2);
+    bar.position.set(-0.03, 2.04, -0.22);
+    group.add(bar);
+    const finial = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.09), goldMat);
+    finial.position.set(0, 2.08, -0.22);
+    group.add(finial);
+    const bannerPivot = new THREE.Object3D();
+    bannerPivot.name = "bannerpivot";
+    bannerPivot.position.set(-0.03, 2.02, -0.22);
+    group.add(bannerPivot);
+    const bannerBodyMat = new THREE.MeshLambertMaterial({ color: 0x7a0a0a, side: THREE.DoubleSide });
+    const bannerBody = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.46, 0.025), bannerBodyMat);
+    bannerBody.position.set(0, -0.24, 0);
+    bannerPivot.add(bannerBody);
+    const emblMat = new THREE.MeshLambertMaterial({ color: 0xddaa00, emissive: 0x553300, emissiveIntensity: 0.25 });
+    const ovalH = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.03), emblMat);
+    ovalH.position.set(0, -0.24, 0);
+    bannerPivot.add(ovalH);
+    const ovalV = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.13, 0.03), emblMat);
+    ovalV.position.set(0, -0.24, 0);
+    bannerPivot.add(ovalV);
+    const borderMat = new THREE.MeshLambertMaterial({ color: 0x1a0a00 });
+    const topBorder = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.04, 0.03), borderMat);
+    topBorder.position.set(0, -0.02, 0);
+    bannerPivot.add(topBorder);
+    const botBorder = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.04, 0.03), borderMat);
+    botBorder.position.set(0, -0.46, 0);
+    bannerPivot.add(botBorder);
   }
 
   private animateLegs(id: number, phase: number): void {
@@ -1376,6 +1411,9 @@ export class EnemyManager {
         const isOrcArm = idx === 1 && (type === "orc" || type === "zombie");
         const base = isWeaponArm ? -0.55 : isOrcArm ? -0.28 : 0;
         (c as THREE.Object3D).rotation.x = base + Math.sin(phase + (1 - idx) * Math.PI) * 0.45;
+      } else if (c.name === "bannerpivot") {
+        (c as THREE.Object3D).rotation.z = Math.sin(phase * 0.9) * 0.18 + Math.sin(phase * 1.7) * 0.06;
+        (c as THREE.Object3D).rotation.y = Math.sin(phase * 0.5 + 1.3) * 0.07;
       }
     });
     // Slight walk bob — only at ground level (preserved by caller for climbing)

@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-01 — Uruk Captain animated war banner
+
+**What was done:**
+- Added an animated war banner to the Uruk Captain (`src/Enemy.ts`): wooden pole (1.55 units
+  tall) with a crossbar and gold finial cap on its back, plus a `bannerpivot` Object3D holding
+  dark red cloth (0.32×0.46, `DoubleSide`) with a gold eye-rune emblem (two overlapping BoxGeometry
+  quads) and dark border strips at top/bottom.
+- `animateLegs()` traverse now handles `c.name === "bannerpivot"`: dual-frequency sinusoid
+  rotation in Z (0.9 Hz + 1.7 Hz) and single in Y (0.5 Hz) makes the cloth ripple like wind.
+- The banner makes the Uruk Captain visually distinct at range — players identify the dangerous
+  unit before it reaches the wall.
+
+**Ideas for next time:**
+- Rain puddle darkening: when weather intensity > 0.5, rebuild nearby chunk top-face vertex
+  colors with -12% brightness for stone/cobblestone/dirt blocks
+- Troll King crown: gold box-geometry crown (5 rectangular spikes in a ring) on `buildTrollKingMesh`
+- Torch point lights: add THREE.PointLight near placed torch blocks for warm radius glow
+- Animated lava hotspot: per-frame randomly brighten/darken bright pixels in the lava CanvasTexture
+
+---
+
 ## 2026-06-01 — Per-enemy hue variation + biome-filtered flora
 
 **What was done:**
