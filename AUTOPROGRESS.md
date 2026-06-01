@@ -1,5 +1,40 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-01 — Moon corona glow + animated lava canvas hotspots
+
+**What was done:**
+- **Moon corona glow** (`src/SceneManager.ts`): Added a `RingGeometry(7.5, 22, 32)`
+  `MeshBasicMaterial` with `AdditiveBlending` and cool blue-white (#aaccff) as a third
+  element returned by `buildMoon()`. In `updateDayNight()` its opacity is driven by
+  `nightness * moonFullness * 0.28` where `moonFullness = |1 - moonPhase * 2|` — full moon
+  gets the brightest ring, new moon has no ring at all. Billboards toward the camera every
+  frame, positioned 0.3 units in front of the moon disc to avoid z-fighting.
+- **Animated lava hotspots** (`src/Map.ts`): Added `_lavaHotTimer` and `_lavaOrigData`
+  (ImageData snapshot taken at VoxelWorld construction time). Every 0.13 s inside
+  `updateFluidAnimation()`: restores original lava canvas pixels via `ctx.putImageData`,
+  then splats 4 random 2×2 yellow-white hotspot blobs with a 1×1 bright center. Sets
+  `lavaMat.map!.needsUpdate = true` to upload the updated canvas to the GPU each tick.
+  Complements the existing UV scroll and emissive pulse with pixel-level "rising bubble"
+  animation visible on the lava surface top faces.
+
+**Notes on this session:**
+- Remote `auto-iterate` branch was 10 commits ahead; reset `--hard` to origin before
+  making changes. The existing codebase already had: moon phases, sun glow, sky dome
+  gradient, GPU wind sway, biome tinting, torch PointLights, rain puddles, war banners,
+  per-enemy hue variation, and many more visual features.
+- TypeScript compile clean.
+
+**Ideas for next time:**
+- Chicken wing flap: add `userData.flapTimer` countdown in PassiveMob; rotate wing pivots
+  ±0.5 rad over 0.15 s when flapTimer > 0; retrigger on random 2–4 s interval
+- Troll King crown: gold box-geometry crown (5 rectangular spike boxes in a ring) on head
+- Crossbow bolt nocked in rail: thin dark box along rail when crossbow is active item
+- Lava ambient light: small orange PointLight above each lava chunk that pulses with the
+  emissive to cast warm light on nearby blocks
+- Depth-of-field vignette: subtle radial blur effect in armScene at screen edges
+
+---
+
 ## 2026-06-01 — Rain puddle darkening via GPU wetness shader
 
 **What was done:**
