@@ -1281,7 +1281,15 @@ export class VoxelWorld {
             if (aboveId === "air") {
               const h = (((wx * 374761393) ^ (wz * 1234567)) >>> 0);
               if ((h % 3) === 0) { // ~33% of grass tops get flora
-                floraEntries.push([wx, wy + 1, wz, (h >> 2) % 4]);
+                // Biome-filtered flora: taiga gets grass+fern only; forest gets all 4 types
+                const fbx = Math.floor(wx / 22), fbz = Math.floor(wz / 22);
+                const fbn1 = (biomeHash(fbx * 9871 + 3001, fbz * 7649 + 2003) % 1000) / 1000;
+                const ffx = Math.floor(wx / 11), ffz = Math.floor(wz / 11);
+                const fbn2 = (biomeHash(ffx * 4567 + 1001, ffz * 3457 + 5003) % 1000) / 1000;
+                const fbn = fbn1 * 0.75 + fbn2 * 0.25;
+                // taiga (fbn > 0.70): types 0–1 only (tall grass, fern); forest: all 4
+                const floraType = fbn > 0.70 ? (h >> 2) % 2 : (h >> 2) % 4;
+                floraEntries.push([wx, wy + 1, wz, floraType]);
               }
             }
           }

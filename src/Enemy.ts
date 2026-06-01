@@ -204,6 +204,31 @@ export class EnemyManager {
 
     const group = this.buildMesh(type, cfg.scale);
 
+    // Per-enemy hue variation so no two goblins/orcs/zombies look identical
+    if (type === "goblin" || type === "goblin_miner" || type === "orc" || type === "zombie") {
+      const seed = (id * 2654435761) >>> 0;
+      const hueDelta  = ((seed % 201) - 100) / 1000;        // ±0.10 hue shift
+      const lightDelta = type === "zombie"
+        ? ((((seed >>> 8) % 101) - 50) / 1000)              // ±0.05 lightness for undead rot
+        : 0;
+      const hslBuf: { h: number; s: number; l: number } = { h: 0, s: 0, l: 0 };
+      group.traverse(obj => {
+        if (!(obj as THREE.Mesh).isMesh) return;
+        const mats = (obj as THREE.Mesh).material;
+        const matList: THREE.Material[] = Array.isArray(mats) ? mats : [mats];
+        for (const mat of matList) {
+          if (!(mat instanceof THREE.MeshLambertMaterial)) continue;
+          if (mat.map) continue; // preserve painted canvas face textures
+          mat.color.getHSL(hslBuf);
+          mat.color.setHSL(
+            (hslBuf.h + hueDelta + 1.0) % 1.0,
+            hslBuf.s,
+            Math.max(0.05, Math.min(0.95, hslBuf.l + lightDelta)),
+          );
+        }
+      });
+    }
+
     if (FLOW_FIELD_TYPES.has(type)) {
       let sx: number, sz: number;
       if (spawnX !== undefined && spawnZ !== undefined) {
