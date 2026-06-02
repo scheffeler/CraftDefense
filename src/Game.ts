@@ -1677,12 +1677,13 @@ export class Game {
       }
     }
 
-    // Biome-specific fog distance: desert=clearer, taiga=slightly mistier
+    // Biome-specific fog distance + sky tint: desert=clearer/warmer, taiga=mistier/cooler
     const biome = getBiomeAt(this.player.position.x, this.player.position.z);
     const biomeFogFar = biome === "desert" ? 165 : biome === "taiga" ? 115 : 130;
     this._fogFarTarget = biomeFogFar;
     this._fogFarCurrent += (this._fogFarTarget - this._fogFarCurrent) * Math.min(1, dt * 0.5);
     this.scene.setFogFarBase(this._fogFarCurrent);
+    this.scene.setBiome(biome);
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);

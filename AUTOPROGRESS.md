@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-02 — Shadow blob soft-edge + biome sky tint
+
+**What was done:**
+- **Shadow blob soft-edge** (`src/SceneManager.ts`): Replaced the flat black `CircleGeometry` player-shadow with a soft penumbra version. A 64×64 canvas is created with a radial gradient (`white → 75% at r=0.5 → 25% at r=0.82 → transparent at edge`) and used as the `alphaMap` on the `MeshBasicMaterial`. The result is a shadow that is dark and solid directly under the player, fading organically to nothing at the rim — far more realistic than the hard-edged disc. Also bumped circle segments from 20 to 24 for smoother silhouette.
+- **Biome sky tint** (`src/SceneManager.ts` + `src/Game.ts`): Added `_biome` field and `setBiome(biome: string)` method to `SceneManager`. In `updateDayNight`, after the sky zenith/horizon colours are set from the day-cycle frame, a biome tint is applied: desert boosts red ×1.06/×1.10 and green ×1.02/×1.04 while cutting blue ×0.88/×0.80 (warm sandy haze); taiga cuts red ×0.94/×0.95 and boosts blue ×1.05/×1.04 (cool pine-forest feel). Wired up from `Game.ts` by adding `this.scene.setBiome(biome)` in the biome-tracking block already present there.
+
+**Notes:**
+- Reset to remote `auto-iterate` which already had the 2-row 32×32 atlas, clouds, fog, emissive eyes, etc.
+- Picked shadow blob and sky tint as the two AUTOPROGRESS suggestions most likely to have immediate visual impact.
+- TypeScript compiles clean. Game loads and renders correctly in Chromium screenshot test.
+
+**Ideas for next time:**
+- Projectile trails: faint smoke/sparks behind flying arrows and bolts (`Particles.ts`)
+- Chicken wing flap: `userData.flapTimer` in `PassiveMob`; rotate wing pivot ±0.5 rad over 0.15 s
+- Enemy footprint decals: brief dark quad at enemy step position, fades over ~0.5 s
+- Rain puddle darkening: multiply top-face vertex colours of dirt/stone by ~0.85 when weather > 0.5
+- Campfire block: 2D cross-pane `Sprite` with animated fire texture + `PointLight(0xff4400, 1.5, 3)`
+- TNT countdown: floating canvas-texture sprite showing fuse seconds remaining above primed TNT
+
+---
+
 ## 2026-06-02 — Player ground-shadow blob + shadow normalBias
 
 **What was done:**

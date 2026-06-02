@@ -172,14 +172,28 @@ export class SceneManager {
       this.armScene.add(this._swingArcMesh);
     }
 
-    // Player ground-shadow blob — dark transparent circle projected at feet level
+    // Player ground-shadow blob — soft-edge dark disc projected at feet level
     {
-      const blobGeo = new THREE.CircleGeometry(0.52, 20);
+      const blobGeo = new THREE.CircleGeometry(0.52, 24);
+
+      // Radial gradient: opaque black at centre, fading to transparent at rim
+      const alphaCanvas = document.createElement("canvas");
+      alphaCanvas.width = alphaCanvas.height = 64;
+      const actx = alphaCanvas.getContext("2d")!;
+      const grad = actx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0,    "rgba(255,255,255,1)");
+      grad.addColorStop(0.50, "rgba(255,255,255,0.75)");
+      grad.addColorStop(0.82, "rgba(255,255,255,0.25)");
+      grad.addColorStop(1,    "rgba(0,0,0,0)");
+      actx.fillStyle = grad;
+      actx.fillRect(0, 0, 64, 64);
+
       const blobMat = new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
         opacity: 0.0,
         depthWrite: false,
+        alphaMap: new THREE.CanvasTexture(alphaCanvas),
       });
       this._playerShadowBlob = new THREE.Mesh(blobGeo, blobMat);
       this._playerShadowBlob.rotation.x = -Math.PI / 2;
@@ -234,6 +248,20 @@ export class SceneManager {
       (this.scene.fog as THREE.Fog).far  = this._fogFarBase - this._nightFarReduction;
       this.skyZenith.setHex(frame.topSky);
       this.skyHorizon.setHex(frame.sky);
+      // Biome sky tint: desert = warmer/sandier, taiga = cooler/bluer
+      if (this._biome === "desert") {
+        this.skyZenith.r  = Math.min(1, this.skyZenith.r  * 1.06);
+        this.skyZenith.g  = Math.min(1, this.skyZenith.g  * 1.02);
+        this.skyZenith.b  *= 0.88;
+        this.skyHorizon.r = Math.min(1, this.skyHorizon.r * 1.10);
+        this.skyHorizon.g = Math.min(1, this.skyHorizon.g * 1.04);
+        this.skyHorizon.b *= 0.80;
+      } else if (this._biome === "taiga") {
+        this.skyZenith.r  *= 0.94;
+        this.skyZenith.b  = Math.min(1, this.skyZenith.b  * 1.05);
+        this.skyHorizon.r *= 0.95;
+        this.skyHorizon.b = Math.min(1, this.skyHorizon.b * 1.04);
+      }
     }
 
     // Horizon haze: warm golden at dawn/dusk, cool blue-white at noon, invisible at night
@@ -340,6 +368,10 @@ export class SceneManager {
   }
 
   private _inLavaEffect = false;
+  private _biome = "forest";
+
+  /** Set the current biome so the sky colour can be tinted accordingly. */
+  setBiome(biome: string): void { this._biome = biome; }
 
   /** Enable/disable the underwater fog effect. */
   setUnderwaterEffect(inWater: boolean): void {
