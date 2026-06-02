@@ -11,3 +11,7 @@ dist_check/
 .claude/
 scripts/screenshot*.mjs
 scripts/ss_*.mjs
+scripts/atlas-*.mjs
+scripts/shadow-*.mjs
+scripts/take-screenshots-*.mjs
+scripts/blocks-screenshot.mjs
