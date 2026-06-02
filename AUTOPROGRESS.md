@@ -1,5 +1,38 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-02 — Night atmospheric fog + per-torch independent flicker
+
+**What was done:**
+- **Night atmospheric fog** (`src/SceneManager.ts`): Added `_nightFarReduction` field. In
+  `updateDayNight`, when `ambientInt` < 0.18, the fog far distance reduces from the biome base
+  (~130) down to ~75 at full midnight, and fog near reduces from 48 to 38. At dawn/dusk the
+  reduction is zero. `setWeatherIntensity` also subtracts `_nightFarReduction` so rain + night
+  combine correctly (rainy night = tightest possible fog). This creates the "torch as beacon"
+  atmospheric effect seen in the screenshots: fortress glows warmly while darkness crowds in.
+- **Per-torch independent flicker** (`src/Game.ts`): Each torch light and flame sprite now gets
+  a unique `flickerPhase = Math.random() * PI*2` stored in `userData` at creation. The flicker
+  loop uses this phase offset for both the `PointLight` intensity and the `Sprite` scale, adding
+  a third harmonic (19.7 Hz) for organic crackle. Previously all torches pulsed in perfect
+  unison; now each one has its own rhythm.
+
+**Notes:**
+- Started session fresh (no AUTOPROGRESS). Reset to remote `auto-iterate` (many prior sessions
+  already done). First attempt at atlas upgrade was redundant — remote already had 32×32 2-row.
+- Switched to night fog + torch flicker as focused, genuinely-new improvements.
+- TypeScript compile clean. Screenshots verify atmospheric night effect working.
+
+**Ideas for next time:**
+- Chicken wing flap: `userData.flapTimer` countdown in `PassiveMob` — WAIT, already done
+- Skeleton arrow trail density: bump `isBolt=true` spawn rate from 45% to 70% in
+  `spawnArrowTrail` for heavier crossbow feel
+- Goblin death shriek: short high-pitched audio cue on goblin despawn
+- Shadow normalBias: add `sunLight.shadow.normalBias = 0.02` to reduce peter-panning on cobble
+- Campfire/bonfire block: decorative block with animated fire sprite and warm PointLight
+- Player shadow blob: flat CircleGeometry under player feet that scales/fades with jump height
+- TNT countdown display: show remaining seconds as floating text above primed TNT
+
+---
+
 ## 2026-06-02 — Emissive eye glow on zombie, orc, and troll enemies
 
 **What was done:**

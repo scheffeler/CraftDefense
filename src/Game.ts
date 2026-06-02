@@ -1579,14 +1579,22 @@ export class Game {
     // TNT fuses countdown
     this.updateTNT(dt);
 
-    // Torch flicker — subtle sine-wave intensity variation + flame scale pulse
+    // Torch flicker — per-torch random phase so all torches flicker independently
     if (this.torchLights.size > 0) {
       const t = performance.now() * 0.001;
       for (const light of this.torchLights.values()) {
-        light.intensity = 1.6 + Math.sin(t * 7.3) * 0.25 + Math.sin(t * 12.1 + 1.5) * 0.12;
+        const p = (light.userData.flickerPhase as number) ?? 0;
+        light.intensity = 1.6
+          + Math.sin(t * 7.3  + p)       * 0.25
+          + Math.sin(t * 12.1 + p * 1.7) * 0.12
+          + Math.sin(t * 19.7 + p * 0.9) * 0.05; // third harmonic for organic crackle
       }
-      const flameScale = 1.0 + Math.sin(t * 9.1) * 0.12 + Math.sin(t * 14.7 + 0.8) * 0.06;
-      for (const flame of this._torchFlameMeshes) flame.scale.set(0.22 * flameScale, 0.32 * flameScale, 1);
+      // Flame sprites: each reads its own phase from userData (same phase as its sibling light)
+      for (const flame of this._torchFlameMeshes) {
+        const p = (flame.userData.flickerPhase as number) ?? 0;
+        const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
+        flame.scale.set(0.22 * fs, 0.32 * fs, 1);
+      }
     }
 
     // Lava light pulse — sync all lava PointLights to the bubbling emissive rhythm
@@ -2521,9 +2529,11 @@ export class Game {
     const key = this.torchKey(wx, wy, wz);
     if (this.torchLights.has(key)) return;
 
-    // Point light — warm orange glow
+    // Point light — warm orange glow with unique flicker phase per torch
     const light = new THREE.PointLight(0xffaa44, 1.8, 10, 2);
     light.position.set(wx + 0.5, wy + 0.8, wz + 0.5);
+    const flickerPhase = Math.random() * Math.PI * 2;
+    light.userData.flickerPhase = flickerPhase;
     this.scene.scene.add(light);
     this.torchLights.set(key, light);
 
@@ -2535,6 +2545,7 @@ export class Game {
 
     // Sprite origin is at its center; position 0.72 + half-height so base aligns with stick tip
     const flame = new THREE.Sprite(this._torchFlameMat);
+    flame.userData.flickerPhase = flickerPhase; // same phase as sibling light
     flame.scale.set(0.22, 0.32, 1);
     flame.position.set(0, 0.72 + 0.16, 0);
     group.add(flame);

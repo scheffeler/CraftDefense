@@ -92,6 +92,7 @@ export class SceneManager {
   private _underwaterEffect  = false;
   private _nightVisionEffect = false;
   private _fogFarBase = 130; // base far fog distance, overridden per biome
+  private _nightFarReduction = 0; // reduced at night for atmospheric darkness
 
   // Block texture shared with the voxel world — used for the held-block cube
   private _blockTex: THREE.Texture | null = null;
@@ -205,9 +206,13 @@ export class SceneManager {
       this.skyZenith.setHex(0x083560);
       this.skyHorizon.setHex(0x083560);
     } else {
+      // At night, tighten fog to simulate limited visibility in darkness.
+      // ambientInt ≈ 0.08 at midnight → reduces far by up to 55 units; dawn/dusk unchanged.
+      this._nightFarReduction = Math.max(0, 1 - frame.ambientInt / 0.18) * 55;
+      const nightNearPull = Math.max(0, 1 - frame.ambientInt / 0.18) * 10;
       (this.scene.fog as THREE.Fog).color.setHex(frame.fog);
-      (this.scene.fog as THREE.Fog).near = 48;
-      (this.scene.fog as THREE.Fog).far  = this._fogFarBase;
+      (this.scene.fog as THREE.Fog).near = 48 - nightNearPull;
+      (this.scene.fog as THREE.Fog).far  = this._fogFarBase - this._nightFarReduction;
       this.skyZenith.setHex(frame.topSky);
       this.skyHorizon.setHex(frame.sky);
     }
@@ -341,7 +346,7 @@ export class SceneManager {
     const t = intensity;
     const fogHex = lerpHex(frame.fog, fogRainy, t * 0.7);
     (this.scene.fog as THREE.Fog).color.setHex(fogHex);
-    (this.scene.fog as THREE.Fog).far = this._fogFarBase - t * 70; // rain reduces visibility
+    (this.scene.fog as THREE.Fog).far = this._fogFarBase - this._nightFarReduction - t * 70; // rain + night
     this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
     this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
     this.skyZenith.setHex(lerpHex(frame.topSky, rainyZenith, t * 0.7));
