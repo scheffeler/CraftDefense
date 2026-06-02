@@ -241,6 +241,21 @@ export class VoxelWorld {
     this._chunkWetUniforms.uWetness.value = Math.max(0, Math.min(1, t));
   }
 
+  /** Current lava emissive glow value (0.28–0.78); useful for syncing PointLight intensity. */
+  get lavaGlow(): number { return this._lavaGlow; }
+  private _lavaGlow = 0.48;
+
+  /** Tint the water material surface color toward the sky — call with current ambient light intensity (0–1). */
+  setWaterSkyTint(skyR: number, skyG: number, skyB: number, ambientInt: number): void {
+    // Reflection only visible above minimum light (dawn) and scales to full at noon
+    const blend = Math.max(0, Math.min(0.4, (ambientInt - 0.35) * 0.9));
+    // Water base hue: deep blue; sky tint blends additively
+    const r = Math.min(1, 0.10 + skyR * blend * 0.7);
+    const g = Math.min(1, 0.37 + skyG * blend * 0.7);
+    const b = Math.min(1, 0.66 + skyB * blend * 0.5);
+    this.waterMat.color.setRGB(r, g, b);
+  }
+
   /** Advance fluid animation — call every frame with elapsed seconds. */
   updateFluidAnimation(dt: number): void {
     this._fluidTime += dt;
@@ -258,7 +273,8 @@ export class VoxelWorld {
       + Math.sin(t * 2.10) * 0.11
       + Math.sin(t * 1.30 + 1.10) * 0.08
       + Math.sin(t * 0.71 + 2.40) * 0.05;
-    this.lavaMat.emissiveIntensity = Math.max(0.28, Math.min(0.78, lavaGlow));
+    this._lavaGlow = Math.max(0.28, Math.min(0.78, lavaGlow));
+    this.lavaMat.emissiveIntensity = this._lavaGlow;
     // Color shifts: more yellow-white at intensity peaks (hottest), deeper orange at troughs
     const heat = Math.max(0, Math.sin(t * 1.73) * 0.5 + 0.5);
     this.lavaMat.emissive.setRGB(1.0, 0.18 + heat * 0.28, 0.0);
@@ -1607,6 +1623,12 @@ export class GameMap {
 
   updateFluidAnimation(dt: number): void {
     this.world.updateFluidAnimation(dt);
+  }
+
+  get lavaGlow(): number { return this.world.lavaGlow; }
+
+  setWaterSkyTint(r: number, g: number, b: number, ambientInt: number): void {
+    this.world.setWaterSkyTint(r, g, b, ambientInt);
   }
 
   scanForBlock(id: import("./types").BlockId): Array<[number, number, number]> {

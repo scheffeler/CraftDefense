@@ -1259,6 +1259,20 @@ export class EnemyManager {
     }
 
     if (type === "goblin_miner") {
+      // Hard hat — yellow construction helmet sitting on head top (head center y=1.25, top=1.46)
+      const hatMat = new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x443300, emissiveIntensity: 0.15 });
+      // Wide brim
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.05, 0.54), hatMat);
+      brim.position.set(0, 1.475, 0);
+      group.add(brim);
+      // Dome top
+      const dome = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.17, 0.40), hatMat);
+      dome.position.set(0, 1.565, 0);
+      group.add(dome);
+      // Front brim visor — slight forward extension
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.04, 0.12), hatMat);
+      visor.position.set(0, 1.468, -0.33);
+      group.add(visor);
       // Pickaxe prop
       const pickMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
       const pick = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), pickMat);

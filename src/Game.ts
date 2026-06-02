@@ -1589,6 +1589,20 @@ export class Game {
       for (const flame of this._torchFlameMeshes) flame.scale.set(0.22 * flameScale, 0.32 * flameScale, 1);
     }
 
+    // Lava light pulse — sync all lava PointLights to the bubbling emissive rhythm
+    if (this.lavaLights.size > 0) {
+      const glow = this.gameMap.lavaGlow;
+      for (const light of this.lavaLights.values()) {
+        light.intensity = 1.8 + glow * 1.4; // range: ~2.2–2.9
+      }
+    }
+
+    // Water sky tint — at dawn/noon/dusk the water surface picks up the sky color
+    {
+      const skyBg = this.scene.scene.background as THREE.Color;
+      this.gameMap.setWaterSkyTint(skyBg.r, skyBg.g, skyBg.b, this.scene.daylight);
+    }
+
     // Freeplay: flow field tracks player (recomputed every 3 s)
     if (this.mode === "freeplay" && this.enemies.getAliveEnemies().length > 0) {
       this._flowUpdateTimer += dt;
