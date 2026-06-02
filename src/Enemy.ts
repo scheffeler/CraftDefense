@@ -1168,6 +1168,14 @@ export class EnemyManager {
         new THREE.MeshLambertMaterial({ map: faceTex }), // +Z front face
         side,
       ]);
+      // Sickly undead-green emissive eye glow visible at night
+      { const eyM = new THREE.MeshLambertMaterial({ color: 0x1a2a08, emissive: 0x55aa10, emissiveIntensity: 0.35 });
+        for (const eyX of [-0.11, 0.11]) {
+          const eyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.01), eyM);
+          eyMesh.position.set(eyX, 1.30, 0.22);
+          group.add(eyMesh);
+        }
+      }
     } else if (type === "goblin" || type === "goblin_miner") {
       const faceTex = EnemyManager.buildGoblinFaceTex();
       const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
@@ -1192,6 +1200,14 @@ export class EnemyManager {
         new THREE.MeshLambertMaterial({ map: faceTex }),
         side,
       ]);
+      // Burning orange-red emissive eyes — anger and bloodlust
+      { const eyM = new THREE.MeshLambertMaterial({ color: 0x550000, emissive: 0xff3300, emissiveIntensity: 0.6 });
+        for (const eyX of [-0.10, 0.10]) {
+          const eyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.04, 0.01), eyM);
+          eyMesh.position.set(eyX, 1.29, 0.22);
+          group.add(eyMesh);
+        }
+      }
     } else if (type === "troll") {
       const faceTex = EnemyManager.buildTrollFaceTex();
       const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
@@ -1200,6 +1216,14 @@ export class EnemyManager {
         new THREE.MeshLambertMaterial({ map: faceTex }),
         side,
       ]);
+      // Amber beast-eyes — primal and hungry
+      { const eyM = new THREE.MeshLambertMaterial({ color: 0x332200, emissive: 0xffaa00, emissiveIntensity: 0.55 });
+        for (const eyX of [-0.11, 0.11]) {
+          const eyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.01), eyM);
+          eyMesh.position.set(eyX, 1.26, 0.22);
+          group.add(eyMesh);
+        }
+      }
     } else if (type === "golem") {
       const faceTex = EnemyManager.buildGolemFaceTex();
       const side = new THREE.MeshLambertMaterial({ color: cfg.headColor });
