@@ -1,5 +1,29 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-02 — Enemy footprint decals
+
+**What was done:**
+- Added a `Decal` subsystem to `src/Particles.ts`: a separate array `decals: Decal[]` alongside `particles`. Decals are flat `CircleGeometry(0.22, 8)` meshes that lay on the ground (`rotation.x = -π/2`), with no gravity and no rotation — they simply fade from 22% opacity to 0 over 0.5 seconds.
+- Added `spawnFootprint(x, y, z)` method to `ParticleSystem` that creates a dark (`0x111111`) transparent circle and registers it in the decal array.
+- Updated `update(dt)` to process decals separately from regular particles (no gravity, no rotation), and updated `clear()` to also dispose decals on wave reset.
+- Added `_footprintTimer` field to `Game.ts`. In `updateCombat`, every 0.35 seconds, all alive non-dying enemies emit a footprint at `pos.y - 0.9` (ground level relative to enemy center). This creates brief dark circles under enemies as they advance — the "grounding" effect that makes enemy movement feel more physical.
+- TypeScript compiles clean. Dev server verified working.
+
+**Notes:**
+- Reset from fresh session to remote `auto-iterate` (already had gradient sky dome, animated water/lava, biome tints, shadow blobs, emissive eyes, etc.)
+- Picked footprint decals since it was mentioned 2× in recent AUTOPROGRESS and directly affects combat visuals (the most-played part of the game).
+- The footprint interval (0.35s) and opacity (0.22) are tuned to be subtle — visible close-up but not distracting.
+
+**Ideas for next time:**
+- TNT countdown display: floating canvas-texture Sprite above primed TNT showing seconds (e.g., "3") — already has `primedTNT` map with `timer` field, just needs a sprite child on the mesh
+- Campfire decorative block: cross-pane fire Sprite + PointLight(0xff4400, 1.5, 3), pre-built in fortress interior or as a new placeable
+- Skeleton arrow trail density: bump `if (Math.random() > 0.45)` to `if (Math.random() > 0.60)` in `spawnArrowTrail` for denser trails
+- Weapon impact flash: brief white/orange emissive flash on enemy mesh when hit, matching screen shake
+- Rain streaks: thin vertical `BoxGeometry(0.01, 0.3, 0.01)` translucent meshes spawned in a radius around player during rain — more atmospheric than sound alone
+- Wave-start color grade: brief desaturated → saturated (or foggy → clear) transition when a wave begins
+
+---
+
 ## 2026-06-02 — Shadow blob soft-edge + biome sky tint
 
 **What was done:**

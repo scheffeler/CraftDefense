@@ -9,8 +9,15 @@ interface Particle {
   maxLife: number;
 }
 
+interface Decal {
+  mesh: THREE.Mesh;
+  life: number;
+  maxLife: number;
+}
+
 export class ParticleSystem {
   private readonly particles: Particle[] = [];
+  private readonly decals: Decal[] = [];
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -349,6 +356,20 @@ export class ParticleSystem {
     this.spawnParticle(mesh, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, 0.18 + Math.random() * 0.12);
   }
 
+  /** Faint oval decal placed at ground level under an enemy step. Fades over 0.5 s. */
+  spawnFootprint(x: number, y: number, z: number): void {
+    const geo = new THREE.CircleGeometry(0.22, 8);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x111111, transparent: true, opacity: 0.22,
+      depthWrite: false, side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y + 0.02, z);
+    mesh.rotation.x = -Math.PI / 2;
+    this.scene.add(mesh);
+    this.decals.push({ mesh, life: 0, maxLife: 0.5 });
+  }
+
   /** Tiny water ring-splash when a raindrop hits a flat surface. */
   spawnRainSplash(x: number, y: number, z: number): void {
     const count = 4 + Math.floor(Math.random() * 3);
@@ -420,6 +441,20 @@ export class ParticleSystem {
       p.mesh.rotation.x += dt * 5;
       p.mesh.rotation.z += dt * 3;
     }
+
+    // Ground decals (footprints etc.) — flat, no gravity, linear fade
+    for (let i = this.decals.length - 1; i >= 0; i--) {
+      const d = this.decals[i];
+      d.life += dt;
+      if (d.life >= d.maxLife) {
+        this.scene.remove(d.mesh);
+        d.mesh.geometry.dispose();
+        (d.mesh.material as THREE.Material).dispose();
+        this.decals.splice(i, 1);
+        continue;
+      }
+      (d.mesh.material as THREE.MeshBasicMaterial).opacity = 0.22 * (1 - d.life / d.maxLife);
+    }
   }
 
   clear(): void {
@@ -429,5 +464,11 @@ export class ParticleSystem {
       (p.mesh.material as THREE.Material).dispose();
     }
     this.particles.length = 0;
+    for (const d of this.decals) {
+      this.scene.remove(d.mesh);
+      d.mesh.geometry.dispose();
+      (d.mesh.material as THREE.Material).dispose();
+    }
+    this.decals.length = 0;
   }
 }

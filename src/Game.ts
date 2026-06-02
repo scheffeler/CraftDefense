@@ -111,6 +111,7 @@ export class Game {
   private _autoSaveTimer = 0;
   private _regenTimer = 0;
   private _stepTimer  = 0;
+  private _footprintTimer = 0;
   private _headBob    = 0;
   private _wasInWater       = false;
   private _fogFarTarget  = 130;
@@ -2081,6 +2082,18 @@ export class Game {
 
   private updateCombat(dt: number): void {
     this.enemies.update(dt);
+
+    // Enemy footprint decals — dark fading circles under moving enemies
+    this._footprintTimer += dt;
+    if (this._footprintTimer >= 0.35) {
+      this._footprintTimer -= 0.35;
+      for (const state of this.enemies.getAliveEnemies()) {
+        if (!state.alive || state.dying) continue;
+        const pos = this.enemies.getEnemyPosition(state.id);
+        if (!pos) continue;
+        this.particles.spawnFootprint(pos.x, pos.y - 0.9, pos.z);
+      }
+    }
 
     // Enemy melee — damage player when within 1.8 blocks, once per 1.5 s
     const pp = this.player.position;
