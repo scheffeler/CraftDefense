@@ -9,5 +9,5 @@ dev-server-*.log
 screenshots/
 dist_check/
 .claude/
-scripts/screenshot_*.mjs
+scripts/screenshot*.mjs
 scripts/ss_*.mjs
