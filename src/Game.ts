@@ -1301,6 +1301,7 @@ export class Game {
         cz + Math.sin(this._titleAngle) * r,
       );
       cam.lookAt(cx, 7, cz);
+      this.scene.hidePlayerShadow();
     }
 
     if (this.phase === "gameover" || this.phase === "win") return;
@@ -1336,6 +1337,23 @@ export class Game {
       }
     }
     this._wasOnGround = this.player.onGround;
+
+    // Player shadow blob — find ground surface directly below player and update blob
+    {
+      const ppx = this.player.position.x;
+      const ppy = this.player.position.y;
+      const ppz = this.player.position.z;
+      let groundSurfY = 0;
+      const startY = Math.max(0, Math.floor(ppy) - 1);
+      for (let gy = startY; gy >= 0; gy--) {
+        const bid = this.gameMap.world.getBlock(Math.floor(ppx), gy, Math.floor(ppz));
+        if (bid !== "air" && !BLOCK_DEFS[bid]?.transparent) {
+          groundSurfY = gy + 1.0;
+          break;
+        }
+      }
+      this.scene.updatePlayerShadow(ppx, groundSurfY, ppz, ppy - groundSurfY);
+    }
 
     // Update crossbow loading HUD
     this.ui.updateCrossbowProgress(

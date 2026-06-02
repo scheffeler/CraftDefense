@@ -109,6 +109,9 @@ export class SceneManager {
   private _swingArcMesh!: THREE.Mesh;
   private _swingWeaponEquipped = false;
 
+  // Player ground-shadow blob
+  private _playerShadowBlob!: THREE.Mesh;
+
   onPointerLockChange: (locked: boolean) => void = () => {};
 
   constructor(container: HTMLElement) {
@@ -167,6 +170,22 @@ export class SceneManager {
       });
       this._swingArcMesh = new THREE.Mesh(arcGeo, arcMat);
       this.armScene.add(this._swingArcMesh);
+    }
+
+    // Player ground-shadow blob — dark transparent circle projected at feet level
+    {
+      const blobGeo = new THREE.CircleGeometry(0.52, 20);
+      const blobMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.0,
+        depthWrite: false,
+      });
+      this._playerShadowBlob = new THREE.Mesh(blobGeo, blobMat);
+      this._playerShadowBlob.rotation.x = -Math.PI / 2;
+      this._playerShadowBlob.renderOrder = 1;
+      this._playerShadowBlob.visible = false;
+      this.scene.add(this._playerShadowBlob);
     }
 
     window.addEventListener("resize", () => this.onResize());
@@ -1550,6 +1569,29 @@ export class SceneManager {
     this.camera.lookAt(32, 8, 60);
   }
 
+  /**
+   * Position the blob shadow under the player.
+   * groundSurfY  — Y-world of the top face of the block directly below the player.
+   * heightAbove  — player.position.y minus groundSurfY (0 = standing, positive = airborne).
+   */
+  updatePlayerShadow(px: number, groundSurfY: number, pz: number, heightAbove: number): void {
+    if (heightAbove < 0 || heightAbove > 6) {
+      this._playerShadowBlob.visible = false;
+      return;
+    }
+    const t = Math.max(0, 1.0 - heightAbove / 5.5);
+    this._playerShadowBlob.visible = true;
+    this._playerShadowBlob.position.set(px, groundSurfY + 0.03, pz);
+    const s = 0.65 + t * 0.35;
+    this._playerShadowBlob.scale.set(s, 1, s);
+    (this._playerShadowBlob.material as THREE.MeshBasicMaterial).opacity = t * 0.30;
+  }
+
+  /** Hide the player shadow (e.g., during title screen). */
+  hidePlayerShadow(): void {
+    this._playerShadowBlob.visible = false;
+  }
+
   private setupLighting(): void {
     this.ambientLight = new THREE.AmbientLight(0xb0c8e8, 0.9);
     this.scene.add(this.ambientLight);
@@ -1560,6 +1602,7 @@ export class SceneManager {
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
     this.sunLight.shadow.bias = -0.001;           // prevent shadow acne on blocks
+    this.sunLight.shadow.normalBias = 0.02;        // reduce peter-panning on angled surfaces
     this.sunLight.shadow.camera.near = 1;
     this.sunLight.shadow.camera.far = 250;
     this.sunLight.shadow.camera.left  = -80;

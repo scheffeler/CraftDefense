@@ -1,5 +1,40 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-02 — Player ground-shadow blob + shadow normalBias
+
+**What was done:**
+- **Player shadow blob** (`src/SceneManager.ts` + `src/Game.ts`): Added a flat dark transparent
+  circle (`CircleGeometry(0.52, 20)`, `MeshBasicMaterial`, `depthWrite:false`, `renderOrder:1`)
+  that projects directly below the player in world space. Every frame, Game.ts scans downward from
+  the player's feet position to find the highest solid non-transparent block, places the disc 0.03
+  units above that surface, and calls `scene.updatePlayerShadow()`. The blob scales from 1.0 at
+  ground level to 0.65 at 5.5 m altitude, and fades from opacity 0.30 → 0 over the same range.
+  Hidden during title screen orbit via `hidePlayerShadow()`.
+- **Shadow normalBias** (`src/SceneManager.ts`, `setupLighting`): Added
+  `sunLight.shadow.normalBias = 0.02` alongside the existing `bias = -0.001`. Reduces
+  peter-panning (floating shadows) on angled surfaces like cobblestone walls without introducing
+  shadow acne on flat terrain.
+
+**Notes:**
+- Started from a fresh session, oriented on git log. Remote `auto-iterate` was 195 commits ahead;
+  reset hard to it. Attempted atlas expansion (16→32 single-row) but remote already had a 2-row
+  32-tile atlas. Picked shadow blob + normalBias as genuinely-new improvements.
+- TypeScript compiles clean. Shadow method is callable and responds to height parameter.
+- The blob provides the "player grounding" effect that first-person voxel games typically rely on
+  the sun shadow map to supply — but in this game the player has no mesh and casts no shadow.
+
+**Ideas for next time:**
+- Skeleton arrow trail: bump `isBolt=true` spawn rate in `spawnArrowTrail` from ~45% to ~70%
+- Campfire/bonfire block: small 2D cross-pane fire Sprite + PointLight(0xff4400, 1.5, 3) placed
+  on top of a stone base block — could be pre-built in the fortress walls
+- TNT countdown: render remaining fuse seconds as a floating `CanvasTexture` sprite above TNT
+- Enemy footprint decals: brief dark quad left on ground after enemy steps (fades over ~0.5 s)
+- Biome sky tint: desert sky slightly yellower/hazier (`scene.fog.color` tint per player biome)
+- Shadow blob soft-edge: replace flat circle with a radial-gradient canvas texture so blob fades
+  at edges for more realistic penumbra look
+
+---
+
 ## 2026-06-02 — Night atmospheric fog + per-torch independent flicker
 
 **What was done:**
