@@ -1,5 +1,43 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-02 — Lava light pulse + water sky reflection + goblin miner hard hat
+
+**What was done:**
+- **Lava PointLight pulse** (`src/Game.ts`, `src/Map.ts`): Added `_lavaGlow` private field to
+  `VoxelWorld` — stored during `updateFluidAnimation` at the moment `lavaMat.emissiveIntensity`
+  is written. Exposed as a `lavaGlow` getter (also forwarded through `GameMap`). In `Game.ts`,
+  after the torch-flicker block, sync all `lavaLights` intensity to `1.8 + glow * 1.4`
+  (range ~2.2–2.9) so the pool of orange light around each lava block breathes with the
+  bubbling emissive — no extra computation needed since the formula already runs.
+- **Water surface sky reflection** (`src/Map.ts`, `src/Game.ts`): Added `setWaterSkyTint(r,g,b,
+  ambientInt)` on `VoxelWorld` (and forwarded on `GameMap`). Blend factor scales 0→0.4 as
+  `ambientInt` rises above 0.35 — fully zero at night. Called from `Game.ts` every frame with
+  `scene.scene.background` RGB and `scene.daylight`. Dawn ponds glow orange-pink; noon water
+  is deep sky-blue; night returns to dark base hue.
+- **Goblin miner hard hat** (`src/Enemy.ts`): In the `type === "goblin_miner"` block of
+  `buildHumanoidMesh`, added three `BoxGeometry` pieces — wide brim (0.54×0.05×0.54 at y=1.475),
+  dome (0.40×0.17×0.40 at y=1.565), and front visor extension (0.54×0.04×0.12 at y=1.468,
+  z=−0.33) — all in `0xffcc00` yellow with subtle emissive. Makes goblin miners immediately
+  recognisable as the wall-digging threat at a glance.
+
+**Notes on this session:**
+- Found `auto-iterate` branch had 8 commits ahead of `main` with many prior improvements already
+  done: 32-tile 2-row atlas, lava hotspot animation, rain wetness shader, flora/wheat wind sway,
+  moon phases, torch PointLights, war banner, per-enemy hue, biome flora filtering.
+- TypeScript compile clean. Dev server ran on port 5175; screenshots verified rendering.
+
+**Ideas for next time:**
+- Chicken wing flap: `userData.flapTimer` countdown in PassiveMob; rotate wing pivots ±0.5 rad
+  over 0.15 s when flapTimer > 0; retrigger on random 2–4 s interval
+- Skeleton arrow trail: bump bolt `spawnArrowTrail` spawn rate from 45% to 70% for heavier feel
+- Night torch fog: at night when `ambientInt < 0.2`, tighten fog `far` from 130 to 80 outside
+  torch radius — areas away from light feel darker and more threatening
+- Orc/zombie emissive eyes: small red emissive eye meshes on zombie and orc (copy from golem)
+- Shadow bias tuning: current `shadow.bias` may cause peter-panning on cobblestone walls —
+  experiment with `bias = -0.0008` for ground and `0.0` for walls
+
+---
+
 ## 2026-06-01 — Farmland moist-soil tint + crossbow nocked bolt
 
 **What was done:**
