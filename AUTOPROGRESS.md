@@ -1,5 +1,41 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-02 — Emissive eye glow on zombie, orc, and troll enemies
+
+**What was done:**
+- **Zombie emissive eyes** (`src/Enemy.ts`): Added two `BoxGeometry(0.09, 0.05, 0.01)` eye
+  patches at `(±0.11, 1.30, 0.22)` group-local with `MeshLambertMaterial(emissive: 0x55aa10,
+  emissiveIntensity: 0.35)` — sickly yellow-green matching undead look.
+- **Orc emissive eyes** (`src/Enemy.ts`): Added two `BoxGeometry(0.10, 0.04, 0.01)` narrow
+  slits at `(±0.10, 1.29, 0.22)` with `emissive: 0xff3300, emissiveIntensity: 0.6` — burning
+  orange-red anger, matching existing red pupils in the orc face texture.
+- **Troll emissive eyes** (`src/Enemy.ts`): Added two `BoxGeometry(0.09, 0.07, 0.01)` patches
+  at `(±0.11, 1.26, 0.22)` with `emissive: 0xffaa00, emissiveIntensity: 0.55` — amber beast
+  eyes, matching existing yellow eyes in the troll face texture.
+- Verified at night: pairs of glowing dots visible at distance — "eyes in the dark" effect
+  confirmed working via screenshots. Matches pattern of existing golem and troll-king eyes.
+- TypeScript compile clean. Dev server ran on port 5175.
+
+**Notes:**
+- Session started by orienting on git log + AUTOPROGRESS.md. Remote `auto-iterate` branch was
+  1 commit ahead (lava light pulse session). Reset hard to remote, then built on top of it.
+- The atlas expansion I drafted from scratch was made redundant by the remote branch (which
+  already had a 32-tile 2-row 32×32 atlas). Switched focus to the enemy eye glow suggestion
+  from the previous session's ideas list.
+
+**Ideas for next time:**
+- Chicken wing flap: `userData.flapTimer` countdown in `PassiveMob`; rotate wing pivots ±0.5
+  rad over 0.15 s when flapTimer > 0; retrigger on random 2–4 s interval
+- Skeleton arrow trail density: bump `isBolt=true` spawn rate from 45% to 70% in
+  `spawnArrowTrail` for heavier crossbow feel
+- Night torch fog: when `ambientInt < 0.2`, tighten `fog.far` from 130 to ~80 to make dark
+  areas away from torches feel more threatening
+- Shadow bias tuning: `shadow.bias = -0.0008` on ground surfaces to reduce peter-panning
+- Goblin death shriek: short high-pitched audio cue on goblin despawn (complement existing
+  `skeleton_death` sound already in the AudioManager)
+
+---
+
 ## 2026-06-02 — Lava light pulse + water sky reflection + goblin miner hard hat
 
 **What was done:**
