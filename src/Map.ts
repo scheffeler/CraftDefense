@@ -125,183 +125,289 @@ export class VoxelWorld {
   }
 
   private static makeBlockTexture(): THREE.Texture {
-    // 16 textures × 16px wide = 256px atlas, 16px tall
+    // 16 textures × 32px wide = 512px atlas, 32px tall — 4× more detail per tile
     const ATLAS_TILES = 16;
-    const S = 16;
+    const S = 32;
     const canvas = document.createElement("canvas");
     canvas.width = ATLAS_TILES * S; canvas.height = S;
     const ctx = canvas.getContext("2d")!;
 
-    // Seeded RNG per tile for deterministic pixel art
     const rng = (seed: number) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; }; };
 
     const pixel = (x: number, y: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
+    const fill   = (ox: number, col: string)           => { ctx.fillStyle = col; ctx.fillRect(ox, 0, S, S); };
     const border = (ox: number) => {
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      ctx.fillRect(ox, 0, S, 1); ctx.fillRect(ox, S-1, S, 1);
-      ctx.fillRect(ox, 0, 1, S); ctx.fillRect(ox+S-1, 0, 1, S);
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      ctx.fillRect(ox, 0, S, 1); ctx.fillRect(ox, S - 1, S, 1);
+      ctx.fillRect(ox, 0, 1, S); ctx.fillRect(ox + S - 1, 0, 1, S);
     };
-    const fill = (ox: number, col: string) => { ctx.fillStyle = col; ctx.fillRect(ox, 0, S, S); };
-    const noise = (ox: number, baseR: number, baseG: number, baseB: number, variance: number, seed: number) => {
+    const noise = (ox: number, bR: number, bG: number, bB: number, variance: number, seed: number) => {
       const r = rng(seed);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = (r() - 0.5) * variance;
-        const cr = Math.max(0, Math.min(255, baseR + v * 255)) | 0;
-        const cg = Math.max(0, Math.min(255, baseG + v * 255)) | 0;
-        const cb = Math.max(0, Math.min(255, baseB + v * 255)) | 0;
-        pixel(ox + x, y, `rgb(${cr},${cg},${cb})`);
+        pixel(ox + x, y, `rgb(${Math.max(0,Math.min(255,bR+v*255))|0},${Math.max(0,Math.min(255,bG+v*255))|0},${Math.max(0,Math.min(255,bB+v*255))|0})`);
       }
     };
 
-    // 0: stone — gray with subtle noise
-    noise(0 * S, 136, 136, 136, 0.08, 1001);
-    border(0 * S);
+    // ── 0: stone — gray noise with subtle crack lines ──────────────────────────
+    noise(0, 128, 128, 128, 0.1, 1001);
+    {
+      const r = rng(3001);
+      for (let i = 0; i < 5; i++) {
+        const x0 = (r() * 26 + 2) | 0, y0 = (r() * 26 + 2) | 0, len = (r() * 9 + 5) | 0;
+        const horiz = r() > 0.5;
+        for (let j = 0; j < len; j++) {
+          const cx = Math.min(S - 1, x0 + (horiz ? j : 0));
+          const cy = Math.min(S - 1, y0 + (horiz ? 0 : j));
+          ctx.fillStyle = "rgba(55,55,55,0.55)"; ctx.fillRect(cx, cy, 1, 1);
+          if (cx + 1 < S) { ctx.fillStyle = "rgba(165,165,165,0.28)"; ctx.fillRect(cx + 1, cy, 1, 1); }
+        }
+      }
+    }
+    border(0);
 
-    // 1: cobblestone — gray with stone shapes
-    noise(1 * S, 136, 128, 112, 0.1, 1002);
-    { const r = rng(2002);
-      for (let i = 0; i < 6; i++) {
-        const bx = (r() * 12 + 1) | 0, by = (r() * 12 + 1) | 0, bw = (r() * 3 + 2) | 0, bh = (r() * 2 + 2) | 0;
-        ctx.fillStyle = "rgba(80,72,60,0.35)"; ctx.fillRect(1 * S + bx, by, bw, bh);
-        ctx.fillStyle = "rgba(180,172,155,0.3)"; ctx.fillRect(1 * S + bx + 1, by + 1, bw, bh);
+    // ── 1: cobblestone — brick-like stone shapes with mortar ───────────────────
+    fill(1 * S, "#6a6050");
+    {
+      const bricks: [number, number, number, number][] = [
+        [1, 1, 13, 10], [16, 1, 15, 10],
+        [1, 13, 11, 10], [14, 13, 17, 10],
+        [1, 25, 14, 6],  [17, 25, 14, 6],
+      ];
+      for (const [bx, by, bw, bh] of bricks) {
+        const r = rng(2100 + bx + by * 32);
+        const baseV = (r() - 0.5) * 20;
+        const sr = (136 + baseV) | 0, sg = (126 + baseV * 0.8) | 0, sb = (110 + baseV * 0.6) | 0;
+        for (let py = by; py < by + bh; py++) {
+          for (let px = bx; px < bx + bw; px++) {
+            const nv = (r() - 0.5) * 22;
+            pixel(1 * S + px, py, `rgb(${Math.max(0,Math.min(255,sr+nv))|0},${Math.max(0,Math.min(255,sg+nv*0.8))|0},${Math.max(0,Math.min(255,sb+nv*0.6))|0})`);
+          }
+        }
+        ctx.fillStyle = "rgba(192,180,162,0.42)"; // highlight top & left
+        ctx.fillRect(1 * S + bx, by, bw, 1); ctx.fillRect(1 * S + bx, by, 1, bh);
+        ctx.fillStyle = "rgba(38,32,24,0.36)";   // shadow bottom & right
+        ctx.fillRect(1 * S + bx, by + bh - 1, bw, 1); ctx.fillRect(1 * S + bx + bw - 1, by, 1, bh);
       }
     }
     border(1 * S);
 
-    // 2: dirt — brown with noise
-    noise(2 * S, 139, 92, 42, 0.1, 1003);
+    // ── 2: dirt — brown with organic specks ────────────────────────────────────
+    noise(2 * S, 134, 88, 40, 0.12, 1003);
+    {
+      const r = rng(3003);
+      for (let i = 0; i < 10; i++) {
+        const dx = (r() * 29) | 0, dy = (r() * 29) | 0;
+        const alpha = (0.25 + r() * 0.3).toFixed(2);
+        ctx.fillStyle = `rgba(${(68+r()*18)|0},${(38+r()*14)|0},${(14+r()*10)|0},${alpha})`;
+        ctx.fillRect(2 * S + dx, dy, (r() * 3 + 1) | 0, (r() * 2 + 1) | 0);
+      }
+      for (let i = 0; i < 5; i++) {
+        const dx = (r() * 30) | 0, dy = (r() * 30) | 0;
+        ctx.fillStyle = "rgba(175,118,66,0.35)"; ctx.fillRect(2 * S + dx, dy, 1, 2);
+      }
+    }
     border(2 * S);
 
-    // 3: grass top — bright green
-    noise(3 * S, 93, 158, 58, 0.1, 1004);
+    // ── 3: grass top — vibrant green with variation ────────────────────────────
+    noise(3 * S, 98, 165, 56, 0.13, 1004);
+    {
+      const r = rng(3004);
+      for (let i = 0; i < 9; i++) {
+        const dx = (r() * 26 + 2) | 0, dy = (r() * 26 + 2) | 0;
+        const dw = (r() * 5 + 2) | 0, dh = (r() * 4 + 2) | 0;
+        const alpha = (0.26 + r() * 0.22).toFixed(2);
+        ctx.fillStyle = `rgba(${(38+r()*32)|0},${(108+r()*42)|0},${(16+r()*22)|0},${alpha})`;
+        ctx.fillRect(3 * S + dx, dy, dw, dh);
+      }
+      for (let i = 0; i < 5; i++) {
+        const dx = (r() * 28 + 2) | 0, dy = (r() * 28 + 2) | 0;
+        ctx.fillStyle = "rgba(148,215,76,0.38)"; ctx.fillRect(3 * S + dx, dy, 2, 2);
+      }
+    }
     border(3 * S);
 
-    // 4: grass side — green strip top 3px, dirt below
-    noise(4 * S, 139, 92, 42, 0.08, 1005);
-    { ctx.fillStyle = "rgba(93,158,58,0.9)"; ctx.fillRect(4 * S, 0, S, 3); }
-    { const r = rng(2005);
-      for (let x = 0; x < S; x++) for (let y = 3; y < 5; y++)
-        if (r() > 0.5) { ctx.fillStyle = `rgba(93,158,58,${0.4 + r() * 0.3})`; ctx.fillRect(4 * S + x, y, 1, 1); }
-    }
-    border(4 * S);
-
-    // 5: sand — sandy with noise
-    noise(5 * S, 212, 196, 132, 0.08, 1006);
-    border(5 * S);
-
-    // 6: wood side — brown with vertical grain
-    fill(6 * S, "#6b4c2a");
-    { const r = rng(2006);
-      for (let x = 1; x < S - 1; x++) {
-        const dark = r() > 0.6;
-        for (let y = 1; y < S - 1; y++) {
-          const v = (r() - 0.5) * 30;
-          const b = dark ? -20 : 0;
-          const cr = Math.max(0, Math.min(255, 107 + b + v)) | 0;
-          const cg = Math.max(0, Math.min(255, 76 + b + v)) | 0;
-          const cb = Math.max(0, Math.min(255, 42 + b + v * 0.5)) | 0;
-          pixel(6 * S + x, y, `rgb(${cr},${cg},${cb})`);
+    // ── 4: grass side — dirt body with green strip + grass blades ──────────────
+    noise(4 * S, 134, 88, 40, 0.1, 1005);
+    {
+      const r = rng(3005);
+      ctx.fillStyle = "rgb(98,165,56)"; ctx.fillRect(4 * S, 0, S, 5);
+      for (let x = 0; x < S; x++) {
+        const nv = (r() - 0.5) * 28;
+        for (let y = 0; y < 3; y++)
+          pixel(4 * S + x, y, `rgb(${(98+nv)|0},${(165+nv*0.7)|0},${(56+nv*0.4)|0})`);
+      }
+      for (let x = 0; x < S; x++) {
+        if (r() > 0.48) {
+          const al = (0.55 + r() * 0.38).toFixed(2);
+          pixel(4 * S + x, 5, `rgba(86,148,44,${al})`);
+          if (r() > 0.62) pixel(4 * S + x, 6, `rgba(65,125,33,${(0.3+r()*0.28).toFixed(2)})`);
         }
       }
     }
-    border(6 * S);
+    border(4 * S);
 
-    // 7: wood top — annular ring pattern
-    fill(7 * S, "#b8905a");
-    { const cx = 8, cy = 8;
+    // ── 5: sand — subtle layered grain ────────────────────────────────────────
+    {
+      const r = rng(3006);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-        const ring = Math.abs(Math.sin(dist * 0.8)) * 0.2 + 0.9;
-        const cr = Math.min(255, Math.round(184 * ring)) | 0;
-        const cg = Math.min(255, Math.round(144 * ring)) | 0;
-        const cb = Math.min(255, Math.round(90 * ring)) | 0;
-        pixel(7 * S + x, y, `rgb(${cr},${cg},${cb})`);
+        const band = Math.sin(y * 0.52) * 6, nv = (r() - 0.5) * 14 + band;
+        pixel(5 * S + x, y, `rgb(${(208+nv)|0},${(191+nv*0.84)|0},${(124+nv*0.55)|0})`);
+      }
+    }
+    border(5 * S);
+
+    // ── 6: wood side — vertical grain with knot ────────────────────────────────
+    fill(6 * S, "#7a5530");
+    {
+      const r = rng(3007);
+      for (let x = 0; x < S; x++) {
+        const grainShift = Math.sin(x * 0.85) * 5 + (x % 6 === 3 ? -18 : 0);
+        for (let y = 0; y < S; y++) {
+          const nv = (r() - 0.5) * 20 + grainShift;
+          pixel(6 * S + x, y, `rgb(${Math.max(0,Math.min(255,122+nv))|0},${Math.max(0,Math.min(255,85+nv*0.7))|0},${Math.max(0,Math.min(255,48+nv*0.4))|0})`);
+        }
+      }
+      const kx = 14, ky = 16;
+      for (let dy = -5; dy <= 5; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.sqrt(dx * dx * 0.8 + dy * dy * 1.2);
+        if (d <= 5) {
+          const al = Math.max(0, 0.58 - d * 0.1).toFixed(2);
+          ctx.fillStyle = `rgba(42,24,8,${al})`; ctx.fillRect(6 * S + kx + dx, ky + dy, 1, 1);
+        }
+      }
+      ctx.fillStyle = "rgba(35,20,6,0.6)";
+      ctx.fillRect(6 * S, 0, 1, S); ctx.fillRect(6 * S + S - 1, 0, 1, S);
+    }
+
+    // ── 7: wood top — concentric ring cross-section ────────────────────────────
+    {
+      const cx2 = 16, cy2 = 16;
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const dist = Math.sqrt((x - cx2) ** 2 + (y - cy2) ** 2);
+        const ring = Math.cos(dist * 1.05) * 0.13 + 0.95;
+        pixel(7 * S + x, y, `rgb(${Math.min(255,Math.round(190*ring))|0},${Math.min(255,Math.round(148*ring))|0},${Math.min(255,Math.round(90*ring))|0})`);
+      }
+      ctx.fillStyle = "rgba(50,28,6,0.55)"; ctx.fillRect(7 * S + cx2 - 1, cy2 - 1, 2, 2);
+      ctx.fillStyle = "rgba(68,38,12,0.3)";
+      for (let a = 0; a < Math.PI * 2; a += 0.13) {
+        const bx = (cx2 + Math.cos(a) * 14.5) | 0, by2 = (cy2 + Math.sin(a) * 14.5) | 0;
+        ctx.fillRect(7 * S + bx, by2, 1, 1);
       }
     }
     border(7 * S);
 
-    // 8: planks — tan with plank seams
+    // ── 8: planks — tan with seams and grain ──────────────────────────────────
     fill(8 * S, "#c8a060");
-    { const r = rng(2008);
+    {
+      const r = rng(2008);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const v = (r() - 0.5) * 20;
-        pixel(8 * S + x, y, `rgb(${(200 + v) | 0},${(160 + v * 0.8) | 0},${(96 + v * 0.5) | 0})`);
+        const grain = Math.sin(y * 0.38) * 4, nv = (r() - 0.5) * 16 + grain;
+        pixel(8 * S + x, y, `rgb(${(200+nv)|0},${(160+nv*0.8)|0},${(96+nv*0.5)|0})`);
       }
-      // horizontal seams every 4px
-      for (let y = 3; y < S; y += 4) { ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(8 * S, y, S, 1); }
-      // vertical offset seam
-      ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.fillRect(8 * S + 8, 0, 1, 4); ctx.fillRect(8 * S + 8, 8, 1, 4);
+      for (let y = 7; y < S; y += 8) {
+        ctx.fillStyle = "rgba(0,0,0,0.26)"; ctx.fillRect(8 * S, y, S, 1);
+        ctx.fillStyle = "rgba(215,180,116,0.2)"; ctx.fillRect(8 * S, y + 1, S, 1);
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.17)";
+      ctx.fillRect(8 * S + 16, 0, 1, 8);  ctx.fillRect(8 * S + 16, 16, 1, 8);
+      ctx.fillRect(8 * S + 8, 8, 1, 8);   ctx.fillRect(8 * S + 8, 24, 1, 8);
+      ctx.fillRect(8 * S + 24, 8, 1, 8);  ctx.fillRect(8 * S + 24, 24, 1, 8);
     }
     border(8 * S);
 
-    // 9: leaves — dark green mottled
-    fill(9 * S, "transparent");
-    { const r = rng(2009);
+    // ── 9: leaves — mottled green with subtle variation ────────────────────────
+    ctx.clearRect(9 * S, 0, S, S);
+    {
+      const r = rng(2009);
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-        const v = r();
-        if (v < 0.15) { pixel(9 * S + x, y, "rgba(0,0,0,0)"); continue; }
-        const brightness = 0.6 + r() * 0.5;
-        pixel(9 * S + x, y, `rgb(${(58 * brightness) | 0},${(122 * brightness) | 0},${(37 * brightness) | 0})`);
+        if (r() < 0.1) continue;
+        const bright = 0.5 + r() * 0.55;
+        const warm = r() > 0.7;
+        const cr = warm ? (84 * bright) | 0 : (46 * bright) | 0;
+        const cg = warm ? (142 * bright) | 0 : (120 * bright) | 0;
+        const cb = warm ? (30 * bright) | 0 : (36 * bright) | 0;
+        pixel(9 * S + x, y, `rgb(${cr},${cg},${cb})`);
       }
     }
     border(9 * S);
 
-    // 10: iron ore — stone base with orange flecks
-    noise(10 * S, 136, 136, 136, 0.07, 1010);
-    { const r = rng(2010);
-      for (let i = 0; i < 5; i++) {
-        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
-        ctx.fillStyle = "#cc8844"; ctx.fillRect(10 * S + ox2, oy2, 2, 2);
-        ctx.fillStyle = "#dd9955"; ctx.fillRect(10 * S + ox2, oy2, 1, 1);
-      }
-    }
-    border(10 * S);
-
-    // 11: coal ore — stone base with dark spots
-    noise(11 * S, 136, 136, 136, 0.07, 1011);
-    { const r = rng(2011);
-      for (let i = 0; i < 5; i++) {
-        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
-        ctx.fillStyle = "#222222"; ctx.fillRect(11 * S + ox2, oy2, 2, 2);
-        ctx.fillStyle = "#333333"; ctx.fillRect(11 * S + ox2 + 1, oy2, 1, 1);
-      }
-    }
-    border(11 * S);
-
-    // 12: bedrock — very dark irregular
-    noise(12 * S, 51, 51, 51, 0.15, 1012);
-    { const r = rng(2012);
+    // ── Ore helper: stone base + round ore blobs ───────────────────────────────
+    const oreBlobs = (
+      tile: number,
+      sR: number, sG: number, sB: number,
+      inner: string, outer: string, highlight: string,
+      seed: number,
+    ) => {
+      noise(tile * S, sR, sG, sB, 0.09, seed);
+      const r = rng(seed + 1000);
       for (let i = 0; i < 8; i++) {
-        const ox2 = (r() * 12 + 1) | 0, oy2 = (r() * 12 + 1) | 0;
-        ctx.fillStyle = "#111111"; ctx.fillRect(12 * S + ox2, oy2, 2, 2);
+        const ox2 = (r() * 22 + 4) | 0, oy2 = (r() * 22 + 4) | 0;
+        const rad = (r() * 1.5 + 1.5);
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+          const d2 = dx * dx + dy * dy;
+          if (d2 > rad * rad + 0.5) continue;
+          const px = ox2 + dx, py = oy2 + dy;
+          if (px < 0 || px >= S || py < 0 || py >= S) continue;
+          pixel(tile * S + px, py, d2 <= (rad - 0.8) * (rad - 0.8) ? inner : outer);
+        }
+        if (ox2 > 0 && oy2 > 0) pixel(tile * S + ox2 - 1, oy2 - 1, highlight);
+      }
+      border(tile * S);
+    };
+
+    // ── 10: iron ore ───────────────────────────────────────────────────────────
+    oreBlobs(10, 128, 128, 128, "#d08840", "#b06828", "#e8a858", 1010);
+
+    // ── 11: coal ore ───────────────────────────────────────────────────────────
+    oreBlobs(11, 128, 128, 128, "#242424", "#141414", "#404040", 1011);
+
+    // ── 12: bedrock — chaotic dark pattern ────────────────────────────────────
+    {
+      const r = rng(2012);
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const v = r();
+        const val = v < 0.2 ? 15 : v < 0.5 ? 30 : v < 0.82 ? 44 : 58;
+        pixel(12 * S + x, y, `rgb(${val},${val},${val})`);
+      }
+      for (let i = 0; i < 8; i++) {
+        const r2 = rng(5000 + i);
+        const val = (50 + r2() * 20) | 0;
+        ctx.fillStyle = `rgba(${val},${val},${val},0.34)`;
+        ctx.fillRect(12 * S + (r2() * 26) | 0, (r2() * 26) | 0, (r2() * 5 + 2) | 0, (r2() * 4 + 1) | 0);
       }
     }
     border(12 * S);
 
-    // 13: generic/default — white with border (vertex color controls appearance)
+    // ── 13: generic — white with subtle edge darkening (vertex color drives look) ─
     fill(13 * S, "#ffffff");
-    border(13 * S);
-
-    // 14: gold ore — stone base with gold flecks
-    noise(14 * S, 136, 136, 136, 0.07, 1014);
-    { const r = rng(2014);
-      for (let i = 0; i < 5; i++) {
-        const ox2 = (r() * 11 + 2) | 0, oy2 = (r() * 11 + 2) | 0;
-        ctx.fillStyle = "#ddaa00"; ctx.fillRect(14 * S + ox2, oy2, 2, 2);
-        ctx.fillStyle = "#eebb22"; ctx.fillRect(14 * S + ox2, oy2, 1, 1);
-      }
+    {
+      ctx.fillStyle = "rgba(0,0,0,0.14)";
+      ctx.fillRect(13 * S, 0, S, 1); ctx.fillRect(13 * S, S - 1, S, 1);
+      ctx.fillRect(13 * S, 0, 1, S); ctx.fillRect(13 * S + S - 1, 0, 1, S);
+      ctx.fillStyle = "rgba(0,0,0,0.06)";
+      ctx.fillRect(13 * S + 1, 1, S - 2, 1); ctx.fillRect(13 * S + 1, S - 2, S - 2, 1);
+      ctx.fillRect(13 * S + 1, 1, 1, S - 2); ctx.fillRect(13 * S + S - 2, 1, 1, S - 2);
     }
-    border(14 * S);
 
-    // 15: diamond ore — stone base with cyan diamonds
-    noise(15 * S, 136, 136, 136, 0.07, 1015);
-    { const r = rng(2015);
-      for (let i = 0; i < 4; i++) {
-        const ox2 = (r() * 10 + 3) | 0, oy2 = (r() * 10 + 3) | 0;
-        pixel(15 * S + ox2, oy2 + 1, "#00cccc"); pixel(15 * S + ox2 + 1, oy2, "#00cccc");
-        pixel(15 * S + ox2 + 1, oy2 + 2, "#00cccc"); pixel(15 * S + ox2 + 2, oy2 + 1, "#00cccc");
-        pixel(15 * S + ox2 + 1, oy2 + 1, "#55ffff");
-      }
+    // ── 14: gold ore ───────────────────────────────────────────────────────────
+    oreBlobs(14, 128, 128, 128, "#f0be00", "#c89200", "#ffe040", 1014);
+
+    // ── 15: diamond ore — cyan crystal diamond shapes ──────────────────────────
+    noise(15 * S, 128, 128, 128, 0.09, 1015);
+    {
+      const r = rng(2015);
+      const diamond = (dcx: number, dcy: number, sz: number) => {
+        for (let dy = -sz; dy <= sz; dy++) for (let dx = -sz; dx <= sz; dx++) {
+          if (Math.abs(dx) + Math.abs(dy) > sz) continue;
+          const px = dcx + dx, py = dcy + dy;
+          if (px < 0 || px >= S || py < 0 || py >= S) continue;
+          pixel(15 * S + px, py, Math.abs(dx) + Math.abs(dy) === sz ? "#00aaaa" : "#22dddd");
+        }
+        if (dcx > 0 && dcy > 0) pixel(15 * S + dcx - 1, dcy - 1, "#88ffff");
+      };
+      for (let i = 0; i < 6; i++)
+        diamond((r() * 22 + 4) | 0, (r() * 22 + 4) | 0, (r() * 1.5 + 2) | 0);
     }
     border(15 * S);
 
