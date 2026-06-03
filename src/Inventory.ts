@@ -101,13 +101,16 @@ export class Inventory {
     return total;
   }
 
-  /** Sum of equipped armor armorValue properties. */
+  /** Sum of equipped armor armorValue properties, including Protection enchantments. */
   getArmorValue(): number {
     let total = 0;
     for (const slot of Object.values(this.armor)) {
       if (!slot) continue;
       const def = ITEMS[slot.itemId];
       if (def?.armorValue) total += def.armorValue;
+      // Protection enchantments add bonus armor
+      if (slot.enchantments?.includes("protection_1")) total += 1;
+      if (slot.enchantments?.includes("protection_2")) total += 2;
     }
     return total;
   }
@@ -116,5 +119,10 @@ export class Inventory {
   setSlot(area: "hotbar" | "backpack", index: number, stack: ItemStack | null): void {
     if (area === "hotbar") this.hotbar[index] = stack;
     else this.backpack[index] = stack;
+  }
+
+  /** Returns true if any equipped armor piece has the given enchantment. */
+  hasEnchantment(enchId: string): boolean {
+    return Object.values(this.armor).some(s => s?.enchantments?.includes(enchId));
   }
 }

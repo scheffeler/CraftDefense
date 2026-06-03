@@ -5,11 +5,14 @@ type SoundName =
   | "ui_click"
   | "wave_start" | "wave_complete" | "base_hit"
   | "explosion" | "victory"
-  | "swing" | "bow_charge" | "arrow_release"
+  | "swing" | "bow_charge" | "arrow_release" | "pistol_shot" | "pistol_empty"
   | "block_break" | "block_place" | "pickup"
   | "eat" | "player_hurt" | "player_death"
   | "step_grass" | "step_stone" | "step_wood" | "step_dirt" | "step_sand"
-  | "splash" | "thunder" | "creeper_hiss";
+  | "splash" | "thunder" | "creeper_hiss"
+  | "pistol_shot" | "sniper_fire" | "scope_in"
+  | "shotgun_blast" | "raygun_fire"
+  | "troll_stomp";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -317,6 +320,20 @@ export class AudioManager {
         tone(660, 0.04, "sawtooth", 0.5);
         break;
 
+      case "pistol_shot":
+        // Sharp crack + low boom
+        noiseBurst(0.04, 14000, 0.015);
+        noiseBurst(0.18, 300, 0.12);
+        tone(90, 0.20, "sawtooth", 0.95);
+        tone(220, 0.06, "square", 0.45);
+        break;
+
+      case "pistol_empty":
+        // Dry click when out of ammo
+        noiseBurst(0.03, 2000, 0.01);
+        tone(800, 0.04, "square", 0.15);
+        break;
+
       case "block_break":
         noiseBurst(0.18, 300, 0.08);
         tone(90, 0.12, "square", 0.4);
@@ -393,6 +410,14 @@ export class AudioManager {
         break;
       }
 
+      case "pistol_shot": {
+        // Sharp crack: very short high-frequency noise burst + low body thud
+        noiseBurst(0.04, 3500, 0.008);
+        noiseBurst(0.12, 120, 0.05);
+        tone(180, 0.06, "sawtooth", 0.8);
+        break;
+      }
+
       case "creeper_hiss": {
         // Rising white-noise hiss (s s s s)
         const hissDur = 1.6;
@@ -408,6 +433,108 @@ export class AudioManager {
         hissGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + hissDur);
         src.buffer = buf; src.connect(filt); filt.connect(hissGain); hissGain.connect(dest);
         src.start(); src.stop(ctx.currentTime + hissDur);
+        break;
+      }
+
+      case "pistol_shot": {
+        // Sharp gunshot: low bang + high crack + metallic click
+        noiseBurst(0.5, 60, 0.05);
+        noiseBurst(0.25, 3000, 0.015);
+        tone(80, 0.08, "sawtooth", 0.7);
+        tone(2400, 0.012, "square", 0.3);
+        const tickTime = ctx.currentTime + 0.06;
+        const tickOsc = ctx.createOscillator();
+        const tickGain = ctx.createGain();
+        tickOsc.type = "sine"; tickOsc.frequency.value = 1800;
+        tickGain.gain.setValueAtTime(vol * 0.2, tickTime);
+        tickGain.gain.exponentialRampToValueAtTime(0.001, tickTime + 0.025);
+        tickOsc.connect(tickGain); tickGain.connect(dest);
+        tickOsc.start(tickTime); tickOsc.stop(tickTime + 0.03);
+        break;
+      }
+
+      case "sniper_fire": {
+        // Loud sharp crack: low-freq boom + high transient
+        const crackDur = 0.5;
+        const cbuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * crackDur), ctx.sampleRate);
+        const cd = cbuf.getChannelData(0);
+        for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1);
+        const cfilt = ctx.createBiquadFilter();
+        cfilt.type = "lowpass"; cfilt.frequency.value = 800;
+        const csrc = ctx.createBufferSource();
+        csrc.buffer = cbuf;
+        const crackGain = ctx.createGain();
+        crackGain.gain.setValueAtTime(vol * 1.4, ctx.currentTime);
+        crackGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + crackDur);
+        csrc.connect(cfilt); cfilt.connect(crackGain); crackGain.connect(dest);
+        csrc.start();
+        const clickOsc = ctx.createOscillator();
+        clickOsc.frequency.value = 120;
+        const clickGain = ctx.createGain();
+        clickGain.gain.setValueAtTime(vol * 0.8, ctx.currentTime);
+        clickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        clickOsc.connect(clickGain); clickGain.connect(dest);
+        clickOsc.start(); clickOsc.stop(ctx.currentTime + 0.08);
+        break;
+      }
+
+      case "scope_in": {
+        const sClickOsc = ctx.createOscillator();
+        sClickOsc.type = "square";
+        sClickOsc.frequency.value = 800;
+        const sClickGain = ctx.createGain();
+        sClickGain.gain.setValueAtTime(vol * 0.2, ctx.currentTime);
+        sClickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+        sClickOsc.connect(sClickGain); sClickGain.connect(dest);
+        sClickOsc.start(); sClickOsc.stop(ctx.currentTime + 0.04);
+        break;
+      }
+
+      case "shotgun_blast": {
+        // Loud bassy boom: multiple overlapping noise layers
+        noiseBurst(0.08, 120, 0.04);   // deep body thud
+        noiseBurst(0.05, 2500, 0.008); // high crack
+        noiseBurst(0.25, 80,  0.14);   // long low rumble
+        tone(90,  0.10, "square", 0.6);
+        tone(55,  0.18, "sawtooth", 0.4);
+        break;
+      }
+
+      case "raygun_fire": {
+        // Sci-fi zap: descending pitch sweep + electric buzz
+        const zapOsc = ctx.createOscillator();
+        const zapGain = ctx.createGain();
+        zapOsc.type = "sawtooth";
+        zapOsc.frequency.setValueAtTime(2400, ctx.currentTime);
+        zapOsc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.3);
+        zapGain.gain.setValueAtTime(vol * 0.6, ctx.currentTime);
+        zapGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        zapOsc.connect(zapGain); zapGain.connect(dest);
+        zapOsc.start(); zapOsc.stop(ctx.currentTime + 0.35);
+
+        // Harmonic buzz layer
+        const buzzOsc = ctx.createOscillator();
+        const buzzGain = ctx.createGain();
+        buzzOsc.type = "square";
+        buzzOsc.frequency.setValueAtTime(1200, ctx.currentTime);
+        buzzOsc.frequency.linearRampToValueAtTime(400, ctx.currentTime + 0.2);
+        buzzGain.gain.setValueAtTime(vol * 0.3, ctx.currentTime);
+        buzzGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        buzzOsc.connect(buzzGain); buzzGain.connect(dest);
+        buzzOsc.start(); buzzOsc.stop(ctx.currentTime + 0.2);
+
+        // Impact pop
+        noiseBurst(0.15, 3000, 0.02);
+        break;
+      }
+
+      case "troll_stomp": {
+        // Deep ground-shake: sub-bass thud + mid crunch
+        noiseBurst(0.06, 60, 0.12);
+        noiseBurst(0.12, 200, 0.08);
+        tone(40, 0.35, "sawtooth", vol * 0.9);
+        tone(80, 0.22, "square",   vol * 0.6);
+        noiseBurst(0.08, 800, 0.05);
         break;
       }
     }

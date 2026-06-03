@@ -2,11 +2,11 @@
 // Shared type definitions — no Three.js imports
 // ---------------------------------------------------------------------------
 
-export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win";
+export type GamePhase = "menu" | "playing" | "wave_clear" | "gameover" | "win" | "endless";
 
-export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton";
+export type EnemyTypeName = "zombie" | "spider" | "golem" | "goblin" | "orc" | "troll" | "goblin_miner" | "creeper" | "skeleton" | "uruk_captain" | "troll_king";
 export type TowerTypeName = "arrow" | "cannon" | "ice"; // kept for UI backward-compat
-export type ProjectileType = "arrow" | "cannonball" | "icebolt";
+export type ProjectileType = "arrow" | "cannonball" | "icebolt" | "crossbow_bolt";
 
 export type BlockId =
   | "air" | "grass" | "dirt" | "stone" | "wood"
@@ -17,7 +17,8 @@ export type BlockId =
   | "bedrock" | "gravel" | "gold_ore" | "diamond_ore"
   | "snow" | "cactus"
   | "bookshelf" | "enchanting_table"
-  | "bed";
+  | "bed" | "tnt" | "lava" | "fire"
+  | "dispenser";
 
 export interface BlockDef {
   id: BlockId;
@@ -90,6 +91,32 @@ export interface EnemyState {
   flashTimer?: number;
   // Skeleton-specific
   shootCooldown?: number;
+  strafeDir?: 1 | -1;
+  strafeTimer?: number;
+  // Spider-specific
+  webCooldown?: number;
+  climbPhase?: "approach" | "up" | "across" | "down";
+  climbTargetX?: number;
+  climbTargetZ?: number;
+  climbInnerZ?: number;
+  climbDirZ?: number;
+  climbTimer?: number;
+  // Knockback / stagger
+  knockbackTimer?: number;
+  // Elite variant
+  elite?: boolean;
+  // Troll / uruk_captain stomp attack
+  stompCooldown?: number;
+  stompCharging?: boolean;
+  stompChargeTimer?: number;
+  // uruk_captain war cry
+  warCryTimer?: number;
+  warCryFlash?: number;
+  // Troll King boss-specific
+  slamCooldown?: number;
+  berserking?: boolean;
+  // Death flash
+  deathFlashTimer?: number;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

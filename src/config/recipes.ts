@@ -132,6 +132,80 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "iron_axe", count: 1 },
   },
 
+  // --- Gold tools & weapons (lightning-fast, super fragile) ---
+  {
+    id: "gold_pickaxe",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [null,            r("stick"),      null           ],
+      [null,            r("stick"),      null           ],
+    ],
+    result: { itemId: "gold_pickaxe", count: 1 },
+  },
+  {
+    id: "gold_sword",
+    pattern: [
+      [r("gold_ingot")],
+      [r("gold_ingot")],
+      [r("stick")     ],
+    ],
+    result: { itemId: "gold_sword", count: 1 },
+  },
+  {
+    id: "gold_axe",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), r("stick")     ],
+      [null,            r("stick")     ],
+    ],
+    result: { itemId: "gold_axe", count: 1 },
+  },
+  {
+    id: "gold_shovel",
+    pattern: [
+      [r("gold_ingot")],
+      [r("stick")     ],
+      [r("stick")     ],
+    ],
+    result: { itemId: "gold_shovel", count: 1 },
+  },
+
+  // --- Gold armor ---
+  {
+    id: "gold_helmet",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+    ],
+    result: { itemId: "gold_helmet", count: 1 },
+  },
+  {
+    id: "gold_chestplate",
+    pattern: [
+      [r("gold_ingot"), null,            r("gold_ingot")],
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+    ],
+    result: { itemId: "gold_chestplate", count: 1 },
+  },
+  {
+    id: "gold_leggings",
+    pattern: [
+      [r("gold_ingot"), r("gold_ingot"), r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+    ],
+    result: { itemId: "gold_leggings", count: 1 },
+  },
+  {
+    id: "gold_boots",
+    pattern: [
+      [r("gold_ingot"), null,            r("gold_ingot")],
+      [r("gold_ingot"), null,            r("gold_ingot")],
+    ],
+    result: { itemId: "gold_boots", count: 1 },
+  },
+
   // --- Iron block ---
   {
     id: "iron_block",
@@ -244,6 +318,7 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "diamond_boots", count: 1 },
   },
 
+
   // --- Bow ---
   {
     id: "bow",
@@ -255,6 +330,17 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "bow", count: 1 },
   },
 
+  // --- Crossbow (iron_ingot + sticks + iron_ingot tripwire) ---
+  {
+    id: "crossbow",
+    pattern: [
+      [r("stick"),      r("iron_ingot"), r("stick")     ],
+      [r("iron_ingot"), null,            r("iron_ingot")],
+      [null,            r("stick"),      null           ],
+    ],
+    result: { itemId: "crossbow", count: 1 },
+  },
+
   // --- Arrows ---
   {
     id: "arrows",
@@ -263,6 +349,27 @@ export const RECIPES: Recipe[] = [
       [r("stick") ],
     ],
     result: { itemId: "arrow_item", count: 4 },
+  },
+
+  // --- Bullets (gunpowder + iron ingot → 8 bullets) ---
+  {
+    id: "bullets",
+    pattern: [
+      [r("iron_ingot")],
+      [r("gunpowder") ],
+    ],
+    result: { itemId: "bullet", count: 8 },
+  },
+
+  // --- Pistol ---
+  {
+    id: "pistol",
+    pattern: [
+      [r("iron_ingot"), r("iron_ingot"), null          ],
+      [r("iron_ingot"), r("stick"),      r("iron_ingot")],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "pistol", count: 1 },
   },
 
   // --- Glass from sand (normally needs furnace, simplified here) ---
@@ -312,6 +419,7 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "iron_hoe", count: 1 },
   },
+
 
   // --- Bread (3 wheat in a row) ---
   {
@@ -372,6 +480,197 @@ export const RECIPES: Recipe[] = [
       [r("obsidian"), r("obsidian"), r("obsidian")],
     ],
     result: { itemId: "enchanting_table", count: 1 },
+  },
+  // --- Sniper Ammo (flint + iron ingot = 8 rounds) ---
+  {
+    id: "sniper_ammo",
+    pattern: [
+      [r("flint"), r("iron_ingot")],
+    ],
+    result: { itemId: "sniper_ammo", count: 8 },
+  },
+
+  // --- Sniper Rifle (iron ingots in barrel + body + grip) ---
+  {
+    id: "sniper_rifle",
+    pattern: [
+      [null,            r("iron_ingot"), r("iron_ingot")],
+      [r("iron_ingot"), r("iron_ingot"), r("iron_ingot")],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "sniper_rifle", count: 1 },
+  },
+
+  // --- Shotgun Shell (gunpowder + iron ingot = 8 shells) ---
+  {
+    id: "shotgun_shell",
+    pattern: [
+      [r("gunpowder"), r("iron_ingot")],
+    ],
+    result: { itemId: "shotgun_shell", count: 8 },
+  },
+
+  // --- Shotgun (iron barrels + wood stock) ---
+  {
+    id: "shotgun",
+    pattern: [
+      [r("iron_ingot"), r("iron_ingot"), r("iron_ingot")],
+      [r("planks"),     r("planks"),     r("iron_ingot")],
+      [null,            null,            null           ],
+    ],
+    result: { itemId: "shotgun", count: 1 },
+  },
+
+  // --- Energy Cell (diamond + gold ingot = 4 cells) ---
+  {
+    id: "energy_cell",
+    pattern: [
+      [r("diamond"),    r("gold_ingot")],
+      [r("gold_ingot"), r("diamond")   ],
+    ],
+    result: { itemId: "energy_cell", count: 4 },
+  },
+
+  // --- Raygun (diamond barrel + gold body + iron grip) ---
+  {
+    id: "raygun",
+    pattern: [
+      [null,            r("diamond"),    r("diamond")   ],
+      [r("gold_ingot"), r("gold_ingot"), r("diamond")   ],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "raygun", count: 1 },
+  },
+
+  // --- TNT (gunpowder + sand checkerboard) ---
+  {
+    id: "tnt",
+    pattern: [
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+      [r("sand"),      r("gunpowder"), r("sand")     ],
+      [r("gunpowder"), r("sand"),      r("gunpowder")],
+    ],
+    result: { itemId: "tnt", count: 1 },
+  },
+
+  // --- Flint and Steel (iron ingot + flint) ---
+  {
+    id: "flint_steel",
+    pattern: [
+      [r("iron_ingot"), null   ],
+      [null,            r("flint")],
+    ],
+    result: { itemId: "flint_steel", count: 1 },
+  },
+
+
+  // ── Potion ingredients ──────────────────────────────────────────────────────
+
+  // Glass bottle (3 glass in V-shape)
+  {
+    id: "glass_bottle",
+    pattern: [
+      [r("glass"), null,      r("glass")],
+      [null,       r("glass"), null     ],
+    ],
+    result: { itemId: "glass_bottle", count: 3 },
+  },
+
+  // Sugar (from wheat)
+  {
+    id: "sugar_from_wheat",
+    pattern: [[r("wheat")]],
+    result: { itemId: "sugar", count: 2 },
+  },
+
+  // Glistering melon (apple + gold ingot)
+  {
+    id: "glistering_melon",
+    pattern: [
+      [r("gold_ingot"), r("apple")],
+    ],
+    result: { itemId: "glistering_melon", count: 1 },
+  },
+
+  // Magma cream (from blaze_rod + coal)
+  {
+    id: "magma_cream",
+    pattern: [
+      [r("blaze_rod")],
+      [r("coal_ore") ],
+    ],
+    result: { itemId: "magma_cream", count: 2 },
+  },
+
+  // Potion of Healing (glass_bottle + glistering_melon + blaze_rod)
+  {
+    id: "potion_healing",
+    pattern: [
+      [r("blaze_rod"),    r("glistering_melon"), null],
+      [r("glass_bottle"), null,                  null],
+    ],
+    result: { itemId: "potion_healing", count: 1 },
+  },
+
+  // Potion of Regeneration (glass_bottle + nether_wart + blaze_rod)
+  {
+    id: "potion_regeneration",
+    pattern: [
+      [r("blaze_rod"),    r("nether_wart"), null],
+      [r("glass_bottle"), null,             null],
+    ],
+    result: { itemId: "potion_regeneration", count: 1 },
+  },
+
+  // Potion of Swiftness (glass_bottle + sugar + blaze_rod)
+  {
+    id: "potion_speed",
+    pattern: [
+      [r("blaze_rod"),    r("sugar"),  null],
+      [r("glass_bottle"), null,        null],
+    ],
+    result: { itemId: "potion_speed", count: 1 },
+  },
+
+  // Potion of Strength (glass_bottle + magma_cream + blaze_rod)
+  {
+    id: "potion_strength",
+    pattern: [
+      [r("blaze_rod"),    r("magma_cream"), null],
+      [r("glass_bottle"), null,             null],
+    ],
+    result: { itemId: "potion_strength", count: 1 },
+  },
+
+  // Potion of Fire Resistance (glass_bottle + magma_cream + nether_wart)
+  {
+    id: "potion_fire_resistance",
+    pattern: [
+      [r("nether_wart"),  r("magma_cream"), null],
+      [r("glass_bottle"), null,             null],
+    ],
+    result: { itemId: "potion_fire_resistance", count: 1 },
+  },
+
+  // --- Iron bucket (3 iron ingots in V-shape) ---
+  {
+    id: "iron_bucket",
+    pattern: [
+      [r("iron_ingot"), null,           r("iron_ingot")],
+      [null,            r("iron_ingot"), null           ],
+    ],
+    result: { itemId: "iron_bucket", count: 1 },
+  },
+
+  // --- Arrow Dispenser (7 cobblestone + 1 bow = auto-shooting turret) ---
+  {
+    id: "dispenser",
+    pattern: [
+      [r("cobblestone"), r("cobblestone"), r("cobblestone")],
+      [r("cobblestone"), r("bow"),         r("cobblestone")],
+      [r("cobblestone"), r("cobblestone"), r("cobblestone")],
+    ],
+    result: { itemId: "dispenser", count: 1 },
   },
 ];
 

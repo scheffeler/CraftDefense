@@ -7,7 +7,7 @@ import { ITEMS } from "./config/items";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Maps item IDs to SVG data URIs for pixel-art style hotbar icons
-function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel"): string {
+function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "crossbow" | "block" | "food" | "armor" | "material" | "hoe" | "shovel" | "potion"): string {
   const s = 32;
   let path = "";
   switch (shape) {
@@ -31,6 +31,12 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
                <rect x="10" y="26" width="12" height="2" fill="#8b6914"/>
                <rect x="10" y="15" width="12" height="2" fill="#c8a060"/>`;
       break;
+    case "crossbow":
+      // Horizontal stock body + vertical prod arms + bolt
+      path = `<rect x="4" y="14" width="20" height="5" fill="${color}"/>
+               <rect x="18" y="8" width="4" height="16" fill="#8b6914"/>
+               <rect x="6" y="15" width="14" height="2" fill="#aaaaaa"/>`;
+      break;
     case "food":
       path = `<rect x="8" y="8" width="16" height="16" fill="${color}"/>
                <rect x="10" y="6" width="4" height="4" fill="#3a7a25"/>`;
@@ -48,6 +54,14 @@ function makeItemIcon(color: string, shape: "sword" | "pick" | "axe" | "bow" | "
     case "shovel":
       path = `<rect x="13" y="4" width="6" height="22" fill="#5c3a1a"/>
                <rect x="10" y="4" width="12" height="12" rx="3" fill="${color}"/>`;
+      break;
+    case "potion":
+      // Bottle with liquid
+      path = `<rect x="12" y="2" width="8" height="5" fill="#5c3a1a"/>
+               <rect x="10" y="7" width="12" height="2" fill="${color}88"/>
+               <rect x="8" y="9" width="16" height="14" rx="6" fill="${color}"/>
+               <rect x="10" y="9" width="6" height="8" fill="${color}cc"/>
+               <rect x="10" y="23" width="12" height="4" rx="2" fill="${color}88"/>`;
       break;
     default: // material / block
       path = `<rect x="4" y="4" width="24" height="24" fill="${color}"/>
@@ -84,6 +98,8 @@ function getItemIcon(itemId: string): string {
   else if (def.toolCategory === "shovel") shape = "shovel";
   else if (def.id.endsWith("_hoe")) shape = "hoe";
   else if (def.id === "bow") shape = "bow";
+  else if (def.id === "crossbow") shape = "crossbow";
+  else if (def.category === "potion") shape = "potion";
   else if (def.category === "food") shape = "food";
   else if (def.category === "armor") shape = "armor";
   else if (def.category === "block") shape = "block";
@@ -94,6 +110,7 @@ function getItemIcon(itemId: string): string {
 export class UI {
   // FPS callbacks
   onRestart: () => void = () => {};
+  onContinueEndless: () => void = () => {};
   onPointerLockRequest: () => void = () => {};
   onModeSelect: (mode: "helmsdeep" | "freeplay") => void = () => {};
   onContinueGame: () => void = () => {};
@@ -122,6 +139,8 @@ export class UI {
   onStartGame: (_difficulty: "easy" | "normal" | "hard") => void = () => {};
 
   private crosshair!: HTMLElement;
+  private crossbowLoadBar!: HTMLElement;
+  private crossbowLoadFill!: HTMLElement;
   private hotbarSlots: HTMLElement[] = [];
   private heartEls: HTMLElement[] = [];
   private hungerEls: HTMLElement[] = [];
@@ -137,11 +156,17 @@ export class UI {
   private compassEl!: HTMLElement;
   private lockPrompt!: HTMLElement;
   private continueBtn!: HTMLElement;
+  private ammoDisplay!: HTMLElement;
+  private bossBarWrap!: HTMLElement;
+  private bossBarFill!: HTMLElement;
+  private bossBarName!: HTMLElement;
+  private scopeOverlay!: HTMLElement;
   private pauseOverlay!: HTMLElement;
   private inventoryOverlay!: HTMLElement;
   private deathOverlay!: HTMLElement;
   private endOverlay!: HTMLElement;
   private floatingContainer!: HTMLElement;
+  private _nearDeathVignette!: HTMLElement;
 
   // Inventory slot elements
   private backpackSlotEls: HTMLElement[] = [];
@@ -177,6 +202,7 @@ export class UI {
 
   private _personalGrid: (string | null)[][] = [[null, null], [null, null]];
   private _inventoryOpen = false;
+  private effectsContainer!: HTMLElement;
 
   private readonly container: HTMLElement;
 
@@ -199,6 +225,29 @@ export class UI {
       else if (hp === 1) el.style.backgroundImage = `url("${HEART_HALF}")`;
       else               el.style.backgroundImage = `url("${HEART_EMPTY}")`;
     }
+    // Near-death pulsing vignette
+    const fraction = max > 0 ? current / max : 0;
+    if (fraction > 0.30) {
+      this._nearDeathVignette.style.opacity = "0";
+    } else {
+      const danger = Math.min(1, (0.30 - fraction) / 0.20);
+      const pulseCyclesPerSec = 0.8 + danger * 2.0;
+      const t = performance.now() / 1000;
+      const pulse = Math.max(0, Math.pow(Math.cos(t * pulseCyclesPerSec * Math.PI), 4));
+      const maxOpacity = 0.30 + danger * 0.55;
+      this._nearDeathVignette.style.opacity = (pulse * maxOpacity).toFixed(3);
+    }
+  }
+
+  /** Show/hide crossbow loading bar. progress=0..1; isLoaded=true when ready to fire. */
+  updateCrossbowProgress(progress: number, isLoading: boolean, isLoaded: boolean): void {
+    if (!isLoading && !isLoaded) {
+      this.crossbowLoadBar.style.display = "none";
+      return;
+    }
+    this.crossbowLoadBar.style.display = "block";
+    this.crossbowLoadFill.style.width = `${Math.round(progress * 100)}%`;
+    this.crossbowLoadFill.style.background = isLoaded ? "#55ff55" : "#ffcc00";
   }
 
   updateXP(current: number, max: number, level?: number): void {
@@ -238,16 +287,33 @@ export class UI {
     if (!def) { this.itemTooltip.style.display = "none"; return; }
     const durStr = (durability != null && def.durability != null)
       ? ` <span style="color:#aaa;font-size:7px">(${durability}/${def.durability})</span>` : "";
-    this.itemTooltip.innerHTML = def.name + durStr;
+    let extra = "";
+    if (def.category === "potion" && def.potionEffect) {
+      const desc: Record<string, string> = {
+        healing: "Instantly restores HP",
+        regeneration: "Regenerates HP over time",
+        speed: "Increases movement speed",
+        strength: "Doubles melee damage",
+        fire_resistance: "Immune to explosion damage",
+      };
+      const d = desc[def.potionEffect] ?? "";
+      const t = def.potionDuration ? ` (${def.potionDuration}s)` : "";
+      extra = d ? ` <span style="color:#88ccff;font-size:7px">— ${d}${t}</span>` : "";
+    }
+    this.itemTooltip.innerHTML = def.name + durStr + extra;
     this.itemTooltip.style.display = "block";
   }
 
-  updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean): void {
+
+  updateWaveInfo(wave: number, total: number, enemyCount: number, dayNum?: number, isDay?: boolean, endless?: boolean): void {
     const dayStr = dayNum != null
       ? `<br><span style="color:${isDay ? "#ffee88" : "#aabbff"}">${isDay ? "☀" : "☽"} Day ${dayNum}</span>`
       : "";
+    const waveLabel = endless
+      ? `<span style="color:#ff8800">&#x221E; Wave ${wave}</span>`
+      : `Wave ${wave}/${total}`;
     this.elWaveInfo.innerHTML =
-      `Wave ${wave}/${total}<br>${enemyCount} enemies${dayStr}`;
+      `${waveLabel}<br>${enemyCount} enemies${dayStr}`;
   }
 
   setObjective(text: string): void {
@@ -271,7 +337,28 @@ export class UI {
 
   isInventoryOpen(): boolean { return this._inventoryOpen; }
 
-  showDeathScreen(): void { this.deathOverlay.style.display = "flex"; }
+  showDeathScreen(endlessWave?: number, bestWave = 0): void {
+    const stats = this.deathOverlay.querySelector<HTMLElement>(".overlay-stats");
+    const record = this.deathOverlay.querySelector<HTMLElement>(".death-record");
+    if (stats) {
+      if (endlessWave !== undefined) {
+        const isNew = endlessWave >= bestWave;
+        stats.textContent = `Fell at endless wave ${endlessWave}`;
+        stats.style.color = isNew ? "#ffdd00" : "";
+        if (record) {
+          record.textContent = isNew
+            ? `★ NEW RECORD!  Best: Wave ${endlessWave}`
+            : `Best: Wave ${bestWave}`;
+          record.style.display = "block";
+        }
+      } else {
+        stats.textContent = "The fortress has fallen.";
+        stats.style.color = "";
+        if (record) record.style.display = "none";
+      }
+    }
+    this.deathOverlay.style.display = "flex";
+  }
   hideDeathScreen(): void { this.deathOverlay.style.display = "none"; }
 
   showSmeltNotice(input: string, output: string): void {
@@ -292,12 +379,21 @@ export class UI {
   }
 
   /** Shows a big centered announcement that fades out after ~2 seconds. */
-  showWaveAnnouncement(waveNum: number): void {
+  showWaveAnnouncement(waveNum: number, endless = false): void {
     const el = document.createElement("div");
     el.className = "wave-announce";
-    el.textContent = `WAVE ${waveNum}`;
+    el.textContent = endless ? `★ ENDLESS WAVE ${waveNum}` : `WAVE ${waveNum}`;
+    if (endless) el.style.color = "#ff8800";
     this.container.appendChild(el);
     setTimeout(() => el.remove(), 2500);
+  }
+
+  showBossWarCry(): void {
+    const el = document.createElement("div");
+    el.className = "boss-war-cry";
+    el.textContent = "WAR CRY!";
+    this.container.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
   }
 
   showAchievement(title: string, desc: string): void {
@@ -364,23 +460,86 @@ export class UI {
 
   // ─── End screens ──────────────────────────────────────────────────────────
 
-  showEnd(type: "victory" | "gameover", detail: string): void {
+  showEnd(type: "victory" | "gameover", detail: string, bestEndlessWave = 0): void {
     const box = this.endOverlay.querySelector(".overlay-box")!;
     const title = box.querySelector<HTMLElement>(".overlay-title")!;
     const stats = box.querySelector<HTMLElement>(".overlay-stats")!;
+    const endlessBtn = box.querySelector<HTMLElement>("#end-endless")!;
+    const record = box.querySelector<HTMLElement>(".end-record");
     title.textContent = type === "victory" ? "VICTORY!" : "GAME OVER";
     title.style.color = type === "victory" ? "#ffdd00" : "#ff4444";
     stats.textContent = detail;
+    if (record) {
+      if (bestEndlessWave > 0) {
+        record.textContent = `★ Best Endless Wave: ${bestEndlessWave}`;
+        record.style.display = "block";
+      } else {
+        record.style.display = "none";
+      }
+    }
+    endlessBtn.style.display = type === "victory" ? "block" : "none";
     this.endOverlay.style.display = "flex";
   }
 
   hideEnd(): void { this.endOverlay.style.display = "none"; }
+
+  updateActiveEffects(effects: Map<string, { duration: number; power: number }>): void {
+    this.effectsContainer.innerHTML = "";
+    const effectMeta: Record<string, { label: string; color: string; icon: string }> = {
+      healing:        { label: "Healing",         color: "#ff4466", icon: "♥" },
+      regeneration:   { label: "Regeneration",    color: "#ff66aa", icon: "✚" },
+      speed:          { label: "Swiftness",        color: "#88ccff", icon: "⚡" },
+      strength:       { label: "Strength",         color: "#ff6600", icon: "⚔" },
+      fire_resistance:{ label: "Fire Resistance",  color: "#ff8800", icon: "🔥" },
+    };
+    for (const [id, eff] of effects) {
+      const meta = effectMeta[id];
+      if (!meta) continue;
+      const el = div("fps-effect-icon");
+      el.style.borderColor = meta.color;
+      el.style.color = meta.color;
+      const secs = Math.ceil(eff.duration);
+      const timeStr = secs >= 60 ? `${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}` : `${secs}s`;
+      el.innerHTML = `<span class="fps-effect-glyph">${meta.icon}</span><span class="fps-effect-label">${meta.label}</span><span class="fps-effect-time">${timeStr}</span>`;
+      this.effectsContainer.appendChild(el);
+    }
+  }
 
   showDamageVignette(): void {
     const el = document.createElement("div");
     el.className = "damage-vignette";
     this.container.appendChild(el);
     setTimeout(() => el.remove(), 600);
+  }
+
+  showWebbedIndicator(): void {
+    // Remove any existing webbed indicators
+    this.container.querySelectorAll(".webbed-indicator,.webbed-vignette").forEach(e => e.remove());
+    const vignette = document.createElement("div");
+    vignette.className = "webbed-vignette";
+    this.container.appendChild(vignette);
+    const label = document.createElement("div");
+    label.className = "webbed-indicator";
+    label.textContent = "WEBBED";
+    this.container.appendChild(label);
+    setTimeout(() => { vignette.remove(); label.remove(); }, 3200);
+  }
+
+  showWitherIndicator(): void {
+    this.container.querySelectorAll(".wither-vignette,.wither-indicator").forEach(e => e.remove());
+    const vignette = document.createElement("div");
+    vignette.className = "wither-vignette";
+    this.container.appendChild(vignette);
+    const label = document.createElement("div");
+    label.className = "wither-indicator";
+    label.textContent = "WITHER";
+    this.container.appendChild(label);
+    setTimeout(() => { vignette.remove(); label.remove(); }, 5200);
+  }
+
+  showScopeOverlay(show: boolean): void {
+    this.scopeOverlay.style.display = show ? "block" : "none";
+    this.crosshair.style.display    = show ? "none"  : "block";
   }
 
   flashThunder(): void {
@@ -422,9 +581,35 @@ export class UI {
     const vignette = div("fps-vignette");
     this.container.appendChild(vignette);
 
+    this._nearDeathVignette = div("near-death-vignette");
+    this.container.appendChild(this._nearDeathVignette);
+
     this.crosshair = div("fps-crosshair");
     this.crosshair.innerHTML = `<span class="fps-ch-h"></span><span class="fps-ch-v"></span>`;
     this.container.appendChild(this.crosshair);
+
+    this.scopeOverlay = div("fps-scope-overlay");
+    // Pure CSS elements so sizing uses the same vmin units as the radial-gradient.
+    this.scopeOverlay.innerHTML = `
+      <div class="scope-ring"></div>
+      <div class="scope-ch-hl"></div>
+      <div class="scope-ch-hr"></div>
+      <div class="scope-ch-vt"></div>
+      <div class="scope-ch-vb"></div>
+      <div class="scope-dot"></div>
+      <div class="scope-mildot" style="top:calc(50% + 8vmin)"></div>
+      <div class="scope-mildot" style="top:calc(50% + 14vmin)"></div>
+      <div class="scope-tick" style="top:calc(50% + 8vmin)"></div>
+      <div class="scope-tick" style="top:calc(50% + 14vmin)"></div>`;
+    this.scopeOverlay.style.display = "none";
+    this.container.appendChild(this.scopeOverlay);
+
+    // Crossbow loading progress bar (shown below crosshair while loading/loaded)
+    this.crossbowLoadBar = div("fps-crossbow-bar");
+    this.crossbowLoadFill = div("fps-crossbow-fill");
+    this.crossbowLoadBar.appendChild(this.crossbowLoadFill);
+    this.crossbowLoadBar.style.display = "none";
+    this.container.appendChild(this.crossbowLoadBar);
 
     this.elObjective = div("fps-objective");
     this.container.appendChild(this.elObjective);
@@ -436,6 +621,7 @@ export class UI {
     this.buildHearts();
     this.buildHungerBar();
     this.buildXPBar();
+    this.buildEffectsBar();
     this.buildHotbar();
     this.buildItemTooltip();
     this.buildDayClock();
@@ -529,6 +715,11 @@ export class UI {
       this.hungerEls.push(h);
     }
     this.container.appendChild(wrap);
+  }
+
+  private buildEffectsBar(): void {
+    this.effectsContainer = div("fps-effects-bar");
+    this.container.appendChild(this.effectsContainer);
   }
 
   private buildXPBar(): void {
@@ -674,17 +865,80 @@ export class UI {
     this.compassEl.textContent = DIRS[idx];
   }
 
+
   private buildHotbar(): void {
     const bar = div("fps-hotbar");
     for (let i = 0; i < 9; i++) {
       const slot = div("fps-hotbar-slot");
       slot.innerHTML = `<span class="fps-slot-num">${i + 1}</span>
         <span class="fps-slot-icon"></span>
-        <span class="fps-slot-count"></span>`;
+        <span class="fps-slot-count"></span>
+        <span class="fps-ammo-badge" style="display:none"></span>`;
       bar.appendChild(slot);
       this.hotbarSlots.push(slot);
     }
     this.container.appendChild(bar);
+
+    // Ammo display (shown when a gun is equipped)
+    this.ammoDisplay = div("fps-ammo-display");
+    this.ammoDisplay.style.display = "none";
+    this.container.appendChild(this.ammoDisplay);
+
+    // Boss health bar (shown during boss fight)
+    this.bossBarWrap = div("fps-boss-bar-wrap");
+    this.bossBarWrap.style.display = "none";
+    this.bossBarName = div("fps-boss-bar-name");
+    this.bossBarName.textContent = "";
+    const bossBarBg = div("fps-boss-bar-bg");
+    this.bossBarFill = div("fps-boss-bar-fill");
+    bossBarBg.appendChild(this.bossBarFill);
+    this.bossBarWrap.appendChild(this.bossBarName);
+    this.bossBarWrap.appendChild(bossBarBg);
+    this.container.appendChild(this.bossBarWrap);
+  }
+
+  updateAmmoDisplay(count: number | null): void {
+    if (count === null) {
+      this.ammoDisplay.style.display = "none";
+    } else {
+      this.ammoDisplay.textContent = `⚙ ${count}`;
+      this.ammoDisplay.style.display = "block";
+    }
+  }
+
+  /**
+   * Show a small colored ammo badge on the specified hotbar slot.
+   * Pass slotIndex=null to clear all badges.
+   * Color: green ≥ 50%, yellow ≥ 20%, red < 20%.
+   */
+  setSlotAmmoBadge(slotIndex: number | null, count: number, maxCount: number): void {
+    for (let i = 0; i < this.hotbarSlots.length; i++) {
+      const badge = this.hotbarSlots[i].querySelector<HTMLElement>(".fps-ammo-badge");
+      if (!badge) continue;
+      if (slotIndex === null || i !== slotIndex || count <= 0) {
+        badge.style.display = "none";
+        continue;
+      }
+      const pct = maxCount > 0 ? count / maxCount : 0;
+      const color = pct >= 0.5 ? "#44ff88" : pct >= 0.2 ? "#ffcc00" : "#ff4444";
+      badge.textContent = String(count);
+      badge.style.color = color;
+      badge.style.display = "block";
+    }
+  }
+
+  showBossHealthBar(name: string, pct: number): void {
+    this.bossBarWrap.style.display = "block";
+    this.bossBarName.textContent = `⚔ ${name}`;
+    this.bossBarFill.style.width = `${Math.max(0, Math.min(1, pct) * 100).toFixed(1)}%`;
+    // Turn red when raging (below 50%)
+    this.bossBarFill.style.background = pct <= 0.5
+      ? "linear-gradient(90deg, #cc0000, #ff3300)"
+      : "linear-gradient(90deg, #880000, #cc2200)";
+  }
+
+  hideBossHealthBar(): void {
+    this.bossBarWrap.style.display = "none";
   }
 
   private buildInventoryOverlay(): void {
@@ -1099,6 +1353,19 @@ export class UI {
       { name: "Diamond Boots", ingredients: "4 Diamonds (2 columns)", key: "diamond_boots" },
       { name: "Arrows", ingredients: "1 Flint + 1 Stick → 4 Arrows", key: "arrows" },
       { name: "Bow", ingredients: "3 Sticks + 3 Arrows (diagonal)", key: "bow" },
+      { name: "Crossbow", ingredients: "3 Iron Ingots + 2 Sticks (3×3 grid) — right-click to load, right-click to fire", key: "crossbow" },
+      { name: "Flint & Steel", ingredients: "1 Iron Ingot + 1 Flint (diagonal) — ignite TNT!", key: "flint_and_steel" },
+      { name: "TNT", ingredients: "4 Gunpowder + 5 Sand (checkerboard) — creepers drop gunpowder!", key: "tnt" },
+      // Potions
+      { name: "⚗ Glass Bottle", ingredients: "3 Glass (V-shape) → 3 Bottles", key: "glass_bottle" },
+      { name: "⚗ Sugar", ingredients: "1 Wheat → 2 Sugar", key: "sugar_from_wheat" },
+      { name: "⚗ Glistering Melon", ingredients: "1 Gold Ingot + 1 Apple", key: "glistering_melon" },
+      { name: "⚗ Magma Cream", ingredients: "1 Blaze Rod + 1 Coal (vertical)", key: "magma_cream" },
+      { name: "🧪 Potion of Healing", ingredients: "Blaze Rod + Glistering Melon + Glass Bottle → heals 8 HP", key: "potion_healing" },
+      { name: "🧪 Potion of Regeneration", ingredients: "Blaze Rod + Nether Wart + Glass Bottle → regen 30s", key: "potion_regeneration" },
+      { name: "🧪 Potion of Swiftness", ingredients: "Blaze Rod + Sugar + Glass Bottle → speed 60s", key: "potion_speed" },
+      { name: "🧪 Potion of Strength", ingredients: "Blaze Rod + Magma Cream + Glass Bottle → 2× dmg 30s", key: "potion_strength" },
+      { name: "🧪 Potion of Fire Resistance", ingredients: "Nether Wart + Magma Cream + Glass Bottle → resist explosions 3min", key: "potion_fire_resistance" },
     ];
 
     const list = div("fps-rb-list");
@@ -1163,6 +1430,7 @@ export class UI {
       <div class="overlay-box">
         <h1 class="overlay-title" style="color:#ff4444">YOU DIED</h1>
         <p class="overlay-stats">The fortress has fallen.</p>
+        <p class="death-record" style="display:none;font-size:1.1em;color:#ffaa00;margin:4px 0 8px"></p>
         <button class="overlay-btn" id="death-restart">Respawn</button>
       </div>`;
     ov.querySelector("#death-restart")!.addEventListener("click", () => {
@@ -1180,11 +1448,19 @@ export class UI {
       <div class="overlay-box">
         <h1 class="overlay-title"></h1>
         <p class="overlay-stats"></p>
+        <p class="end-record" style="display:none;font-size:1.05em;color:#ffaa00;margin:4px 0 8px"></p>
+        <button class="overlay-btn" id="end-endless" style="display:none;background:#c87800;margin-bottom:8px">
+          &#x221E; Continue: Endless Mode
+        </button>
         <button class="overlay-btn" id="end-restart">Play Again</button>
       </div>`;
     ov.querySelector("#end-restart")!.addEventListener("click", () => {
       ov.style.display = "none";
       this.onRestart();
+    });
+    ov.querySelector("#end-endless")!.addEventListener("click", () => {
+      ov.style.display = "none";
+      this.onContinueEndless();
     });
     this.endOverlay = ov;
     this.container.appendChild(ov);
@@ -1329,6 +1605,73 @@ const FPS_CSS = `
   background: #fff;
 }
 
+/* Sniper scope overlay — full-screen dark vignette with circular clear window */
+.fps-scope-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none; z-index: 25;
+  background: radial-gradient(circle at 50% 50%, rgba(0,12,0,0.12) 27.5vmin, rgba(0,0,0,0.98) 28.0vmin);
+}
+/* Scope lens ring — exactly matches the CSS vignette circle */
+.scope-ring {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 56vmin; height: 56vmin; border-radius: 50%;
+  border: 1.5px solid rgba(74,102,74,0.9);
+  box-shadow: inset 0 0 0 3px rgba(20,35,20,0.75), 0 0 0 1px rgba(74,102,74,0.4);
+}
+/* Horizontal crosshair halves — gap in center */
+.scope-ch-hl, .scope-ch-hr {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  height: 1px; background: rgba(138,170,138,0.9);
+  width: calc(22vmin - 8px);
+}
+.scope-ch-hl { right: calc(50% + 8px); }
+.scope-ch-hr { left:  calc(50% + 8px); }
+/* Vertical crosshair halves */
+.scope-ch-vt, .scope-ch-vb {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 1px; background: rgba(138,170,138,0.9);
+  height: calc(22vmin - 8px);
+}
+.scope-ch-vt { bottom: calc(50% + 8px); }
+.scope-ch-vb { top:    calc(50% + 8px); }
+/* Center dot */
+.scope-dot {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 3px; border-radius: 50%;
+  background: rgba(138,170,138,1.0);
+}
+/* Mil-dot reticle marks below center */
+.scope-mildot {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(138,170,138,0.85);
+}
+/* Horizontal ticks beside mil-dots */
+.scope-tick {
+  position: absolute; left: 50%; transform: translate(-50%, -50%);
+  width: 10px; height: 1px;
+  background: rgba(138,170,138,0.65);
+}
+
+/* Crossbow loading bar — appears below crosshair */
+.fps-crossbow-bar {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, 18px);
+  width: 80px; height: 6px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 3px;
+  z-index: 21; pointer-events: none;
+}
+.fps-crossbow-fill {
+  height: 100%; border-radius: 3px;
+  background: #ffcc00;
+  transition: width 0.05s linear;
+}
+
 /* Objective banner — flat, no blur, pixel shadow */
 .fps-objective {
   position: absolute;
@@ -1464,6 +1807,15 @@ const FPS_CSS = `
 }
 
 /* Hotbar — Minecraft dark gray, square slots */
+.fps-ammo-display {
+  position: absolute;
+  bottom: 68px; right: 16px;
+  color: #fff; font-size: 18px; font-family: monospace;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+  pointer-events: none; z-index: 15;
+  letter-spacing: 1px;
+}
+
 .fps-hotbar {
   position: absolute;
   bottom: 10px; left: 50%; transform: translateX(-50%);
@@ -1500,6 +1852,14 @@ const FPS_CSS = `
   position: absolute; bottom: 1px; right: 2px;
   font-size: 9px; font-weight: bold;
   color: #fff; text-shadow: 1px 1px 0 #000;
+}
+.fps-ammo-badge {
+  position: absolute; bottom: 1px; left: 2px;
+  font-size: 9px; font-weight: bold;
+  font-family: monospace;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+  z-index: 2;
 }
 .slot-dur-bar {
   position: absolute; bottom: 2px; left: 2px; right: 2px;
@@ -1818,6 +2178,29 @@ const FPS_CSS = `
   80%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.0) translateY(-20px); }
 }
+/* Boss war cry announcement — fiery orange, centered */
+.boss-war-cry {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 28px;
+  color: #ff8800;
+  text-shadow: 0 0 14px #ff4400, 3px 3px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+  z-index: 55;
+  animation: warCryAnnounce 2.0s ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes warCryAnnounce {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.6) rotate(-3deg); }
+  15%  { opacity: 1; transform: translateX(-50%) scale(1.2) rotate(2deg); }
+  35%  { opacity: 1; transform: translateX(-50%) scale(1.0) rotate(0deg); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.95) translateY(-24px); }
+}
+
 /* Minecraft-style achievement toast */
 .achievement-toast {
   position: absolute;
@@ -1853,10 +2236,75 @@ const FPS_CSS = `
   background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.75) 100%);
   animation: damageFlash 0.6s ease-out forwards;
 }
+.webbed-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 58;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(80,160,60,0.55) 100%);
+  animation: webbedPulse 3.2s ease-out forwards;
+}
+.webbed-indicator {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 65;
+  color: #cceecc;
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-family: monospace;
+  text-shadow: 0 0 8px #44aa44, 0 2px 4px #000;
+  letter-spacing: 0.2em;
+  animation: webbedPulse 3.2s ease-out forwards;
+}
+@keyframes webbedPulse {
+  0%   { opacity: 1; }
+  70%  { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+.wither-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 57;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(40,0,60,0.65) 100%);
+  animation: witherPulse 5.2s ease-out forwards;
+}
+.wither-indicator {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 65;
+  color: #bb88ee;
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-family: monospace;
+  text-shadow: 0 0 10px #7700aa, 0 2px 4px #000;
+  letter-spacing: 0.2em;
+  animation: witherPulse 5.2s ease-out forwards;
+}
+@keyframes witherPulse {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.7; }
+  100% { opacity: 0; }
+}
 @keyframes damageFlash {
   0%   { opacity: 1; }
   30%  { opacity: 0.9; }
   100% { opacity: 0; }
+}
+.near-death-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 55;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(200,0,0,0.88) 100%);
+  opacity: 0;
+  transition: none;
 }
 .thunder-flash {
   position: absolute;
@@ -1899,4 +2347,51 @@ const FPS_CSS = `
 .fps-rb-name { font-size: 9px; color: #fff; margin-bottom: 2px; }
 .fps-rb-ing  { font-size: 7px; color: #aaa; }
 .fps-rb-hint { font-size: 7px; color: #666; text-align: center; margin-top: 8px; }
+
+/* Boss health bar */
+.fps-boss-bar-wrap {
+  position: absolute;
+  top: 16px; left: 50%; transform: translateX(-50%);
+  width: 360px; pointer-events: none; z-index: 20;
+  text-align: center;
+}
+.fps-boss-bar-name {
+  font-family: monospace; font-size: 14px; font-weight: bold;
+  color: #ff4422; text-shadow: 0 0 6px #ff0000, 2px 2px 0 #000;
+  margin-bottom: 4px; letter-spacing: 2px;
+}
+.fps-boss-bar-bg {
+  width: 100%; height: 16px;
+  background: rgba(0,0,0,0.7);
+  border: 2px solid #880000;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 0 8px #ff000055;
+}
+.fps-boss-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #880000, #cc2200);
+  transition: width 0.15s ease-out;
+}
+
+/* Active potion effects bar — top-right */
+.fps-effects-bar {
+  position: absolute;
+  top: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  pointer-events: none; z-index: 20;
+}
+.fps-effect-icon {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid #888;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+.fps-effect-glyph { font-size: 13px; line-height: 1; }
+.fps-effect-label { flex: 1; }
+.fps-effect-time  { opacity: 0.75; min-width: 28px; text-align: right; }
 `;

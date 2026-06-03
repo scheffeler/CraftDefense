@@ -3,21 +3,28 @@ import type { VoxelWorld } from "./Map";
 import { sweepAABBWorld } from "./Physics";
 import type { MovementInput } from "./InputManager";
 
-const WALK_SPEED      = 5.0;
-const SPRINT_MULT     = 1.6;
-const CROUCH_MULT     = 0.35;
-const JUMP_IMPULSE    = 7.5;
-const WATER_SPEED     = 0.5;   // fraction of normal speed in water
-const SWIM_ACCEL      = 18;    // upward accel when holding jump in water
-const SWIM_MAX_UP     = 3.5;   // max upward swim velocity
-const EYE_HEIGHT      = 1.62;
-const MELEE_COOLDOWN  = 0.5;
-const BOW_CHARGE_TIME = 1.5;  // seconds to reach full charge
-const MELEE_RADIUS    = 2.5;
-const MELEE_REACH     = 2.0;
+const WALK_SPEED           = 5.0;
+const SPRINT_MULT          = 1.6;
+const CROUCH_MULT          = 0.35;
+const JUMP_IMPULSE         = 7.5;
+const WATER_SPEED          = 0.5;
+const SWIM_ACCEL           = 18;
+const SWIM_MAX_UP          = 3.5;
+const EYE_HEIGHT           = 1.62;
+const MELEE_COOLDOWN       = 0.5;
+const BOW_CHARGE_TIME      = 1.5;
+const CROSSBOW_LOAD_TIME   = 1.2;
+const MELEE_RADIUS         = 2.5;
+const MELEE_REACH          = 2.0;
+const PISTOL_COOLDOWN      = 0.45;
+
+export interface ActiveEffect {
+  duration: number;  // remaining seconds
+  power: number;     // effect magnitude
+}
 
 export class Player {
-  position: THREE.Vector3;    // feet position
+  position: THREE.Vector3;
   velocity: THREE.Vector3 = new THREE.Vector3();
   onGround = false;
   inWater  = false;
@@ -27,15 +34,23 @@ export class Player {
   hunger    = 20;
   xp        = 0;
   level     = 0;
-  armorValue = 0; // sum of equipped armor pieces, updated by Game.ts
+  armorValue = 0;
 
-  attackCooldown = 0;
-  bowCharge      = 0;
-  isBowCharging  = false;
+  attackCooldown       = 0;
+  bowCharge            = 0;
+  isBowCharging        = false;
+  gunCooldown          = 0;
+  webSlowTimer         = 0;
+
+  isCrossbowLoading    = false;
+  isCrossbowLoaded     = false;
+  crossbowLoadProgress = 0;
+
+  readonly activeEffects: Map<string, ActiveEffect> = new Map();
+  private _regenTick = 0;
 
   onDeath: () => void = () => {};
 
-  // Look direction extracted from camera quaternion
   private readonly _lookDir = new THREE.Vector3();
   private readonly _euler   = new THREE.Euler(0, 0, 0, "YXZ");
 
@@ -50,14 +65,94 @@ export class Player {
 
   update(dt: number, input: MovementInput): void {
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.gunCooldown    = Math.max(0, this.gunCooldown - dt);
+    this.webSlowTimer   = Math.max(0, this.webSlowTimer - dt);
     if (this.isBowCharging) {
       this.bowCharge = Math.min(BOW_CHARGE_TIME, this.bowCharge + dt);
     }
+    if (this.isCrossbowLoading) {
+      this.crossbowLoadProgress = Math.min(1, this.crossbowLoadProgress + dt / CROSSBOW_LOAD_TIME);
+      if (this.crossbowLoadProgress >= 1) {
+        this.isCrossbowLoading = false;
+        this.isCrossbowLoaded  = true;
+      }
+    }
+    this._tickEffects(dt);
     this.applyMovement(dt, input);
     this.camera.position.copy(this.getCameraPosition());
   }
 
-  /** Returns melee sphere params if attack was successful, null if on cooldown. */
+  private _tickEffects(dt: number): void {
+    for (const [id, eff] of this.activeEffects) {
+      eff.duration -= dt;
+      if (eff.duration <= 0) this.activeEffects.delete(id);
+    }
+    if (this.activeEffects.has("regeneration")) {
+      this._regenTick += dt;
+      if (this._regenTick >= 2) {
+        this._regenTick -= 2;
+        this.heal(1);
+      }
+    } else {
+      this._regenTick = 0;
+    }
+  }
+
+  // ── Effect accessors ──────────────────────────────────────────────────────
+
+  get speedPotionMult(): number {
+    const e = this.activeEffects.get("speed");
+    return e ? e.power : 1.0;
+  }
+
+  /** @deprecated use speedPotionMult */
+  getSpeedMult(): number { return this.speedPotionMult; }
+
+  get strengthMult(): number {
+    const e = this.activeEffects.get("strength");
+    return e ? e.power : 1.0;
+  }
+
+  getStrengthBonus(): number {
+    const e = this.activeEffects.get("strength");
+    return e ? e.power - 1 : 0;
+  }
+
+  get fireResistant(): boolean {
+    return this.activeEffects.has("fire_resistance");
+  }
+
+  getHasteMult(): number {
+    const e = this.activeEffects.get("haste");
+    return e ? e.power : 1.0;
+  }
+
+  getNightVisionActive(): boolean {
+    const e = this.activeEffects.get("night_vision");
+    return !!(e && e.duration > 0);
+  }
+
+  // ── Effect application ────────────────────────────────────────────────────
+
+  applyPotionEffect(effect: string, duration: number, power: number): void {
+    if (duration === 0) {
+      if (effect === "healing") this.heal(power);
+    } else {
+      const existing = this.activeEffects.get(effect);
+      if (existing) {
+        existing.duration = Math.max(existing.duration, duration);
+      } else {
+        this.activeEffects.set(effect, { duration, power });
+      }
+    }
+  }
+
+  applyEffect(id: string, duration: number, magnitude: number): void {
+    this.applyPotionEffect(id, duration, magnitude);
+  }
+
+  // ── Attack / weapon methods ──────────────────────────────────────────────
+
   tryMeleeAttack(): { center: THREE.Vector3; radius: number } | null {
     if (this.attackCooldown > 0) return null;
     this.attackCooldown = MELEE_COOLDOWN;
@@ -68,6 +163,12 @@ export class Player {
     return { center, radius: MELEE_RADIUS };
   }
 
+  tryGunFire(): { from: THREE.Vector3; direction: THREE.Vector3 } | null {
+    if (this.gunCooldown > 0) return null;
+    this.gunCooldown = PISTOL_COOLDOWN;
+    return { from: this.getCameraPosition(), direction: this.getLookDirection() };
+  }
+
   startBowCharge(): void {
     if (!this.isBowCharging) {
       this.isBowCharging = true;
@@ -75,22 +176,36 @@ export class Player {
     }
   }
 
-  /**
-   * Releases the bow. Returns shot params if power >= 10%, otherwise null.
-   * power is [0..1]; speed = 15 + power * 25 m/s.
-   */
   releaseBow(): { power: number; from: THREE.Vector3; direction: THREE.Vector3 } | null {
     if (!this.isBowCharging) return null;
     const power = Math.min(1, this.bowCharge / BOW_CHARGE_TIME);
     this.isBowCharging = false;
     this.bowCharge = 0;
     if (power < 0.1) return null;
-    return {
-      power,
-      from: this.getCameraPosition(),
-      direction: this.getLookDirection(),
-    };
+    return { power, from: this.getCameraPosition(), direction: this.getLookDirection() };
   }
+
+  startCrossbowLoad(): void {
+    if (this.isCrossbowLoaded || this.isCrossbowLoading) return;
+    this.isCrossbowLoading    = true;
+    this.crossbowLoadProgress = 0;
+  }
+
+  fireCrossbow(): { from: THREE.Vector3; direction: THREE.Vector3 } | null {
+    if (!this.isCrossbowLoaded) return null;
+    this.isCrossbowLoaded    = false;
+    this.isCrossbowLoading   = false;
+    this.crossbowLoadProgress = 0;
+    return { from: this.getCameraPosition(), direction: this.getLookDirection() };
+  }
+
+  cancelCrossbow(): void {
+    this.isCrossbowLoaded    = false;
+    this.isCrossbowLoading   = false;
+    this.crossbowLoadProgress = 0;
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
 
   getCameraPosition(): THREE.Vector3 {
     return this.position.clone().add(new THREE.Vector3(0, EYE_HEIGHT, 0));
@@ -130,11 +245,11 @@ export class Player {
   private applyMovement(dt: number, input: MovementInput): void {
     const yaw = this.getYaw();
 
-    let speed = WALK_SPEED;
+    let speed = WALK_SPEED * this.speedPotionMult;
     if (input.sprint) speed *= SPRINT_MULT;
     if (this.inWater) speed *= WATER_SPEED;
+    if (this.webSlowTimer > 0) speed *= 0.35;
 
-    // Build horizontal move vector relative to camera yaw
     const move = new THREE.Vector3();
     if (input.forward)  move.z -= 1;
     if (input.backward) move.z += 1;
@@ -162,7 +277,6 @@ export class Player {
     this.onGround = result.onGround;
     this.inWater  = result.inWater;
 
-    // Clamp position inside world bounds
     this.position.x = Math.max(0.31, Math.min(63.69, this.position.x));
     this.position.z = Math.max(0.31, Math.min(63.69, this.position.z));
   }
