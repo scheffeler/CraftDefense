@@ -802,3 +802,24 @@
 - Passive mob improvements: chicken flapping wing animation, pig wider snout
 - Moon phase visual: change the shadow disc offset each game-day for visual night variety
 - Rain puddle darkening: when rain is active, gradually darken top-face vertex colors of dirt/stone by ~12%
+
+---
+
+## 2026-06-03 — Arm walk-bob + wave-start exposure pulse
+
+**What was done:**
+- **Arm walk-bob** (`src/SceneManager.ts`): The first-person arm was previously completely static between swings. Added `_armBobTime`, `_armBobSpeed`, and `_armBobLastPos` fields. Each frame `renderArm()` measures camera XZ displacement to derive movement speed, then smoothly ramps a bob intensity (0→1) with a 12×dt lerp. The bob applies: Y = sin(bobTime) × 0.022, X-sway = cos(bobTime×0.5) × 0.009, and a subtle roll tilt of cos(bobTime×0.5) × 0.04 rad — all scaled by movement intensity. Bob is also suppressed during weapon swings so animations don't compete. This makes the first-person view feel dramatically more alive during normal play.
+- **Wave-start exposure pulse** (`src/SceneManager.ts` + `src/Game.ts`): Added `triggerWavePulse()` to SceneManager. It fires a 550 ms tone-mapping exposure envelope: 0–25 % ramps from ×1.0 to ×1.5 (bright flash), 25–45 % drops to ×0.7 (dark dip), 45–100 % recovers to ×1.0. `startNextWave()` in Game.ts calls `scene.triggerWavePulse()` alongside the wave_start audio, giving each wave a cinematic "lens-adjust" beat.
+- **tsconfig fix**: Changed `moduleResolution` from deprecated `"Node"` to `"bundler"` so `npm run dev` (which runs `tsc && node scripts/dev.mjs`) exits cleanly on TypeScript 6.
+
+**Notes:**
+- Started fresh from remote `auto-iterate` which already had 32-tile atlas, torch point lights, rain streaks, shadow blobs, lava/water animations, wind sway, biome tints, sky dome, enemy eye glow, footprint decals, TNT countdown sprites, and pixel-art item sprites.
+- TypeScript compiles clean. Game loads without JS errors (verified via Playwright page inspect).
+
+**Ideas for next time:**
+- Enemy death flash: at the moment `hp ≤ 0`, do a more dramatic white emissive (1.0 → 0 over 0.2 s) separate from the per-hit `flashHit` — currently the dying tumble animation starts immediately, a flash burst would punctuate it
+- Campfire decorative block: cross-pane fire Sprite + `PointLight(0xff4400, 1.5, 3)`, could be pre-built in the fortress interior or craftable
+- Moon phase visual: update moon canvas texture each game-day to show crescent/half/full cycle
+- Leaves emissive at night: traverse leaf blocks near player, add tiny emissive so the canopy glows faintly after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle at the moment the boss activates war cry
+- Biome ambient sound: different ambient drone/chirp audio per biome (desert wind vs taiga crickets vs forest birds)
