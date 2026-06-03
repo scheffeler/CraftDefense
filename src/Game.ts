@@ -122,8 +122,10 @@ export class Game {
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
   // Arrow dispensers: keyed by "wx,wy,wz", value = {x,y,z,timer}
   private readonly dispenserBlocks = new Map<string, { x: number; y: number; z: number; timer: number }>();
-  // TNT fuses: keyed by "wx,wy,wz", value = {x,y,z,timer,flashTimer}
-  private readonly tntFuses = new Map<string, { x: number; y: number; z: number; timer: number; flashTimer: number }>();
+  // TNT fuses: keyed by "wx,wy,wz", value = {x,y,z,timer,flashTimer,displayN}
+  private readonly tntFuses = new Map<string, { x: number; y: number; z: number; timer: number; flashTimer: number; displayN: number }>();
+  // Floating countdown sprites above primed TNT blocks
+  private readonly _tntCountdownSprites = new Map<string, THREE.Sprite>();
   // Chest storage: key = "wx,wy,wz", value = array of {itemId, count} | null
   private readonly chestStorage = new Map<string, Array<{itemId:string;count:number}|null>>();
   private openChestKey: string | null = null;
@@ -496,7 +498,8 @@ export class Game {
         if (stack?.itemId === "flint_and_steel" || stack?.itemId === "flint_steel") {
           const key = `${tb.wx},${tb.wy},${tb.wz}`;
           if (!this.tntFuses.has(key)) {
-            this.tntFuses.set(key, { x: tb.wx, y: tb.wy, z: tb.wz, timer: 3.5, flashTimer: 0 });
+            this.tntFuses.set(key, { x: tb.wx, y: tb.wy, z: tb.wz, timer: 3.5, flashTimer: 0, displayN: 3 });
+            this.spawnTNTSprite(key, tb.wx, tb.wy, tb.wz);
             this.audio.play("creeper_hiss", 0.6);
             this.ui.showAchievement("Boom!", "You lit a TNT block");
           }
@@ -702,7 +705,8 @@ export class Game {
         this.gameMap.world.rebuildDirtyChunks();
         const key = `${wx},${wy},${wz}`;
         if (!this.tntFuses.has(key)) {
-          this.tntFuses.set(key, { x: wx, y: wy, z: wz, timer: 3.5, flashTimer: 0 });
+          this.tntFuses.set(key, { x: wx, y: wy, z: wz, timer: 3.5, flashTimer: 0, displayN: 3 });
+          this.spawnTNTSprite(key, wx, wy, wz);
           this.audio.play("creeper_hiss", 0.7);
         }
         return;
@@ -1254,6 +1258,7 @@ export class Game {
     this.projectiles.reset();
     this.waves.reset();
     this.dispenserBlocks.clear();
+    this._tntCountdownSprites.forEach((_, k) => this.removeTNTSprite(k));
     this.tntFuses.clear();
     this.lavaSourceBlocks.clear();
     this.player.health    = this.player.maxHealth;
@@ -1900,8 +1905,15 @@ export class Game {
         tnt.flashTimer = 0.3;
         this.particles.spawnBlockBreak(tnt.x, tnt.y + 0.5, tnt.z, 0xff5533);
       }
+      // Update countdown sprite when displayed second changes
+      const newDisplayN = Math.max(1, Math.min(3, Math.ceil(tnt.timer)));
+      if (newDisplayN !== tnt.displayN) {
+        tnt.displayN = newDisplayN;
+        this.updateTNTSprite(key, newDisplayN);
+      }
       if (tnt.timer > 0) continue;
       // Explode
+      this.removeTNTSprite(key);
       this.tntFuses.delete(key);
       this.gameMap.world.setBlock(tnt.x, tnt.y, tnt.z, "air");
       this.gameMap.world.rebuildDirtyChunks();
@@ -2496,6 +2508,73 @@ export class Game {
   // ─── Torch lights ─────────────────────────────────────────────────────────
 
   /** Build a 16×32 canvas flame texture: yellow base → orange → red tip, alpha cutout edges. */
+  // -------------------------------------------------------------------------
+  // TNT countdown sprite helpers
+  // -------------------------------------------------------------------------
+
+  private static makeTNTCountdownCanvas(n: number): HTMLCanvasElement {
+    const size = 64;
+    const c = document.createElement("canvas");
+    c.width = size; c.height = size;
+    const ctx = c.getContext("2d")!;
+    const cx2 = size / 2;
+    // Coloured ring — red for 1, orange for 2, yellow for 3
+    const ringColor = n <= 1 ? "#ff2200" : n <= 2 ? "#ff6600" : "#ffaa00";
+    ctx.beginPath();
+    ctx.arc(cx2, cx2, cx2 - 3, 0, Math.PI * 2);
+    ctx.fillStyle = n <= 1 ? "rgba(200,30,0,0.82)" : n <= 2 ? "rgba(200,80,0,0.78)" : "rgba(160,60,0,0.72)";
+    ctx.fill();
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // Big bold digit
+    ctx.save();
+    ctx.shadowColor = ringColor;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ffe080";
+    ctx.font = `bold ${Math.round(size * 0.62)}px monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(n), cx2, cx2 + 2);
+    ctx.restore();
+    return c;
+  }
+
+  private spawnTNTSprite(key: string, wx: number, wy: number, wz: number): void {
+    const canvas = Game.makeTNTCountdownCanvas(3);
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.setScalar(0.8);
+    sprite.position.set(wx + 0.5, wy + 1.6, wz + 0.5);
+    this.scene.scene.add(sprite);
+    this._tntCountdownSprites.set(key, sprite);
+  }
+
+  private updateTNTSprite(key: string, n: number): void {
+    const sprite = this._tntCountdownSprites.get(key);
+    if (!sprite) return;
+    const mat = sprite.material as THREE.SpriteMaterial;
+    if (mat.map) mat.map.dispose();
+    mat.map = new THREE.CanvasTexture(Game.makeTNTCountdownCanvas(n));
+    mat.needsUpdate = true;
+    sprite.scale.setScalar(0.7 + (3 - n) * 0.12);
+  }
+
+  private removeTNTSprite(key: string): void {
+    const sprite = this._tntCountdownSprites.get(key);
+    if (!sprite) return;
+    const mat = sprite.material as THREE.SpriteMaterial;
+    if (mat.map) mat.map.dispose();
+    mat.dispose();
+    this.scene.scene.remove(sprite);
+    this._tntCountdownSprites.delete(key);
+  }
+
   private static buildFlameTexture(): THREE.CanvasTexture {
     const W = 16, H = 32;
     const canvas = document.createElement("canvas");

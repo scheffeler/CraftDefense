@@ -1,5 +1,29 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-03 — TNT countdown floating sprite
+
+**What was done:**
+- Added `_tntCountdownSprites: Map<string, THREE.Sprite>` to `Game.ts` and added `displayN: number` field to the `tntFuses` value type.
+- `spawnTNTSprite(key, wx, wy, wz)` creates a `THREE.Sprite` with a 64×64 canvas texture showing the starting digit "3" (dark orange ring + bright yellow numeral with shadow glow), positioned 1.6 units above the TNT block center. Sprite scales up slightly as the countdown decreases (0.80 at "3" → 0.94 at "1") for urgency.
+- `updateTNTSprite(key, n)` generates a fresh canvas (color shifts: yellow ring for "3", orange for "2", red for "1") and swaps the sprite material texture. Called at most 3 times per fuse — only when `Math.max(1, Math.min(3, Math.ceil(timer)))` changes.
+- `removeTNTSprite(key)` disposes texture + material and removes the sprite from the scene. Called on explosion and on wave reset.
+- Both ignition paths (flint_and_steel right-click, and block-break-relight) call `spawnTNTSprite`. Reset code calls `removeTNTSprite` for all live TNT sprites.
+- TypeScript compiles clean. Sprite creation verified in browser via console inspection.
+
+**Notes:**
+- Oriented fresh session: remote `auto-iterate` already had 32-tile atlas, rain streaks, shadow blobs, enemy eye glow, footprint decals, biome sky tint, night fog, etc.
+- Dev workflow note: `npx tsc -p tsconfig.emit.json` now exits cleanly (tsconfig.emit.json uses `moduleResolution: bundler`). Run tsc first, then `node scripts/dev.mjs` to start Vite.
+
+**Ideas for next time:**
+- Campfire decorative block: pre-placed in fortress interior; 2D cross-pane fire Sprite + `PointLight(0xff4400, 1.5, 3)`
+- Chicken wing-flap: animate wing groups in `PassiveMob.ts` — store a `flapTimer` per mob, oscillate wing pivot ±0.5 rad over 0.15 s
+- Projectile trail spark density for crossbow bolts: bump spawn probability in `spawnArrowTrail` from 0.55 to 0.75
+- Wave-start color grade: on wave begin, briefly desaturate (three.js `renderer.toneMappingExposure` pulse) then snap back to normal for dramatic effect
+- Enemy death color: brief bright flash (white emissive 1.0 → 0 over 0.15s) exactly at the moment `hp ≤ 0` before death particles spawn
+- Boss war-cry visual: currently spawns a golden flash ring — could add a shockwave ring particle (expand + fade `RingGeometry`)
+
+---
+
 ## 2026-06-02 — Enemy footprint decals
 
 **What was done:**
