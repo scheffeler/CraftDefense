@@ -115,6 +115,8 @@ export interface EnemyState {
   // Troll King boss-specific
   slamCooldown?: number;
   berserking?: boolean;
+  // Death flash
+  deathFlashTimer?: number;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error

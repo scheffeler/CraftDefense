@@ -266,6 +266,18 @@ export class EnemyManager {
         const group = this.meshes.get(id)!;
         group.rotation.x += dt * 4;
         group.scale.multiplyScalar(1 - dt * 3);
+
+        // Fade the death-flash emissive while tumbling
+        if ((state.deathFlashTimer ?? 0) > 0) {
+          state.deathFlashTimer = (state.deathFlashTimer ?? 0) - dt;
+          const t = Math.max(0, (state.deathFlashTimer ?? 0) / 0.22);
+          group.traverse(c => {
+            const m = c as THREE.Mesh;
+            if (!m.isMesh) return;
+            (m.material as THREE.MeshLambertMaterial).emissiveIntensity = t * 1.3;
+          });
+        }
+
         if (state.dyingTimer <= 0) this.despawn(id);
         continue;
       }
@@ -382,7 +394,12 @@ export class EnemyManager {
 
     const prevPct = state.health / state.config.maxHealth;
     state.health = Math.max(0, state.health - amount);
-    this.flashHit(id);
+
+    if (state.health > 0) {
+      this.flashHit(id); // non-lethal hit flash (100 ms white)
+    } else {
+      this.flashDeath(id); // killing blow: brighter burst that fades over 0.22 s
+    }
 
     // Brief stagger on melee hit — interrupts skeleton strafe direction
     if (knockback) {
@@ -412,6 +429,7 @@ export class EnemyManager {
     if (state.health <= 0) {
       state.dying = true;
       state.dyingTimer = 0.5;
+      state.deathFlashTimer = 0.22;
       if (state.config.type === "uruk_captain") this.onBossDied();
       this.onEnemyDied(state);
     }
@@ -1513,6 +1531,18 @@ export class EnemyManager {
         mat.emissive.setHex(orig);
         mat.emissiveIntensity = 0;
       }, 100);
+    });
+  }
+
+  private flashDeath(id: number): void {
+    const group = this.meshes.get(id);
+    if (!group) return;
+    group.traverse(c => {
+      const m = c as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.emissive.setHex(0xffffff);
+      mat.emissiveIntensity = 1.3;
     });
   }
 

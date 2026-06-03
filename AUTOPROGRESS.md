@@ -823,3 +823,29 @@
 - Leaves emissive at night: traverse leaf blocks near player, add tiny emissive so the canopy glows faintly after dark
 - Boss war-cry shockwave ring: expand + fade `RingGeometry` particle at the moment the boss activates war cry
 - Biome ambient sound: different ambient drone/chirp audio per biome (desert wind vs taiga crickets vs forest birds)
+
+---
+
+## 2026-06-03 — Enemy death flash (killing-blow emissive burst)
+
+**What was done:**
+- Added `deathFlashTimer?: number` to `EnemyState` in `src/types.ts`.
+- Split the damage response in `Enemy.ts` into two paths:
+  - **Non-lethal hits** (`state.health > 0` after damage): existing `flashHit()` path — 100ms white emissive via setTimeout, unchanged.
+  - **Killing blow** (`state.health <= 0`): new `flashDeath()` path — immediately sets all mesh materials to `emissive: 0xffffff, emissiveIntensity: 1.3` without a setTimeout, so it persists until the dying-update clears it.
+- Added `flashDeath(id)` private method: traverses the enemy group and sets max-intensity white emissive.
+- In the dying-update block, a new sub-tick fades the death flash: `deathFlashTimer` counts down from 0.22s, and each frame `emissiveIntensity = (t / 0.22) × 1.3` — producing a smooth white-to-dark fade as the enemy tumbles and shrinks.
+- The result: every enemy killed produces a bright white flash that takes ~0.22s to fade out, timed so it coincides with the first half of the 0.5s tumble animation. Much more visceral than just the spin+shrink.
+
+**Notes:**
+- Oriented fresh session: remote `auto-iterate` was ahead. Reset to it. Atlas expansion was already done (32 tiles, 2-row, 32×32 px each). Picked death flash since it was listed #1 in the most recent session's "Ideas for next time."
+- `tsconfig.emit.json` already uses `moduleResolution: bundler` — `npm run dev` exits cleanly.
+- TypeScript compiles clean. No JS errors in browser (verified via Playwright headless).
+
+**Ideas for next time:**
+- Campfire decorative block: cross-pane fire Sprite + `PointLight(0xff4400, 1.5, 3)`, could be pre-built in the fortress interior (mentioned in 3 previous sessions — high priority)
+- Moon phase visual: change the shadow-disc offset each game-day for crescent/half/full visual variety
+- Leaves emissive at night: traverse leaf blocks near player, add tiny emissive so the canopy glows faintly after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Biome ambient sound: distinct ambient audio per biome (desert wind, taiga crickets, forest birds)
+- Hit flash colour tint: change non-lethal hit flash from white to the weapon's colour (sword=red, magic=purple) for feedback differentiation
