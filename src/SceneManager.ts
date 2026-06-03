@@ -109,6 +109,14 @@ export class SceneManager {
   private _swingArcMesh!: THREE.Mesh;
   private _swingWeaponEquipped = false;
 
+  // Arm walk-bob
+  private _armBobTime = 0;
+  private _armBobSpeed = 0;
+  private _armBobLastPos = new THREE.Vector3();
+
+  // Wave-start exposure pulse (0 = inactive)
+  private _wavePulseTimer = 0;
+
   // Player ground-shadow blob
   private _playerShadowBlob!: THREE.Mesh;
 
@@ -293,7 +301,8 @@ export class SceneManager {
     );
 
     // Tone mapping exposure: brighter at noon, dimmer at night
-    this.renderer.toneMappingExposure = 0.5 + frame.ambientInt * 0.8;
+    const baseExposure = 0.5 + frame.ambientInt * 0.8;
+    this.renderer.toneMappingExposure = baseExposure * this._getWavePulseMult(dt);
 
     // Stars and moon: visible at night; stars twinkle with staggered phases
     const nightness = Math.max(0, 1 - frame.ambientInt * 4);
@@ -408,6 +417,20 @@ export class SceneManager {
 
   /** Set the base far fog distance (biome-dependent; 130 default, 165 desert, 115 taiga). */
   setFogFarBase(far: number): void { this._fogFarBase = far; }
+
+  /** Trigger a brief exposure pulse when a wave begins: bright flash → dark dip → recovery. */
+  triggerWavePulse(): void { this._wavePulseTimer = 0.55; }
+
+  /** Returns the current wave-pulse exposure multiplier and advances the timer. */
+  private _getWavePulseMult(dt: number): number {
+    if (this._wavePulseTimer <= 0) return 1.0;
+    this._wavePulseTimer = Math.max(0, this._wavePulseTimer - dt);
+    const t = 1 - this._wavePulseTimer / 0.55; // 0 → 1 over 550 ms
+    // 0–0.25: ramp up to bright flash (×1.5), 0.25–0.45: dip dark (×0.7), 0.45–1.0: recover
+    if (t < 0.25) return 1 + (t / 0.25) * 0.5;
+    if (t < 0.45) return 1.5 - ((t - 0.25) / 0.20) * 0.8;
+    return 0.7 + ((t - 0.45) / 0.55) * 0.3;
+  }
 
   /** Call when hotbar active slot changes. itemId = null for empty hand. */
   updateArmItem(itemId: string | null): void {
@@ -1539,16 +1562,29 @@ export class SceneManager {
     this.camera.getWorldPosition(worldPos);
     this.camera.getWorldQuaternion(worldQuat);
 
+    // Walk-bob: detect XZ movement speed, advance bob timer, compute offsets
+    const camSpeed = worldPos.distanceTo(this._armBobLastPos) / Math.max(dt, 0.001);
+    this._armBobLastPos.copy(worldPos);
+    this._armBobSpeed += (Math.min(camSpeed, 8) - this._armBobSpeed) * Math.min(1, dt * 12);
+    if (this._armBobSpeed > 0.15) this._armBobTime += dt * 7.8;
+    const bobAmt = Math.min(1, this._armBobSpeed * 0.16);
+
     // Swing: rotate arm forward and back over the swing duration
     const swingPct = this.armSwingTimer / this.ARM_SWING_DURATION;
     const swingAngle = Math.sin(swingPct * Math.PI) * 1.2; // 1.2 rad ≈ 69 degrees
 
-    const localOffset = new THREE.Vector3(0.38, -0.52 + swingPct * 0.08, -0.75);
+    // Bob fades out during swings so they don't fight each other
+    const activeBob = bobAmt * (1 - swingPct);
+    const bobY   = Math.sin(this._armBobTime) * 0.022 * activeBob;
+    const bobX   = Math.cos(this._armBobTime * 0.5) * 0.009 * activeBob;
+    const bobTilt = Math.cos(this._armBobTime * 0.5) * 0.04 * activeBob; // subtle roll
+
+    const localOffset = new THREE.Vector3(0.38 + bobX, -0.52 + swingPct * 0.08 + bobY, -0.75);
     localOffset.applyQuaternion(worldQuat);
     this.armGroup.position.copy(worldPos).add(localOffset);
 
     const tiltQ = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(0.25 - swingAngle, -0.2, 0.12, "YXZ"),
+      new THREE.Euler(0.25 - swingAngle, -0.2, 0.12 + bobTilt, "YXZ"),
     );
     this.armGroup.quaternion.copy(worldQuat).multiply(tiltQ);
 

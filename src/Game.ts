@@ -1229,6 +1229,7 @@ export class Game {
   private startNextWave(): void {
     this.phase = this.waves.isEndless ? "endless" : "playing";
     this.waves.startWave((type, gate) => this.spawnEnemy(type, gate));
+    this.scene.triggerWavePulse();
     this.audio.play("wave_start");
     const endlessTag = this.waves.isEndless ? "★ ENDLESS — " : "";
     this.ui.setObjective(`${endlessTag}Wave ${this.waves.wave} — Defend the fortress!`);
