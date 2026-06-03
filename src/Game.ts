@@ -1710,6 +1710,7 @@ export class Game {
     this.scene.setWeatherIntensity(this.weather.intensity);
     this.audio.setRainIntensity(this.weather.intensity);
     this.gameMap.world.setWetness(this.weather.intensity);
+    this.gameMap.world.setLeafNight(Math.max(0, 1 - this.scene.daylight * 4));
 
     // Rain ground splashes — spawn tiny water-ring particles around the player when raining
     if (this.weather.intensity > 0.1) {

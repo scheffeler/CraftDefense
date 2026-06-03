@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-03 — Leaf night bio-glow
+
+**What was done:**
+- Added `_chunkLeafNightUniforms: { uLeafNight: IUniform<number> }` to `VoxelWorld` in `src/Map.ts`.
+- Updated `makeChunkMaterial(blockTex, wetUniforms, leafNightUniforms)` to inject a fragment-shader uniform `uLeafNight`. The GLSL detects leaf atlas tile faces (U ∈ [9/16, 10/16], V ∈ [0, 0.5] per atlas layout) via step functions and adds `vec3(0.04, 0.20, 0.02)` scaled by `uLeafNight` to `totalEmissiveRadiance` — a faint green bioluminescent emission.
+- Added public `setLeafNight(v: number)` setter matching the existing `setWetness` pattern.
+- In `Game.ts`, the game loop calls `this.gameMap.world.setLeafNight(Math.max(0, 1 - this.scene.daylight * 4))` each frame alongside the existing wetness update — 0 at noon, ~0.68 at midnight.
+- Effect smoothly fades in at dusk and out at dawn. Verified with Playwright screenshots: at midnight the forest canopy glows with distinctly green light; at noon there is no visible effect.
+
+**Notes:**
+- Campfire decorative block was already implemented in origin/auto-iterate (merged in at session start).
+- TypeScript compiles cleanly. Shader replacement confirmed working via visual inspect (matched Three.js r165 Lambert `totalEmissiveRadiance` line exactly).
+
+**Ideas for next time:**
+- Add **time-varying leaf glow pulse** — pass `uTime` uniform to the leaf night shader and multiply by `0.85 + 0.15 * sin(uTime * 1.3 + posX * 0.7)` for subtle firefly breathing
+- **Hit flash colour tint**: weapon-coloured emissive flash on non-lethal hits (sword=red, arrow=yellow, magic=purple) — currently always white
+- **Enemy spawn effect**: expanding smoke ring when enemy enters the arena
+- **Dusk/dawn light rays**: screen-space radial blur/shaft from sun position at t≈0.27 and t≈0.73
+- **Passive mob sounds**: ambient chicken clucks, pig oinks near farmland
+- **Crossbow 3D viewmodel**: T-shape stock + rail instead of reusing sword mesh
+
 ## 2026-06-03 — Campfire decorative block
 
 **What was done:**

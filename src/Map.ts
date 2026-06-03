@@ -207,9 +207,10 @@ export class VoxelWorld {
   private readonly lavaMat: THREE.MeshLambertMaterial;
   private readonly wheatMat: THREE.MeshLambertMaterial;
   private readonly floraMat: THREE.MeshLambertMaterial;
-  // Shared opaque-block material — all chunk meshes share it so wetness is one uniform
+  // Shared opaque-block material — all chunk meshes share it so wetness/leaf-night are one uniform
   private readonly _chunkMat: THREE.MeshLambertMaterial;
   private readonly _chunkWetUniforms: { uWetness: THREE.IUniform<number> } = { uWetness: { value: 0.0 } };
+  private readonly _chunkLeafNightUniforms: { uLeafNight: THREE.IUniform<number> } = { uLeafNight: { value: 0.0 } };
   private _fluidTime = 0;
   private _floraWindUniforms!: { uTime: THREE.IUniform<number> };
   private _wheatWindUniforms!: { uTime: THREE.IUniform<number> };
@@ -221,7 +222,7 @@ export class VoxelWorld {
     this.chunkMeshGroup = new THREE.Group();
     scene.add(this.chunkMeshGroup);
     this.blockTex = VoxelWorld.makeBlockTexture();
-    this._chunkMat = VoxelWorld.makeChunkMaterial(this.blockTex, this._chunkWetUniforms);
+    this._chunkMat = VoxelWorld.makeChunkMaterial(this.blockTex, this._chunkWetUniforms, this._chunkLeafNightUniforms);
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
     // Snapshot the lava canvas pixels so we can restore them between hotspot updates
@@ -240,6 +241,11 @@ export class VoxelWorld {
   /** 0 = dry, 1 = fully wet — darkens top-facing block surfaces to simulate rain puddles. */
   setWetness(t: number): void {
     this._chunkWetUniforms.uWetness.value = Math.max(0, Math.min(1, t));
+  }
+
+  /** 0 = day, 1 = full night — adds a faint green bio-luminescent glow to leaf block faces. */
+  setLeafNight(v: number): void {
+    this._chunkLeafNightUniforms.uLeafNight.value = Math.max(0, Math.min(1, v));
   }
 
   /** Current lava emissive glow value (0.28–0.78); useful for syncing PointLight intensity. */
@@ -310,6 +316,7 @@ export class VoxelWorld {
   private static makeChunkMaterial(
     blockTex: THREE.Texture,
     wetUniforms: { uWetness: THREE.IUniform<number> },
+    leafNightUniforms: { uLeafNight: THREE.IUniform<number> },
   ): THREE.MeshLambertMaterial {
     const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
@@ -318,10 +325,12 @@ export class VoxelWorld {
       alphaTest: 0.1,
     });
     mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uWetness = wetUniforms.uWetness;
-      // Inject uniform declaration at the top of the vertex shader
-      shader.vertexShader = 'uniform float uWetness;\n' + shader.vertexShader;
-      // After color_vertex assigns vColor from the attribute, darken top-facing vertices
+      shader.uniforms.uWetness  = wetUniforms.uWetness;
+      shader.uniforms.uLeafNight = leafNightUniforms.uLeafNight;
+      // Inject uniform declarations at the top of vertex + fragment shaders
+      shader.vertexShader   = 'uniform float uWetness;\n' + shader.vertexShader;
+      shader.fragmentShader = 'uniform float uLeafNight;\n' + shader.fragmentShader;
+      // Vertex: darken top-facing surfaces when wet
       shader.vertexShader = shader.vertexShader.replace(
         '#include <color_vertex>',
         `#include <color_vertex>
@@ -330,6 +339,14 @@ export class VoxelWorld {
           vColor.xyz *= 1.0 - uWetness * 0.28 * _wv;
           vColor.xyz = mix(vColor.xyz, vec3(0.34, 0.39, 0.46), uWetness * _wv * 0.10);
         #endif`,
+      );
+      // Fragment: add faint green bio-glow to leaf tile (atlas index 9: U∈[9/16,10/16], V∈[0,0.5])
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '\tvec3 totalEmissiveRadiance = emissive;',
+        `\tfloat _lnU = step(9.0/16.0, vUv.x) - step(10.0/16.0, vUv.x);
+\tfloat _lnV = 1.0 - step(0.5, vUv.y);
+\tfloat _isLeaf = max(0.0, _lnU) * _lnV;
+\tvec3 totalEmissiveRadiance = emissive + _isLeaf * uLeafNight * vec3(0.04, 0.20, 0.02);`,
       );
     };
     return mat;
