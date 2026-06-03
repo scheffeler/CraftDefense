@@ -371,6 +371,10 @@ function generateInterior(world: VoxelWorld): void {
   world.setBlock(cx, G + 3, cz - 2, "torch");
   world.setBlock(cx, G + 3, cz + 2, "torch");
 
+  // Campfires in the open clearing, flanking the central well
+  world.setBlock(cx - 6, G + 1, cz + 6, "campfire"); // southwest clearing
+  world.setBlock(cx + 6, G + 1, cz - 6, "campfire"); // northeast clearing
+
   // East shack (crafting area)
   for (let dx = 0; dx < 3; dx++) {
     world.setBlock(38 + dx, G + 1, 28, "planks");

@@ -250,7 +250,7 @@ export class ProjectileManager {
         const by = Math.floor(a.mesh.position.y);
         const bz = Math.floor(a.mesh.position.z);
         const bid = getBlockAt(bx, by, bz);
-        if (bid !== "air" && bid !== "water" && bid !== "torch") {
+        if (bid !== "air" && bid !== "water" && bid !== "torch" && bid !== "campfire") {
           this.onPlayerArrowHitBlock(bx, by, bz, bid);
           this.deactivateArrow(a);
           continue;

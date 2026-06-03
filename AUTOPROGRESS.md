@@ -1,5 +1,30 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-03 — Campfire decorative block
+
+**What was done:**
+- Added `"campfire"` to `BlockId` in `src/types.ts` and added block definition (name, color, hardness, transparent, non-placeable) in `src/Map.ts`.
+- Added `campfire` to `BLOCK_BEHAVIORS` in `src/config/blocks.ts` (axe tool, drops wood).
+- Excluded campfire from chunk geometry meshing in `Map.ts` (same as torch) — rendered as dedicated 3D mesh.
+- Added campfire to passthrough block list in `Projectile.ts` so arrows/bolts fly through the fire planes.
+- Built full campfire mesh+light system in `Game.ts`:
+  - **Fields**: `campfireLights` (Map), `campfireGroups` (Map), `_campfireFlames` (array), `_campfireEmberTimer`, shared log geometry/materials (`_campfireLogGeo`, `_campfireLogMat`, `_campfireAshesMat`).
+  - **`addCampfireLight(wx, wy, wz)`**: creates a `PointLight(0xff5500, 2.5, 14)`, a flat ash-bed `CylinderGeometry` (dark disc), four crossed log `BoxGeometry` meshes at ±35° and ±80° rotations, and a crossed-quad fire plane mesh (two Minecraft-style quad pairs with `AdditiveBlending`). All grouped together with per-campfire random flicker phase.
+  - **`removeCampfireLight`**: disposes geometry + material, removes from scene.
+  - **`initCampfireLights()`**: scans the world at startup (like `initTorchLights`), called from `start()`.
+  - **Block event handlers**: remove/add campfire on block break/place.
+  - **Per-frame update**: campfire light flicker (three sine harmonics, wider range than torch), fire plane scale/rotation wobble, and ember spark bursts every ~0.22 s via `spawnLavaEmbers`.
+- Placed 2 campfires in `WorldGen.ts` in the open clearing flanking the central well — `(26, G+1, 38)` southwest and `(38, G+1, 26)` northeast.
+- Verified: `npx tsc -p tsconfig.emit.json` exits cleanly. Browser loads with `window.__game` live, campfireLights.size=2, campfireGroups.size=2, _campfireFlames.length=2. No JS errors.
+
+**Ideas for next time:**
+- Moon phase visual: change the shadow-disc offset each game-day for crescent/half/full visual variety
+- Leaves emissive at night: traverse leaf blocks near player, add tiny emissive so the canopy glows faintly after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Hit flash colour tint: change non-lethal hit flash from white to the weapon's colour (sword=red, magic=purple)
+- Campfire cook mechanic: right-click campfire with raw food to cook it (campfire as an alternative to furnace)
+- Smoke particle column above campfire: a slower, grey upward particle stream above the flames
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
