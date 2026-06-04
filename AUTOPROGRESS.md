@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-04 — Hit flash colour tinting
+
+**What was done:**
+- Added optional `flashColor = 0xffffff` parameter to `EnemyManager.damage()` and `flashHit()` in `src/Enemy.ts`. Non-lethal hits set the emissive to the specified colour at intensity 1.1 (vs 0.8 for white), then reset after 110 ms. The killing-blow `flashDeath()` path is unchanged (always white burst).
+- Updated all weapon-damage callers in `src/Game.ts` to pass appropriate colours:
+  - Melee swing: `0xff1a1a` red (or `0xff6600` orange when fire aspect is active)
+  - Burning status tick: `0xff5500` orange
+  - Lava contact: `0xff4400` deep orange
+  - Fire block contact: `0xff7722` warm orange
+  - Thorns reflect: `0xdd44ff` purple
+  - TNT/cannon explosion: `0xff8844` warm orange
+  - Projectile hit: `0x44aaff` cyan for ice-bolt (slow factor < 1.0), `0xff8800` orange for cannonball (damage ≥ 20), white default for standard arrows
+- Pistol/shotgun/raygun callers retain the white default — visually neutral for ranged shots which already have their own hit-spark particles.
+
+**Notes:**
+- Oriented from git log + AUTOPROGRESS. Remote `auto-iterate` was at cb5044b (campfire). Hit flash tinting was listed in previous session's ideas and is a focused, shippable improvement with zero risk of breakage (optional parameter, all existing callers still valid).
+- TypeScript compiles clean (`npx tsc -p tsconfig.emit.json` zero output).
+- Game loads without JS errors (Playwright screenshot verified).
+
+**Ideas for next time:**
+- Moon phase visual: update moon canvas texture each game-day to show crescent/half/full cycle
+- Leaves emissive at night: traverse leaf blocks near player, add tiny emissive so the canopy glows faintly after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Biome ambient sound: distinct ambient audio per biome (desert wind, taiga crickets, forest birds)
+- Campfire cook mechanic: right-click campfire with raw food to cook it (alternative to furnace)
+- Smoke particle column above campfire: slower grey upward particle stream above the flames
+
+---
+
 ## 2026-06-03 — Campfire decorative block
 
 **What was done:**
