@@ -388,7 +388,7 @@ export class EnemyManager {
     }
   }
 
-  damage(id: number, amount: number, slowFactor = 1.0, slowDuration = 0, knockback = false): void {
+  damage(id: number, amount: number, slowFactor = 1.0, slowDuration = 0, knockback = false, flashColor = 0xffffff): void {
     const state = this.enemies.get(id);
     if (!state || !state.alive || state.dying) return;
 
@@ -396,7 +396,7 @@ export class EnemyManager {
     state.health = Math.max(0, state.health - amount);
 
     if (state.health > 0) {
-      this.flashHit(id); // non-lethal hit flash (100 ms white)
+      this.flashHit(id, flashColor); // non-lethal hit flash
     } else {
       this.flashDeath(id); // killing blow: brighter burst that fades over 0.22 s
     }
@@ -1517,7 +1517,7 @@ export class EnemyManager {
 
   // ─── Visual effects ────────────────────────────────────────────────────────
 
-  private flashHit(id: number): void {
+  private flashHit(id: number, color = 0xffffff): void {
     const group = this.meshes.get(id);
     if (!group) return;
     group.traverse(c => {
@@ -1525,12 +1525,12 @@ export class EnemyManager {
       if (!m.isMesh) return;
       const mat = m.material as THREE.MeshLambertMaterial;
       const orig = mat.emissive.getHex();
-      mat.emissive.setHex(0xffffff);
-      mat.emissiveIntensity = 0.8;
+      mat.emissive.setHex(color);
+      mat.emissiveIntensity = color === 0xffffff ? 0.8 : 1.1;
       setTimeout(() => {
         mat.emissive.setHex(orig);
         mat.emissiveIntensity = 0;
-      }, 100);
+      }, 110);
     });
   }
 

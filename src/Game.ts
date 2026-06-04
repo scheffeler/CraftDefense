@@ -1875,7 +1875,7 @@ export class Game {
       // Apply burn damage
       const state = this.enemies.getEnemy(id);
       if (!state || !state.alive || state.dying) { this.burningEnemies.delete(id); continue; }
-      this.enemies.damage(id, 2);
+      this.enemies.damage(id, 2, 1.0, 0, false, 0xff5500); // burning: orange flash
       // Spawn small flame particles on the burning enemy
       const pos = this.enemies.getEnemyPosition(id);
       if (pos) this.particles.spawnBlockBreak(pos.x, pos.y + 1, pos.z, 0xff4400);
@@ -1978,7 +1978,7 @@ export class Game {
       const dist = pos.distanceTo(new THREE.Vector3(x, y, z));
       if (dist > radius) continue;
       const dmg = Math.round(maxDamage * (1 - dist / radius)) + 4;
-      this.enemies.damage(enemy.id, dmg, 1, 0);
+      this.enemies.damage(enemy.id, dmg, 1, 0, false, 0xff8844); // explosion: warm orange flash
       const ep = this.enemies.getEnemyPosition(enemy.id);
       if (ep) this.showDamageNumber(dmg, ep.x, ep.y + 1.8, ep.z);
     }
@@ -2168,7 +2168,7 @@ export class Game {
           this.audio.play("player_hurt", 0.65);
           // Thorns I — reflect 2 damage back to attacker
           if (this.inventory.hasEnchantment("thorns_1")) {
-            this.enemies.damage(state.id, 2);
+            this.enemies.damage(state.id, 2, 1.0, 0, false, 0xdd44ff); // thorns: purple flash
             this.particles.spawnBlockBreak(pos.x, pos.y + 1, pos.z, 0xff6600);
           }
           this.enemyMeleeCooldown.set(state.id, 1.5);
@@ -2189,7 +2189,7 @@ export class Game {
       const bx = Math.floor(pos.x), by = Math.floor(pos.y), bz = Math.floor(pos.z);
       if (this.gameMap.world.getBlock(bx, by, bz) === "lava" ||
           this.gameMap.world.getBlock(bx, by - 1, bz) === "lava") {
-        this.enemies.damage(state.id, dt * 2);
+        this.enemies.damage(state.id, dt * 2, 1.0, 0, false, 0xff4400); // lava: deep orange flash
       }
     }
 
@@ -2197,7 +2197,9 @@ export class Game {
       dt,
       (id)         => this.enemies.getEnemyPosition(id),
       (id, d, s, dur) => {
-        this.enemies.damage(id, d, s, dur);
+        // Ice bolt: slow < 1 → cyan; cannonball: high damage → orange; arrow: white
+        const projColor = s < 1.0 ? 0x44aaff : d >= 20 ? 0xff8800 : 0xffffff;
+        this.enemies.damage(id, d, s, dur, false, projColor);
         const pos = this.enemies.getEnemyPosition(id);
         if (pos) this.showDamageNumber(d, pos.x, pos.y + 1.8, pos.z);
       },
@@ -2235,7 +2237,7 @@ export class Game {
     for (const state of this.enemies.getAliveEnemies()) {
       const pos = this.enemies.getEnemyPosition(state.id);
       if (pos && pos.distanceTo(result.center) <= result.radius) {
-        this.enemies.damage(state.id, damage, 1, 0, true); // knockback on melee
+        this.enemies.damage(state.id, damage, 1, 0, true, hasFireAspect ? 0xff6600 : 0xff1a1a); // melee: red (orange if fire aspect)
         this.audio.play("hit", 0.4);
         this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
         this.particles.spawnMeleeHit(pos.x, pos.y + 1.0, pos.z);
@@ -3059,7 +3061,7 @@ export class Game {
           for (const [key] of this.activeFire) {
             const [fx, fy, fz] = key.split(",").map(Number);
             if (Math.abs(fx - ex) <= 1 && Math.abs(fy - ey) <= 1 && Math.abs(fz - ez) <= 1) {
-              this.enemies.damage(state.id, 1);
+              this.enemies.damage(state.id, 1, 1.0, 0, false, 0xff7722); // fire block: warm orange flash
               break;
             }
           }
