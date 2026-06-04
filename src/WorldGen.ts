@@ -414,6 +414,12 @@ function generateInterior(world: VoxelWorld): void {
   }
   world.setBlock(24, G + 3, 30, "torch");
   world.setBlock(22, G + 1, 30, "chest");
+
+  // Campfires — placed in open areas of the interior for warmth and atmosphere
+  // Northwest area (near barracks, open clearing)
+  world.setBlock(26, G + 1, 35, "campfire");
+  // Northeast area (near crafting shack, open clearing)
+  world.setBlock(37, G + 1, 24, "campfire");
 }
 
 function generateSpawnMarkers(world: VoxelWorld): void {

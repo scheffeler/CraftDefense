@@ -38,4 +38,5 @@ export const BLOCK_BEHAVIORS: Partial<Record<BlockId, BlockBehavior>> = {
   tnt:            { toolCategory: "hand",    requiresTool: false, drops: []               },
   lava:           { toolCategory: "hand",    requiresTool: false, drops: []               },
   fire:           { toolCategory: "hand",    requiresTool: false, drops: []               },
+  campfire:       { toolCategory: "hand",    requiresTool: false, drops: []               },
 };

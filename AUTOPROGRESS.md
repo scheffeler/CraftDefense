@@ -1,5 +1,39 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-04 — Campfire decorative blocks in fortress interior
+
+**What was done:**
+- Added `campfire` to `BlockId` union in `src/types.ts`.
+- Added `campfire` block def to `BLOCK_DEFS` in `src/Map.ts`: transparent, hardness 0, not placeable. Also added a `continue` skip in the chunk mesh builder so campfire blocks render as air (visual handled by Game.ts).
+- Added `campfire` behavior in `src/config/blocks.ts`: hand tool, no drops.
+- Pre-placed two campfires in `src/WorldGen.ts` `generateInterior()`:
+  - Northwest interior: (26, G+1, 35)
+  - Northeast interior: (37, G+1, 24)
+- Added full campfire visual system to `src/Game.ts`:
+  - `campfireLights: Map<string, THREE.PointLight>`, `campfireMeshes: Map<string, THREE.Group>`, `_campfireFireMeshes: THREE.Mesh[]` fields.
+  - `initCampfireLights()` called from `start()` — scans for campfire blocks via `gameMap.scanForBlock("campfire")`.
+  - `addCampfireLight(wx, wy, wz)` builds the full group: 4 stone ring pieces (gray BoxGeometry at ±0.33 compass points), 2 crossed log bars (dark brown), 1 char ember center (dark emissive), 1 animated fire cross-plane mesh. PointLight(0xff4400, 2.4, 9) — richer/warmer than torches.
+  - `removeCampfireLight(wx, wy, wz)` cleans up on block break.
+  - Campfire flicker loop in the existing torch-flicker block: 5.3/9.7/16.1 Hz multi-harmonic with ±0.40/0.22/0.10 amplitudes (more dramatic than torches). Fire cross-planes also animate: slow rotation + scale wobble on both axes.
+  - Block-break callback wired to call `removeCampfireLight` when campfire block is broken.
+- TypeScript compiles clean. Both campfires spawn and register in campfireLights + campfireMeshes maps. PointLight glow verified visible in fortress interior at night.
+
+**Notes:**
+- `campfire` was mentioned in 4+ previous AUTOPROGRESS sessions as "high priority" — finally implemented.
+- Fresh session, reset to remote `auto-iterate`-merged master. Branch: `claude/dreamy-cerf-hJwSg`.
+- Campfire mesh group: position (26.5, 7, 35.5) and (37.5, 7, 24.5), 8 children each, visible, in scene.
+
+**Ideas for next time:**
+- Moon phase visual: update moon canvas texture each game-day (crescent/half/full cycle) for night variety
+- Campfire smoke sprite: add a slow-rising semi-transparent gray `Sprite` above each campfire for extra atmosphere
+- Leaves emissive at night: traverse leaf blocks near player, add tiny green emissive so the canopy glows faintly after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Biome ambient sound: distinct ambient audio per biome (desert wind, taiga crickets, forest birds)
+- Hit flash colour tint: change non-lethal hit flash from white to weapon colour (sword=red, magic=purple)
+- Extra campfire placements: consider adding one near the central well area or south gate for player visibility on entry
+
+---
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
