@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-04 — Milky Way nebula band + star fog fix
+
+**What was done:**
+- Added `buildMilkyWay()` to `src/SceneManager.ts`: 800 points distributed along a tilted galactic arc. Uses a sinusoidal-latitude formula (`phi_center = π/3 + π/4 * cos(θ)`) which is the spherical-coordinates projection of a tilted great circle. The band sweeps from near-zenith on one side to near-horizon on the other, just like the real Milky Way.
+- Vertex colours shade points from warm yellow-white (near the high-overhead galactic-centre arc) to cool blue-white (rim), with per-point random brightness variance. `AdditiveBlending` + `fog: false` give a soft diffuse nebula glow.
+- Opacity tracks `nightness × 0.38` so the band fades in smoothly at dusk and disappears by dawn.
+- **Critical bug fix**: Regular star `PointsMaterial` was missing `fog: false`. Stars are at r=160 but `fog.far ≈ 130`, so all 800 stars were completely fogged out (invisible). Stars now properly visible at night. Also added `depthWrite: false` to prevent z-buffer artefacts. The same `fog: false` is applied to the Milky Way material.
+- Verified via Playwright debug screenshot that the band appears in upper sky and forms a distinct arc. Regular star field confirmed visible after fog fix.
+
+**Notes:**
+- Fresh session from remote `auto-iterate` (already had: campfire, moon phases, screen shake, war cry shockwave, death flash, arm bob, wave pulse, TNT sprites, footprint decals, biome sky tint, night fog, torch flicker, emissive eye glow, combat particles, block-type break particles, crossbow viewmodel, all pixel-art item sprites, wheat wind shader, water UV scroll, lava pulse, shadow blobs, per-enemy hue variation).
+- Both campfire and moon phase were already implemented; war cry shockwave was also already done.
+- The star fog bug was a pre-existing issue — stars were never visible. The Milky Way addition simultaneously fixed the underlying bug.
+
+**Ideas for next time:**
+- Leaves emissive at night: building a separate leaf mesh chunk (similar to water/lava fluid meshes) to allow per-material emissive updates — faint green glow at night
+- Fireflies: 10–15 small `PointLight` + emissive `Sprite` pairs drifting around the clearing at night, fading in at dusk
+- Better cloud variety: occasionally spawn a dark storm-cloud variant with slightly blue-grey tint when rain begins
+- Passive mob animations: chicken wing-flap animation, pig snout twitch
+- Day number HUD improvement: show moon phase icon next to "Day N" in the corner
+
 ## 2026-06-04 — Uruk Captain war-cry shockwave ring
 
 **What was done:**
