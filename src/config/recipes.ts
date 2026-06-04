@@ -26,6 +26,17 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "stick", count: 4 },
   },
 
+  // --- Campfire ---
+  {
+    id: "campfire",
+    pattern: [
+      [null,       r("stick"),    null      ],
+      [r("stick"), r("coal_ore"), r("stick")],
+      [r("wood"),  r("wood"),     r("wood") ],
+    ],
+    result: { itemId: "campfire", count: 1 },
+  },
+
   // --- Crafting table ---
   {
     id: "crafting_table",
