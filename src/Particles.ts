@@ -15,9 +15,17 @@ interface Decal {
   maxLife: number;
 }
 
+interface ShockwaveRing {
+  mesh: THREE.Mesh;
+  life: number;       // Starts at -delay; active when >= 0
+  maxLife: number;    // Active duration after life reaches 0
+  maxRadius: number;
+}
+
 export class ParticleSystem {
   private readonly particles: Particle[] = [];
   private readonly decals: Decal[] = [];
+  private readonly _rings: ShockwaveRing[] = [];
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -388,6 +396,50 @@ export class ParticleSystem {
     }
   }
 
+  /** Three staggered expanding ground rings + radiating embers for the Uruk Captain war cry. */
+  spawnWarCryShockwave(x: number, y: number, z: number): void {
+    const rings = [
+      { delay: 0.00, color: 0xff3300, maxRadius: 8.5, maxLife: 0.75 },
+      { delay: 0.13, color: 0xff6600, maxRadius: 6.5, maxLife: 0.68 },
+      { delay: 0.26, color: 0xffaa00, maxRadius: 5.0, maxLife: 0.60 },
+    ];
+    for (const cfg of rings) {
+      const geo = new THREE.RingGeometry(0.15, 1.0, 48);
+      const mat = new THREE.MeshBasicMaterial({
+        color: cfg.color,
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(x, y, z);
+      mesh.scale.setScalar(0.01);
+      this.scene.add(mesh);
+      this._rings.push({ mesh, life: -cfg.delay, maxLife: cfg.maxLife, maxRadius: cfg.maxRadius });
+    }
+
+    // Radiating ember sparks
+    for (let i = 0; i < 18; i++) {
+      const theta = (i / 18) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+      const c = (i % 3 === 0) ? 0xff3300 : (i % 3 === 1) ? 0xff8800 : 0xffcc00;
+      const s = 0.04 + Math.random() * 0.07;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(s, s, s),
+        new THREE.MeshBasicMaterial({ color: c }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.6,
+        y + 0.15 + Math.random() * 0.4,
+        z + (Math.random() - 0.5) * 0.6,
+      );
+      const spd = 4.5 + Math.random() * 4.5;
+      this.spawnParticle(mesh, Math.cos(theta) * spd, 0.8 + Math.random() * 2.0, Math.sin(theta) * spd, 0.45 + Math.random() * 0.3);
+    }
+  }
+
   spawnLavaEmbers(x: number, y: number, z: number): void {
     const colors = [0xff6600, 0xff4400, 0xffaa00, 0xff8800];
     const count = 2 + Math.floor(Math.random() * 3);
@@ -442,6 +494,23 @@ export class ParticleSystem {
       p.mesh.rotation.z += dt * 3;
     }
 
+    // Shockwave rings — expand radially, fade out
+    for (let i = this._rings.length - 1; i >= 0; i--) {
+      const r = this._rings[i];
+      r.life += dt;
+      if (r.life >= r.maxLife) {
+        this.scene.remove(r.mesh);
+        r.mesh.geometry.dispose();
+        (r.mesh.material as THREE.Material).dispose();
+        this._rings.splice(i, 1);
+        continue;
+      }
+      if (r.life < 0) continue; // Waiting for delay
+      const t = r.life / r.maxLife;
+      r.mesh.scale.setScalar(Math.max(0.01, r.maxRadius * t));
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - t) * 0.55;
+    }
+
     // Ground decals (footprints etc.) — flat, no gravity, linear fade
     for (let i = this.decals.length - 1; i >= 0; i--) {
       const d = this.decals[i];
@@ -470,5 +539,11 @@ export class ParticleSystem {
       (d.mesh.material as THREE.Material).dispose();
     }
     this.decals.length = 0;
+    for (const r of this._rings) {
+      this.scene.remove(r.mesh);
+      r.mesh.geometry.dispose();
+      (r.mesh.material as THREE.Material).dispose();
+    }
+    this._rings.length = 0;
   }
 }

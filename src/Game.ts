@@ -866,10 +866,11 @@ export class Game {
       this.unlockAchievement("boss_slain", "The Battle of Helm's Deep", "Defeated the Uruk-hai Captain!");
     };
 
-    this.enemies.onBossWarCry = (_x, _z) => {
+    this.enemies.onBossWarCry = (x, z) => {
       this.ui.showBossWarCry();
       this.scene.shake(0.08, 0.4);
       this.audio.play("explosion", 0.25);
+      this.particles.spawnWarCryShockwave(x, 0.3, z);
     };
 
     this.enemies.onBossSlam = (damage, bx, bz) => {
