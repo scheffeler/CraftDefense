@@ -1,5 +1,27 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-04 — Campfire decorative block
+
+**What was done:**
+- Added "campfire" to `BlockId` union in `types.ts`.
+- Added campfire to `BLOCK_DEFS` in `Map.ts` (`transparent: true`, `hardness: 1.5`, `placeable: true`) and added it to the chunk-builder skip rule alongside torch so it renders as a dedicated 3D mesh.
+- Added campfire to `BLOCK_BEHAVIORS` in `config/blocks.ts` (axe-breakable, drops itself).
+- Added campfire item to `config/items.ts` (orange icon, `placesBlock:"campfire"`).
+- Added 3×3 campfire recipe to `config/recipes.ts`: `[null, stick, null] / [stick, coal, stick] / [wood, wood, wood]` → 1 campfire.
+- Added `scanWorldCampfires()` call at game init and `addCampfire`/`removeCampfire` hooks in `onBlockPlaced`/`onBlockBroken` callbacks.
+- `addCampfire()` builds a `THREE.Group` with: two crossed log halves (brown `BoxGeometry(0.82, 0.14, 0.22)`, shared `MeshLambertMaterial`), a cross-pane double-plane fire mesh (double-sided `MeshBasicMaterial`, `color:0xff7722`, additive-ish), and a warm `PointLight(0xff7722, 2.4, 14)` with random per-campfire flicker phase.
+- Added per-frame campfire flicker animation in the update loop: light intensity modulated by three sinusoidal harmonics (5.9, 9.7, 16.3 Hz), fire plane rotates and scale-y wobbles using world position as seed for variation.
+- Pre-placed one campfire in `WorldGen.ts` at fortress courtyard center-south (`cx, G+1, cz+7 = 32, 7, 39`).
+- Verified: `tsc -p tsconfig.emit.json` clean, `campfireLights.size=1` at runtime (pre-placed campfire scanned), zero JS errors.
+
+**Ideas for next time:**
+- Smoke particle trail above campfire: periodically emit small grey `PointsMaterial` particles that drift upward and fade (same pattern as existing Particles.ts emitters)
+- Leaves emissive at night: traverse leaf blocks near player, add subtle green emissive when `daylight < 0.3` — canopy glow effect
+- Moon phase visual: update moon canvas texture each game-day to show crescent/half/full cycle
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` at moment uruk_captain activates war cry
+- Hit flash colour by weapon: non-lethal hit flash white → weapon tint (sword=red, magic=purple)
+- Campfire smoke rising particles (extends this session's campfire naturally)
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
