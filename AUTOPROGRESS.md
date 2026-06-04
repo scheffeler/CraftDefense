@@ -1,5 +1,22 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-04 — Uruk Captain war-cry shockwave ring
+
+**What was done:**
+- Added `ShockwaveRing` interface and `_rings: ShockwaveRing[]` to `ParticleSystem` (`src/Particles.ts`). Rings use a staggered-delay approach: `life` starts at `-delay` and becomes active when it reaches 0, avoiding any separate "pending" queue.
+- `spawnWarCryShockwave(x, y, z)` creates three flat `RingGeometry` meshes (r=8.5, 6.5, 5.0 units) with `AdditiveBlending` in red/orange/yellow, staggered 0.13 s apart. Each ring expands from scale ~0 to its max radius while fading opacity 0.55→0 over 0.6–0.75 s.
+- Also spawns 18 ember `BoxGeometry` particles radiating outward at 4.5–9 m/s matching the ring palette, for a ground-level blast feeling.
+- Ring update loop in `update()` handles both delay phase (skip if `life < 0`) and expansion phase; `clear()` disposes all active rings on wave reset.
+- Wired to `onBossWarCry` in `Game.ts` — now fires alongside the existing UI banner, screen shake, and explosion audio.
+- TypeScript compiles clean, game loads without JS errors. Ring geometry verified (3 rings with correct positions and staggered life values).
+
+**Ideas for next time:**
+- **Leaves emissive at night**: When `nightness > 0.5`, traverse leaf chunk meshes near the player and set a soft green `emissiveIntensity` (~0.08–0.12) so the canopy glows faintly. Reset emissive to 0 at dawn.
+- **Torch halo disc**: Add a `PlaneGeometry(1.2, 1.2)` with soft radial gradient texture (`AdditiveBlending`) as a third child of the torch group, lying flat at the torch base. Would give torches a warm pool-of-light visual on the ground.
+- **Arrow trail density**: In `spawnArrowTrail`, change `if (Math.random() > 0.45)` to `> 0.65` for noticeably denser trails — very low risk, one-line change.
+- **Projectile smoke trail**: Spawning tiny semi-transparent grey cubes behind fired arrows/bolts for a "flight smoke" trail (distinct from the current arrow-feather trail).
+- **Moon texture variation**: Build 8 distinct canvas textures for the moon (full, gibbous, half, crescent, new) and swap the sprite texture as `_totalDays` advances, rather than relying on the shadow-disc offset trick.
+
 ## 2026-06-04 — Hit flash colour tinting
 
 **What was done:**
