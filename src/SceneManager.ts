@@ -70,6 +70,7 @@ export class SceneManager {
 
   // Sky elements
   private readonly starGroups: THREE.Points[];
+  private _milkyWay!: THREE.Points;
   private _starTime = 0;
   private readonly moon: THREE.Mesh;
   private readonly moonShadow: THREE.Mesh;
@@ -150,6 +151,7 @@ export class SceneManager {
     this.skyDome = this.buildSkyDome();
     this.buildClouds();
     this.starGroups = this.buildStars();
+    this._milkyWay  = this.buildMilkyWay();
     [this.moon, this.moonShadow, this.moonGlow] = this.buildMoon();
     this.sun   = this.buildSun();
 
@@ -315,6 +317,8 @@ export class SceneManager {
       mat.size = 0.45 + 0.18 * Math.sin(this._starTime * 1.1 + PHASES[g])
                       + 0.07 * Math.sin(this._starTime * 2.9 + PHASES[g]);
     }
+    // Milky Way: dense star band — fades in once the sky is dark
+    (this._milkyWay.material as THREE.PointsMaterial).opacity = nightness * 0.38;
     (this.moon.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
 
     // Moon position: high at midnight (t=0), offset PI/2 so |sin|=1 at t=0
@@ -1338,12 +1342,70 @@ export class SceneManager {
       geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
       // Base size varies slightly per group so they don't all look the same
       const baseSize = 0.38 + g * 0.08;
-      const mat = new THREE.PointsMaterial({ color: 0xffffff, size: baseSize, transparent: true, opacity: 0 });
+      const mat = new THREE.PointsMaterial({ color: 0xffffff, size: baseSize, transparent: true, opacity: 0, fog: false, depthWrite: false });
       const pts = new THREE.Points(geo, mat);
       this.scene.add(pts);
       groups.push(pts);
     }
     return groups;
+  }
+
+  private buildMilkyWay(): THREE.Points {
+    // Dense star band arcing across the upper hemisphere — a tilted galactic plane.
+    // Uses a sinusoidal-latitude formula which is the spherical-coords projection
+    // of a tilted great circle: phi_center = A + B*cos(theta).
+    const COUNT = 800;
+    const r = 155; // slightly inside star sphere (r=160)
+
+    // Crude 3-sample Gaussian approximation (mean=0, σ≈0.58, clipped)
+    const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 0.72;
+
+    const positions = new Float32Array(COUNT * 3);
+    const colors    = new Float32Array(COUNT * 3);
+
+    for (let i = 0; i < COUNT; i++) {
+      const theta = Math.random() * Math.PI * 2;
+
+      // Sinusoidal band: phi oscillates ±(π/4) around a base of π/3 (~60° from zenith).
+      // Result: band sweeps from near-zenith on one side to near-horizon on the other.
+      const phi_center = Math.PI / 3 + (Math.PI / 4) * Math.cos(theta);
+      const phi = Math.max(0.03, Math.min(Math.PI * 0.48, phi_center + gauss() * 0.11));
+
+      const x = r * Math.sin(phi) * Math.cos(theta) + 32;
+      const y = r * Math.cos(phi);                         // always ≥ 0 (upper hemisphere)
+      const z = r * Math.sin(phi) * Math.sin(theta) + 32;
+
+      positions[i * 3]     = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+
+      // Colour: warm toward the galactic-centre arc, cool toward the rim.
+      // phi_center near 0 = galactic centre (high overhead) → warm yellow-white.
+      // phi_center near π/2 = galactic rim → cool blue-white.
+      const warmth  = Math.max(0, 1 - phi_center / (Math.PI / 2));
+      const bright  = 0.45 + Math.random() * 0.55;
+      colors[i * 3]     = bright;
+      colors[i * 3 + 1] = bright * (0.88 + warmth * 0.12);
+      colors[i * 3 + 2] = bright * (0.78 + (1 - warmth) * 0.22);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute("color",    new THREE.Float32BufferAttribute(colors,    3));
+
+    const mat = new THREE.PointsMaterial({
+      size:         0.28,
+      transparent:  true,
+      opacity:      0,
+      vertexColors: true,
+      blending:     THREE.AdditiveBlending,
+      depthWrite:   false,
+      fog:          false,
+    });
+
+    const pts = new THREE.Points(geo, mat);
+    this.scene.add(pts);
+    return pts;
   }
 
   private buildMoon(): [THREE.Mesh, THREE.Mesh, THREE.Mesh] {
