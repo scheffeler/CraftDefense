@@ -116,6 +116,7 @@ export class Game {
   private readonly campfireGroups  = new Map<string, THREE.Group>();
   private readonly _campfireFlames: THREE.Mesh[] = [];
   private _campfireEmberTimer = 0;
+  private _campfireSmokeTimer = 0;
   // Shared campfire geometry/materials (created once)
   private readonly _campfireLogGeo  = new THREE.BoxGeometry(0.72, 0.10, 0.14);
   private readonly _campfireLogMat  = new THREE.MeshLambertMaterial({ color: 0x6b3a1a });
@@ -1318,6 +1319,64 @@ export class Game {
     this.gameMap.updateFluidAnimation(dt);
     this.audio.updateAmbient(dt, this.scene.daylight);
 
+    // Torch flicker — runs always (title screen + gameplay)
+    if (this.torchLights.size > 0) {
+      const t = performance.now() * 0.001;
+      for (const light of this.torchLights.values()) {
+        const p = (light.userData.flickerPhase as number) ?? 0;
+        light.intensity = 1.6
+          + Math.sin(t * 7.3  + p)       * 0.25
+          + Math.sin(t * 12.1 + p * 1.7) * 0.12
+          + Math.sin(t * 19.7 + p * 0.9) * 0.05;
+      }
+      for (const flame of this._torchFlameMeshes) {
+        const p = (flame.userData.flickerPhase as number) ?? 0;
+        const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
+        flame.scale.set(0.22 * fs, 0.32 * fs, 1);
+      }
+    }
+
+    // Campfire flicker + ember sparks + smoke wisps — runs always (title screen + gameplay)
+    if (this.campfireLights.size > 0) {
+      const t = performance.now() * 0.001;
+      for (const light of this.campfireLights.values()) {
+        const p = (light.userData.flickerPhase as number) ?? 0;
+        light.intensity = 2.2
+          + Math.sin(t * 5.7  + p)       * 0.55
+          + Math.sin(t * 11.3 + p * 1.8) * 0.28
+          + Math.sin(t * 17.9 + p * 0.7) * 0.12;
+      }
+      for (const flame of this._campfireFlames) {
+        const p = (flame.userData.flickerPhase as number) ?? 0;
+        const t2 = performance.now() * 0.001;
+        const scaleY = 0.88 + Math.sin(t2 * 10.3 + p) * 0.16 + Math.sin(t2 * 15.7 + p * 1.5) * 0.08;
+        const scaleX = 0.82 + Math.sin(t2 * 7.1  + p * 0.9) * 0.12;
+        flame.scale.set(scaleX, scaleY, 1);
+        flame.rotation.y = t2 * 1.4 + p;
+      }
+      this._campfireEmberTimer += dt;
+      if (this._campfireEmberTimer >= 0.22) {
+        this._campfireEmberTimer = 0;
+        for (const [key] of this.campfireLights) {
+          if (Math.random() < 0.55) {
+            const [wx, wy, wz] = key.split(",").map(Number);
+            this.particles.spawnLavaEmbers(wx + 0.5, wy + 0.1, wz + 0.5);
+          }
+        }
+      }
+      this._campfireSmokeTimer += dt;
+      if (this._campfireSmokeTimer >= 0.35) {
+        this._campfireSmokeTimer = 0;
+        for (const [key] of this.campfireLights) {
+          if (Math.random() < 0.80) {
+            const [wx, wy, wz] = key.split(",").map(Number);
+            this.particles.spawnCampfireSmoke(wx + 0.5, wy, wz + 0.5);
+          }
+        }
+      }
+    }
+    this.particles.updateSmoke(dt);
+
     // Title screen orbit: slowly rotate camera around fortress when pointer not locked
     if (!this.scene.isPointerLocked && this.phase !== "gameover" && this.phase !== "win") {
       this._titleAngle += dt * 0.06;
@@ -1625,55 +1684,6 @@ export class Game {
 
     // TNT fuses countdown
     this.updateTNT(dt);
-
-    // Torch flicker — per-torch random phase so all torches flicker independently
-    if (this.torchLights.size > 0) {
-      const t = performance.now() * 0.001;
-      for (const light of this.torchLights.values()) {
-        const p = (light.userData.flickerPhase as number) ?? 0;
-        light.intensity = 1.6
-          + Math.sin(t * 7.3  + p)       * 0.25
-          + Math.sin(t * 12.1 + p * 1.7) * 0.12
-          + Math.sin(t * 19.7 + p * 0.9) * 0.05; // third harmonic for organic crackle
-      }
-      // Flame sprites: each reads its own phase from userData (same phase as its sibling light)
-      for (const flame of this._torchFlameMeshes) {
-        const p = (flame.userData.flickerPhase as number) ?? 0;
-        const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
-        flame.scale.set(0.22 * fs, 0.32 * fs, 1);
-      }
-    }
-
-    // Campfire flicker + ember particles
-    if (this.campfireLights.size > 0) {
-      const t = performance.now() * 0.001;
-      for (const light of this.campfireLights.values()) {
-        const p = (light.userData.flickerPhase as number) ?? 0;
-        light.intensity = 2.2
-          + Math.sin(t * 5.7  + p)       * 0.55
-          + Math.sin(t * 11.3 + p * 1.8) * 0.28
-          + Math.sin(t * 17.9 + p * 0.7) * 0.12;
-      }
-      for (const flame of this._campfireFlames) {
-        const p = (flame.userData.flickerPhase as number) ?? 0;
-        const t2 = performance.now() * 0.001;
-        const scaleY = 0.88 + Math.sin(t2 * 10.3 + p) * 0.16 + Math.sin(t2 * 15.7 + p * 1.5) * 0.08;
-        const scaleX = 0.82 + Math.sin(t2 * 7.1  + p * 0.9) * 0.12;
-        flame.scale.set(scaleX, scaleY, 1);
-        flame.rotation.y = t2 * 1.4 + p;
-      }
-      // Ember sparks — upward particles from each campfire
-      this._campfireEmberTimer += dt;
-      if (this._campfireEmberTimer >= 0.22) {
-        this._campfireEmberTimer = 0;
-        for (const [key] of this.campfireLights) {
-          if (Math.random() < 0.55) {
-            const [wx, wy, wz] = key.split(",").map(Number);
-            this.particles.spawnLavaEmbers(wx + 0.5, wy + 0.1, wz + 0.5);
-          }
-        }
-      }
-    }
 
     // Lava light pulse — sync all lava PointLights to the bubbling emissive rhythm
     if (this.lavaLights.size > 0) {

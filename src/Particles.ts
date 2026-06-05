@@ -22,10 +22,19 @@ interface ShockwaveRing {
   maxRadius: number;
 }
 
+interface SmokeParticle {
+  mesh: THREE.Mesh;
+  vx: number; vy: number; vz: number;
+  life: number;
+  maxLife: number;
+  peakOpacity: number;
+}
+
 export class ParticleSystem {
   private readonly particles: Particle[] = [];
   private readonly decals: Decal[] = [];
   private readonly _rings: ShockwaveRing[] = [];
+  private readonly _smoke: SmokeParticle[] = [];
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -460,6 +469,58 @@ export class ParticleSystem {
     }
   }
 
+  spawnCampfireSmoke(x: number, y: number, z: number): void {
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      const r = 0.09 + Math.random() * 0.07;
+      const grey = 0.42 + Math.random() * 0.22;
+      const mat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(grey, grey, grey),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 5, 4), mat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.3,
+        y + 1.05 + Math.random() * 0.25,
+        z + (Math.random() - 0.5) * 0.3,
+      );
+      this._smoke.push({
+        mesh,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: 0.55 + Math.random() * 0.4,
+        vz: (Math.random() - 0.5) * 0.25,
+        life: 0,
+        maxLife: 2.8 + Math.random() * 1.4,
+        peakOpacity: 0.22 + Math.random() * 0.10,
+      });
+      this.scene.add(mesh);
+    }
+  }
+
+  /** Update only smoke wisps — call always (not just during pointer-locked gameplay). */
+  updateSmoke(dt: number): void {
+    for (let i = this._smoke.length - 1; i >= 0; i--) {
+      const s = this._smoke[i];
+      s.life += dt;
+      const t = s.life / s.maxLife;
+      if (t >= 1) {
+        this.scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        (s.mesh.material as THREE.Material).dispose();
+        this._smoke.splice(i, 1);
+        continue;
+      }
+      s.mesh.position.x += s.vx * dt;
+      s.mesh.position.y += s.vy * (1 - t * 0.35) * dt;
+      s.mesh.position.z += s.vz * dt;
+      s.mesh.scale.setScalar(1 + t * 2.5);
+      const opT = t < 0.18 ? t / 0.18 : 1 - (t - 0.18) / 0.82;
+      (s.mesh.material as THREE.MeshBasicMaterial).opacity = s.peakOpacity * Math.max(0, opT);
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);
@@ -545,5 +606,11 @@ export class ParticleSystem {
       (r.mesh.material as THREE.Material).dispose();
     }
     this._rings.length = 0;
+    for (const s of this._smoke) {
+      this.scene.remove(s.mesh);
+      s.mesh.geometry.dispose();
+      (s.mesh.material as THREE.Material).dispose();
+    }
+    this._smoke.length = 0;
   }
 }
