@@ -357,7 +357,7 @@ export class ParticleSystem {
 
   /** Tiny feather/air puff behind a flying arrow or bolt. Call every frame per active projectile. */
   spawnArrowTrail(x: number, y: number, z: number, isBolt = false): void {
-    if (Math.random() > 0.45) return; // sparse trail
+    if (Math.random() > 0.65) return; // denser trail
     const color = isBolt ? 0x88aacc : 0xddcc88;
     const size = 0.025 + Math.random() * 0.025;
     const mesh = new THREE.Mesh(

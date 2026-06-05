@@ -122,6 +122,10 @@ export class Game {
   private readonly _campfireLogMat  = new THREE.MeshLambertMaterial({ color: 0x6b3a1a });
   private readonly _campfireAshesMat = new THREE.MeshLambertMaterial({ color: 0x2a1a0a });
 
+  // Enchanting table aura — floating book + purple light, keyed by "wx,wy,wz"
+  private readonly _enchantAuras = new Map<string, { group: THREE.Group; light: THREE.PointLight; phase: number; baseY: number }>();
+  private _enchantAuraTime = 0;
+
   // Fall damage tracking
   private _wasOnGround = true;
 
@@ -716,8 +720,9 @@ export class Game {
         if (fortuneMult > 1)
           this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
-      if (id === "torch")    this.removeTorchLight(wx, wy, wz);
-      if (id === "campfire") this.removeCampfireLight(wx, wy, wz);
+      if (id === "torch")             this.removeTorchLight(wx, wy, wz);
+      if (id === "campfire")          this.removeCampfireLight(wx, wy, wz);
+      if (id === "enchanting_table")  this.removeEnchantAura(wx, wy, wz);
       if (id === "lava")  { this.removeLavaLight(wx, wy, wz); this.lavaSourceBlocks.delete(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.delete(`${wx},${wy},${wz}`);
       // TNT: re-place and start fuse instead of dropping item
@@ -742,8 +747,9 @@ export class Game {
 
     this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
       this.audio.play("block_place", 0.5);
-      if (id === "torch")    this.addTorchLight(wx, wy, wz);
-      if (id === "campfire") this.addCampfireLight(wx, wy, wz);
+      if (id === "torch")             this.addTorchLight(wx, wy, wz);
+      if (id === "campfire")          this.addCampfireLight(wx, wy, wz);
+      if (id === "enchanting_table")  this.addEnchantAura(wx, wy, wz);
       if (id === "lava")  { this.addLavaLight(wx, wy, wz); this.lavaSourceBlocks.add(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.set(`${wx},${wy},${wz}`, { x: wx, y: wy, z: wz, timer: 0.5 });
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
@@ -1376,6 +1382,18 @@ export class Game {
       }
     }
     this.particles.updateSmoke(dt);
+
+    // Enchanting table aura — floating book bob + purple light pulse (always-on)
+    if (this._enchantAuras.size > 0) {
+      this._enchantAuraTime += dt;
+      const t = this._enchantAuraTime;
+      for (const aura of this._enchantAuras.values()) {
+        aura.group.position.y = aura.baseY + Math.sin(t * 0.9 + aura.phase) * 0.07;
+        aura.group.rotation.y = t * 0.45 + aura.phase;
+        aura.light.intensity = 0.75 + Math.sin(t * 2.1 + aura.phase) * 0.15
+          + Math.sin(t * 3.7 + aura.phase * 1.3) * 0.06;
+      }
+    }
 
     // Title screen orbit: slowly rotate camera around fortress when pointer not locked
     if (!this.scene.isPointerLocked && this.phase !== "gameover" && this.phase !== "win") {
@@ -2886,6 +2904,84 @@ export class Game {
       this.scene.scene.remove(group);
       this.campfireGroups.delete(key);
     }
+  }
+
+  private addEnchantAura(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this._enchantAuras.has(key)) return;
+
+    const baseY = wy + 1.3;
+    const phase = Math.random() * Math.PI * 2;
+
+    // Soft purple point light hovering above the table
+    const light = new THREE.PointLight(0x9933ff, 0.85, 4.5, 2);
+    light.position.set(wx + 0.5, wy + 1.1, wz + 0.5);
+    this.scene.scene.add(light);
+
+    // Floating open-book group
+    const group = new THREE.Group();
+    group.position.set(wx + 0.5, baseY, wz + 0.5);
+
+    const coverMat = new THREE.MeshLambertMaterial({
+      color: 0x1a0a2a,
+      emissive: new THREE.Color(0x440088),
+      emissiveIntensity: 0.5,
+    });
+    const pageMat  = new THREE.MeshLambertMaterial({ color: 0xeeeedd });
+    const spineMat = new THREE.MeshLambertMaterial({
+      color: 0x7700aa,
+      emissive: new THREE.Color(0xcc44ff),
+      emissiveIntensity: 0.9,
+    });
+
+    // Two angled cover halves forming a V (open book)
+    const lCover = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.018, 0.18), coverMat);
+    lCover.position.set(-0.065, 0, 0);
+    lCover.rotation.z = 0.30;
+    group.add(lCover);
+
+    const rCover = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.018, 0.18), coverMat);
+    rCover.position.set(0.065, 0, 0);
+    rCover.rotation.z = -0.30;
+    group.add(rCover);
+
+    // Page layers (slightly smaller, cream — visible as a sliver above the covers)
+    const lPages = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.014, 0.16), pageMat);
+    lPages.position.set(-0.057, 0.005, 0);
+    lPages.rotation.z = 0.30;
+    group.add(lPages);
+
+    const rPages = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.014, 0.16), pageMat);
+    rPages.position.set(0.057, 0.005, 0);
+    rPages.rotation.z = -0.30;
+    group.add(rPages);
+
+    // Glowing spine strip where the two halves meet
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.036, 0.18), spineMat);
+    group.add(spine);
+
+    // Slight forward tilt — book "reads" slightly toward the player
+    group.rotation.x = 0.15;
+
+    this.scene.scene.add(group);
+    this._enchantAuras.set(key, { group, light, phase, baseY });
+  }
+
+  private removeEnchantAura(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    const aura = this._enchantAuras.get(key);
+    if (!aura) return;
+    this.scene.scene.remove(aura.light);
+    aura.light.dispose();
+    aura.group.traverse(obj => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.dispose();
+      if (Array.isArray(mesh.material)) mesh.material.forEach(m => (m as THREE.Material).dispose());
+      else (mesh.material as THREE.Material).dispose();
+    });
+    this.scene.scene.remove(aura.group);
+    this._enchantAuras.delete(key);
   }
 
   private _spreadLava(): void {
