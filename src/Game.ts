@@ -103,6 +103,11 @@ export class Game {
   private readonly fireMeshes = new Map<string, THREE.Mesh>();
   private _fireDamageTimer = 0;
 
+  // Campfire visuals: stone ring + logs + animated fire planes + point light
+  private readonly campfireLights = new Map<string, THREE.PointLight>();
+  private readonly campfireMeshes = new Map<string, THREE.Group>();
+  private readonly _campfireFireMeshes = new Map<string, THREE.Mesh>();
+
   // Fall damage tracking
   private _wasOnGround = true;
 
@@ -200,6 +205,7 @@ export class Game {
   start(): void {
     this.buildSystems();
     this.initTorchLights();
+    this.initCampfires();
     // Expose camera for screenshot tooling
     (window as any).__GAME_CAMERA__ = this.scene.camera;
     requestAnimationFrame(t => this.loop(t));
@@ -696,7 +702,8 @@ export class Game {
         if (fortuneMult > 1)
           this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
-      if (id === "torch") this.removeTorchLight(wx, wy, wz);
+      if (id === "torch")    this.removeTorchLight(wx, wy, wz);
+      if (id === "campfire") this.removeCampfireVisual(wx, wy, wz);
       if (id === "lava")  { this.removeLavaLight(wx, wy, wz); this.lavaSourceBlocks.delete(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.delete(`${wx},${wy},${wz}`);
       // TNT: re-place and start fuse instead of dropping item
@@ -1619,6 +1626,23 @@ export class Game {
         const p = (flame.userData.flickerPhase as number) ?? 0;
         const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
         flame.scale.set(0.22 * fs, 0.32 * fs, 1);
+      }
+    }
+
+    // Campfire flicker — deeper, more complex flame rhythm than torches
+    if (this.campfireLights.size > 0) {
+      const t = performance.now() * 0.001;
+      for (const [key, light] of this.campfireLights) {
+        const p = (light.userData.flickerPhase as number) ?? 0;
+        light.intensity = 2.0
+          + Math.sin(t * 5.8  + p)       * 0.45
+          + Math.sin(t * 11.3 + p * 1.6) * 0.22
+          + Math.sin(t * 17.9 + p * 0.7) * 0.09;
+        const fireMesh = this._campfireFireMeshes.get(key);
+        if (fireMesh) {
+          fireMesh.rotation.y = t * 1.2 + p;
+          fireMesh.scale.y = 0.85 + Math.sin(t * 9.4 + p) * 0.16 + Math.sin(t * 15.1 + p * 1.3) * 0.08;
+        }
       }
     }
 
@@ -2687,6 +2711,98 @@ export class Game {
       this.scene.scene.remove(mesh);
       this.torchMeshes.delete(key);
     }
+  }
+
+  // ─── Campfire system ──────────────────────────────────────────────────────
+
+  private initCampfires(): void {
+    const positions = this.gameMap.scanForBlock("campfire");
+    for (const [wx, wy, wz] of positions) this.addCampfireVisual(wx, wy, wz);
+  }
+
+  private addCampfireVisual(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.campfireMeshes.has(key)) return;
+
+    const group = new THREE.Group();
+
+    // Stone ring — 4 cobblestone-coloured slabs encircling the fire
+    const stoneMat = new THREE.MeshLambertMaterial({ color: 0x888070 });
+    const stoneGeo = new THREE.BoxGeometry(1, 1, 1);
+    const ringPieces = [
+      { p: [ 0,     0.15, -0.38] as [number,number,number], s: [0.68, 0.28, 0.16] as [number,number,number] },
+      { p: [ 0,     0.15,  0.38] as [number,number,number], s: [0.68, 0.28, 0.16] as [number,number,number] },
+      { p: [-0.38,  0.15,  0   ] as [number,number,number], s: [0.16, 0.28, 0.68] as [number,number,number] },
+      { p: [ 0.38,  0.15,  0   ] as [number,number,number], s: [0.16, 0.28, 0.68] as [number,number,number] },
+    ];
+    for (const { p, s } of ringPieces) {
+      const stone = new THREE.Mesh(stoneGeo, stoneMat);
+      stone.position.set(...p);
+      stone.scale.set(...s);
+      group.add(stone);
+    }
+
+    // Crossed logs — two brown boxes sitting inside the ring
+    const logMat = new THREE.MeshLambertMaterial({ color: 0x4a3010 });
+    const logGeo = new THREE.BoxGeometry(1, 1, 1);
+    const logA = new THREE.Mesh(logGeo, logMat);
+    logA.position.set(0, 0.07, 0);
+    logA.scale.set(0.68, 0.11, 0.12);
+    group.add(logA);
+    const logB = new THREE.Mesh(logGeo, logMat);
+    logB.position.set(0, 0.07, 0);
+    logB.scale.set(0.12, 0.11, 0.68);
+    group.add(logB);
+
+    // Fire — two crossed vertical planes, wider/taller than a torch flame
+    const fireMat = new THREE.MeshBasicMaterial({
+      color: 0xff5500, transparent: true, opacity: 0.92,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const hw = 0.30, fh = 0.55;
+    const fp = new Float32Array([
+      -hw, 0,   0,   hw, 0,   0,   hw, fh,  0,   -hw, fh,  0,
+       0,  0,  -hw,   0, 0,   hw,   0, fh,  hw,    0, fh,  -hw,
+    ]);
+    const fi = new Uint16Array([
+      0,1,2, 0,2,3, 2,1,0, 3,2,0,
+      4,5,6, 4,6,7, 6,5,4, 7,6,4,
+    ]);
+    const fireGeo = new THREE.BufferGeometry();
+    fireGeo.setAttribute("position", new THREE.BufferAttribute(fp, 3));
+    fireGeo.setIndex(new THREE.BufferAttribute(fi, 1));
+    const fireMesh = new THREE.Mesh(fireGeo, fireMat);
+    fireMesh.position.set(0, 0.16, 0);
+    group.add(fireMesh);
+    this._campfireFireMeshes.set(key, fireMesh);
+
+    group.position.set(wx + 0.5, wy, wz + 0.5);
+    this.scene.scene.add(group);
+    this.campfireMeshes.set(key, group);
+
+    // Warm orange point light — brighter and wider reach than a torch
+    const flickerPhase = Math.random() * Math.PI * 2;
+    const light = new THREE.PointLight(0xff5500, 2.2, 9, 2);
+    light.position.set(wx + 0.5, wy + 0.7, wz + 0.5);
+    light.userData.flickerPhase = flickerPhase;
+    this.scene.scene.add(light);
+    this.campfireLights.set(key, light);
+  }
+
+  private removeCampfireVisual(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    const light = this.campfireLights.get(key);
+    if (light) {
+      this.scene.scene.remove(light);
+      light.dispose();
+      this.campfireLights.delete(key);
+    }
+    const mesh = this.campfireMeshes.get(key);
+    if (mesh) {
+      this.scene.scene.remove(mesh);
+      this.campfireMeshes.delete(key);
+    }
+    this._campfireFireMeshes.delete(key);
   }
 
   private _spreadLava(): void {
