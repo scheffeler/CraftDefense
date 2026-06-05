@@ -1,5 +1,33 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-05 — Campfire decorative block
+
+**What was done:**
+- Added `"campfire"` to `BlockId` union in `src/types.ts`.
+- Added block def in `src/Map.ts` (transparent: true, hardness 0.5, placeable: false) and excluded it from chunk geometry with the same `continue` guard used for torches.
+- Added `campfire` to `BLOCK_BEHAVIORS` in `src/config/blocks.ts` (axe tool, no drops — purely decorative).
+- Pre-placed 2 campfires in `src/WorldGen.ts` inside the fortress interior at `(26, G+1, 36)` (west, near barracks shack) and `(38, G+1, 36)` (east, near crafting shack).
+- Added full campfire visual system to `src/Game.ts`:
+  - Fields: `campfireLights`, `campfireMeshes`, `_campfireFireMeshes` (all Maps keyed by "wx,wy,wz").
+  - `initCampfires()` — scans world for campfire blocks and calls `addCampfireVisual` for each; called in `start()`.
+  - `addCampfireVisual(wx, wy, wz)` — builds a `THREE.Group` with: 4 cobblestone-coloured ring slabs (BoxGeometry scaled per side), 2 crossed brown log boxes, 2 crossed vertical fire planes (orange MeshBasicMaterial, DoubleSide, additive), plus a `PointLight(0xff5500, 2.2, 9, 2)` with a random per-campfire flicker phase.
+  - `removeCampfireVisual(wx, wy, wz)` — removes light, group, and fire-mesh entry; called when the block is broken.
+  - Campfire flicker update block in the main `update()` loop: 3-harmonic flicker at ~5.8/11.3/17.9 Hz (slower, deeper than torches), plus Y-scale wobble on the fire-planes mesh for a breathing flame effect.
+- TypeScript compiles clean. Verified in browser via Playwright: `campfireLights.size = 2`, `campfireMeshes.size = 2`. Wide aerial screenshots confirm warm orange glow lighting up the fortress interior at night.
+
+**Notes:**
+- This was the highest-priority "Ideas for next time" item, mentioned in 3 consecutive sessions.
+- The null-dereference error `"Cannot read properties of null (reading 'r')"` in the water-sky tint path is pre-existing (sky dome sets `scene.background = null`), not introduced by this session.
+- Session ran on branch `claude/dreamy-cerf-2bPmn` (not `auto-iterate`) per environment instructions.
+
+**Ideas for next time:**
+- Moon phase visual: update the shadow-disc offset each game-day for crescent/half/full phase variety
+- Leaves emissive at night: add tiny emissive value to leaf blocks near the player so the canopy glows faintly after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Hit flash colour tint: change non-lethal hit flash to the weapon's colour (sword=red, magic=purple) for differentiation
+- Smoke particles above campfire: upward-drifting grey billboards from the campfire center — `ParticleSystem` could handle this
+- Campfire warm glow on block faces: manually darken/tint adjacent grass/cobblestone faces near campfire using vertex colors (ambient occlusion style but warm-orange tinted)
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
