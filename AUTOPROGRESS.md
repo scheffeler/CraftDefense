@@ -1,5 +1,24 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-05 — Leaf night glow + torch ground halo disc
+
+**What was done:**
+- **Leaf canopy emissive at night** (`src/Map.ts`): Leaf block faces are now separated into a dedicated per-chunk `leafMesh` (alongside the existing water/lava/wheat/flora meshes). A shared `leafMat` (`THREE.MeshLambertMaterial`, `DoubleSide`, same block texture atlas, emissive `0x003300`) is used for all leaf meshes. `setLeafEmissive(nightness)` updates `emissiveIntensity` to `nightness × 0.10` each frame — 0 at noon, 0.10 at midnight. Called from `Game.ts` alongside the water-sky-tint update: `Math.max(0, 1 - daylight * 4)`. The separation required: adding `leafMesh` to the `Chunk` class, a `makeLeafMaterial()` static factory, cleanup in `rebuildChunkMesh()`, a `addLeafFace()` closure parallel to `addFace()`, and the mesh-build block at the end of `rebuildChunkMesh`.
+- **Torch ground halo disc** (`src/Game.ts`): Added `_torchHaloGeo` (`CircleGeometry(0.88, 20)`) and `_torchHaloMat` (64×64 canvas radial gradient: warm orange-yellow core → golden mid → transparent rim, `AdditiveBlending`) as shared fields. Each `addTorchLight()` call now attaches a flat halo `Mesh` (rotation.x = -π/2, y = 0.02, renderOrder = 1) to the torch group, creating a warm pool-of-light on the ground beneath every torch.
+- Verified: 73 halo meshes detected (72 torches + player shadow), 12 leaf meshes detected. Night screenshots show warm orange pools under torches and faint green leaf canopy glow. TypeScript compiles clean.
+
+**Notes:**
+- Oriented fresh session: remote `auto-iterate` was at f87276e (firefly sprites). Node_modules was absent; `npm install` required before tsc.
+- `makeLeafMaterial` uses `side: THREE.DoubleSide` so leaves are visible from both sides (interior and exterior of canopy). `alphaTest: 0.1` keeps the same texture transparency behavior as the main chunk mesh.
+- The leaf separation means the main `chunk.mesh` (opaque) no longer contains leaf faces. This is correct since leaves are transparent anyway.
+
+**Ideas for next time:**
+- **Passive mob animations**: chicken wing-flap oscillation (±0.5 rad, 0.15 s period via `flapTimer` per mob), pig snout twitch — mentioned 5+ sessions, high priority
+- **Arrow trail density**: bump `if (Math.random() > 0.45)` to `> 0.65` in `spawnArrowTrail` — one-liner, very low risk
+- **Smoke column above campfire**: slow upward grey particle stream from campfire mesh position (~3 particles/s, slow upward velocity 0.5 m/s, opacity 0.15–0.30) — mentioned 3 sessions
+- **Block break particle color**: match particle color to block type in `spawnBreakParticles` (stone=grey, dirt=brown, wood=brown, leaves=green, etc.)
+- **Enchanting table aura**: slow-rotating rune sprites around the enchanting table, faint purple emissive glow, similar to campfire treatment
+
 ## 2026-06-05 — Firefly glow sprites at night
 
 **What was done:**
