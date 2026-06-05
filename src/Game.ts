@@ -76,6 +76,28 @@ export class Game {
   // Flame sprites for per-frame flicker animation
   private readonly _torchFlameMeshes: THREE.Sprite[] = [];
 
+  // Campfire point lights + visual meshes keyed by "wx,wy,wz"
+  private readonly campfireLights  = new Map<string, THREE.PointLight>();
+  private readonly campfireMeshes  = new Map<string, THREE.Group>();
+  // Shared campfire geometry/materials (created once)
+  private readonly _campfireBaseGeo  = new THREE.BoxGeometry(0.9, 0.15, 0.9);
+  private readonly _campfireBaseMat  = new THREE.MeshLambertMaterial({ color: 0x777777 });
+  private readonly _campfireLogGeo   = new THREE.BoxGeometry(0.82, 0.11, 0.2);
+  private readonly _campfireLogMat   = new THREE.MeshLambertMaterial({ color: 0x5a3010 });
+  private readonly _campfireEmberGeo = new THREE.PlaneGeometry(0.42, 0.42);
+  private readonly _campfireEmberMat = new THREE.MeshBasicMaterial({
+    color: 0xff4400, transparent: true, opacity: 0.75,
+    depthWrite: false, side: THREE.DoubleSide,
+  });
+  private readonly _campfireFlameMat = new THREE.SpriteMaterial({
+    map: Game.buildCampfireFlameTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  // Campfire flame sprites tracked for per-frame flicker
+  private readonly _campfireFlameSprites: THREE.Sprite[] = [];
+
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
 
@@ -333,6 +355,7 @@ export class Game {
 
     this.wireCallbacks();
     this.scanWorldTorches();
+    this.scanWorldCampfires();
     this.refreshHUD();
     this.ui.setObjective(
       `Build fortifications! Wave 1 begins in ${Math.ceil(this.buildPhaseTimer)}s.`,
@@ -696,7 +719,8 @@ export class Game {
         if (fortuneMult > 1)
           this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
-      if (id === "torch") this.removeTorchLight(wx, wy, wz);
+      if (id === "torch")    this.removeTorchLight(wx, wy, wz);
+      if (id === "campfire") this.removeCampfireLight(wx, wy, wz);
       if (id === "lava")  { this.removeLavaLight(wx, wy, wz); this.lavaSourceBlocks.delete(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.delete(`${wx},${wy},${wz}`);
       // TNT: re-place and start fuse instead of dropping item
@@ -721,7 +745,8 @@ export class Game {
 
     this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
       this.audio.play("block_place", 0.5);
-      if (id === "torch") this.addTorchLight(wx, wy, wz);
+      if (id === "torch")    this.addTorchLight(wx, wy, wz);
+      if (id === "campfire") this.addCampfireLight(wx, wy, wz);
       if (id === "lava")  { this.addLavaLight(wx, wy, wz); this.lavaSourceBlocks.add(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.set(`${wx},${wy},${wz}`, { x: wx, y: wy, z: wz, timer: 0.5 });
       this.flowField.recompute(FORTRESS_CENTER_X, FORTRESS_CENTER_Z);
@@ -1619,6 +1644,24 @@ export class Game {
         const p = (flame.userData.flickerPhase as number) ?? 0;
         const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
         flame.scale.set(0.22 * fs, 0.32 * fs, 1);
+      }
+    }
+
+    // Campfire flicker — larger flame, slower pulse than torch
+    if (this.campfireLights.size > 0) {
+      const t = performance.now() * 0.001;
+      for (const light of this.campfireLights.values()) {
+        const p = (light.userData.flickerPhase as number) ?? 0;
+        light.intensity = 2.0
+          + Math.sin(t * 4.3  + p)       * 0.40
+          + Math.sin(t * 9.7  + p * 1.5) * 0.18
+          + Math.sin(t * 17.1 + p * 0.7) * 0.08;
+      }
+      for (const flame of this._campfireFlameSprites) {
+        const p = (flame.userData.flickerPhase as number) ?? 0;
+        const t2 = performance.now() * 0.001;
+        const fs = 1.0 + Math.sin(t2 * 5.8 + p) * 0.14 + Math.sin(t2 * 11.3 + p * 1.4) * 0.08;
+        flame.scale.set(0.52 * fs, 0.72 * fs, 1);
       }
     }
 
@@ -2686,6 +2729,134 @@ export class Game {
       }
       this.scene.scene.remove(mesh);
       this.torchMeshes.delete(key);
+    }
+  }
+
+  // ─── Campfire system ────────────────────────────────────────────────────────
+
+  private static buildCampfireFlameTexture(): THREE.CanvasTexture {
+    const W = 24, H = 48;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+    const imageData = ctx.createImageData(W, H);
+    const data = imageData.data;
+
+    let seed = 0xcafef00d;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
+
+    for (let cy = 0; cy < H; cy++) {
+      // t = 0 at canvas top (flame tip), 1 at base
+      const t = (H - 1 - cy) / (H - 1);
+      const halfWidth = Math.pow(t, 0.65) * (W * 0.46);
+      // Multiple jagged tips for campfire (wider flame)
+      const jag = t < 0.3 ? (rand() - 0.5) * 5 * (1 - t / 0.3) : 0;
+      for (let cx2 = 0; cx2 < W; cx2++) {
+        const dist = Math.abs(cx2 - (W / 2 - 0.5));
+        const hw = halfWidth + jag;
+        if (dist >= hw || hw <= 0) continue;
+        const edge = Math.max(0, 1 - dist / hw);
+        // Richer color: yellow → orange → deep red at tip
+        const gChannel = Math.max(0, Math.min(255, Math.round(60 + 185 * t)));
+        const bChannel = Math.max(0, Math.round(15 * t));
+        const alpha = Math.round(Math.pow(edge, 0.5) * (0.2 + 0.8 * Math.sqrt(t)) * 255);
+        const idx = (cy * W + cx2) * 4;
+        data[idx]     = 255;
+        data[idx + 1] = gChannel;
+        data[idx + 2] = bChannel;
+        data[idx + 3] = alpha;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+  }
+
+  private campfireKey(wx: number, wy: number, wz: number): string {
+    return `${wx},${wy},${wz}`;
+  }
+
+  private scanWorldCampfires(): void {
+    const world = this.gameMap.world;
+    for (let wx = 0; wx < 64; wx++) {
+      for (let wz = 0; wz < 64; wz++) {
+        for (let wy = 1; wy < 32; wy++) {
+          if (world.getBlock(wx, wy, wz) === "campfire") {
+            this.addCampfireLight(wx, wy, wz);
+          }
+        }
+      }
+    }
+  }
+
+  private addCampfireLight(wx: number, wy: number, wz: number): void {
+    const key = this.campfireKey(wx, wy, wz);
+    if (this.campfireLights.has(key)) return;
+
+    const flickerPhase = Math.random() * Math.PI * 2;
+
+    // Warm orange-red point light, larger radius than torch
+    const light = new THREE.PointLight(0xff5500, 2.2, 9, 2);
+    light.position.set(wx + 0.5, wy + 0.9, wz + 0.5);
+    light.userData.flickerPhase = flickerPhase;
+    this.scene.scene.add(light);
+    this.campfireLights.set(key, light);
+
+    // Visual campfire group
+    const group = new THREE.Group();
+
+    // Stone slab base
+    const base = new THREE.Mesh(this._campfireBaseGeo, this._campfireBaseMat);
+    base.position.set(0, 0.075, 0);
+    group.add(base);
+
+    // Crossed logs — two dark brown bars in an X pattern
+    const log1 = new THREE.Mesh(this._campfireLogGeo, this._campfireLogMat);
+    log1.position.set(0, 0.2, 0);
+    group.add(log1);
+    const log2 = new THREE.Mesh(this._campfireLogGeo, this._campfireLogMat);
+    log2.rotation.y = Math.PI / 2;
+    log2.position.set(0, 0.2, 0);
+    group.add(log2);
+
+    // Ember disc — horizontal glowing plane at the base of the flame
+    const ember = new THREE.Mesh(this._campfireEmberGeo, this._campfireEmberMat);
+    ember.rotation.x = -Math.PI / 2;
+    ember.position.set(0, 0.28, 0);
+    group.add(ember);
+
+    // Billboard fire sprite
+    const flame = new THREE.Sprite(this._campfireFlameMat);
+    flame.userData.flickerPhase = flickerPhase;
+    flame.scale.set(0.52, 0.72, 1);
+    flame.position.set(0, 0.7, 0);
+    group.add(flame);
+    this._campfireFlameSprites.push(flame);
+
+    group.position.set(wx + 0.5, wy, wz + 0.5);
+    this.scene.scene.add(group);
+    this.campfireMeshes.set(key, group);
+  }
+
+  private removeCampfireLight(wx: number, wy: number, wz: number): void {
+    const key = this.campfireKey(wx, wy, wz);
+    const light = this.campfireLights.get(key);
+    if (light) {
+      this.scene.scene.remove(light);
+      light.dispose();
+      this.campfireLights.delete(key);
+    }
+    const mesh = this.campfireMeshes.get(key);
+    if (mesh) {
+      const flame = mesh.children[3] as THREE.Sprite | undefined;
+      if (flame) {
+        const idx = this._campfireFlameSprites.indexOf(flame);
+        if (idx !== -1) this._campfireFlameSprites.splice(idx, 1);
+      }
+      this.scene.scene.remove(mesh);
+      this.campfireMeshes.delete(key);
     }
   }
 
