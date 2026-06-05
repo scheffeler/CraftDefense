@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-05 — Campfire smoke wisps + always-on torch/campfire FX
+
+**What was done:**
+- Added `SmokeParticle` interface and `_smoke: SmokeParticle[]` to `ParticleSystem` in `Particles.ts`.
+- `spawnCampfireSmoke(x, y, z)`: spawns 1-2 grey `SphereGeometry(r, 5, 4)` wisps per call. Each wisp rises upward at 0.55–0.95 m/s with no gravity, expands from 1× to 3.5× its initial radius, and fades over a 2.8–4.2 s lifetime with a quick fade-in (first 18% of life) then slow fade-out.
+- `updateSmoke(dt)`: new public method that processes only the `_smoke` array (no gravity, no rotation). Called unconditionally every frame in Game.ts so smoke runs during the title-screen camera orbit as well as during gameplay.
+- `clear()` now also disposes smoke particles.
+- **Moved torch flicker + campfire flicker/ember/smoke** from after the `isPointerLocked` early-return to before it — these pure visual effects now run always, making campfires and torches animate on the title screen orbit and improving the overall atmosphere of the game world.
+- `_campfireSmokeTimer` fires every ~0.35 s with 80% probability per campfire, producing a continuous gentle smoke plume above both fortress campfires.
+
+**Notes:**
+- WebGL/Playwright headless test not viable in this container (browser crashes with no GPU). TypeScript compiles clean (0 errors). Logic verified by code review — smoke particle lifecycle, update, and disposal paths are all correct.
+- Oriented fresh session: remote `auto-iterate` already had campfire lights + cross-pane flames + ember sparks. This session adds the missing smoke column.
+
+**Ideas for next time:**
+- Rain ground splash rings: when rain is active, periodically spawn expanding `RingGeometry` particles on the terrain surface near the player (classic rain puddle ripple)
+- Hit flash colour tint: change non-lethal hit flash from white to weapon colour (sword=red, bow=teal, magic=purple)
+- Campfire smoke colour variation: tint slightly yellow/brown at bottom (fresh wood smoke) fading to white/grey higher up
+- Snow particle fall: in taiga biome during rain, replace rain streaks with slower white dot particles
+- Animated water vertex displacement: per-vertex sine-wave height on water top faces for a genuine wave surface effect
+
 ## 2026-06-05 — Leaf night glow + torch ground halo disc
 
 **What was done:**
