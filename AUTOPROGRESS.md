@@ -1,5 +1,24 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-05 — Enchanting table floating book aura + denser arrow trails
+
+**What was done:**
+- **Enchanting table aura** (`src/Game.ts`): When a player places an enchanting table, a floating animated open-book appears above it — identical to Minecraft's iconic enchanting table visual. Implementation follows the torch/campfire pattern exactly: `_enchantAuras: Map<string, { group, light, phase, baseY }>`, `addEnchantAura(wx,wy,wz)` and `removeEnchantAura(wx,wy,wz)` wired to `onBlockPlaced`/`onBlockBroken`. The book is built from 5 meshes: two `BoxGeometry` cover halves angled at ±0.30 rad (forming a V / open-book silhouette), two cream page layers on top, and a central glowing purple spine (`emissive: 0xcc44ff`). The whole group bobs vertically `sin(t*0.9) × 0.07 m` and rotates at 0.45 rad/s. A `PointLight(0x9933ff, 0.85, 4.5)` hovers 1.1 units above the table with multi-frequency flicker. All runs on the always-on pre-pointer-lock path alongside campfire/torch effects.
+- **Arrow trail density** (`src/Particles.ts`): Changed early-exit threshold from `> 0.45` to `> 0.65`, increasing trail particle spawn rate by ~57% for noticeably denser smoke trails on arrows and crossbow bolts.
+
+**Notes:**
+- Oriented fresh from remote `auto-iterate` (already had campfire smoke wisps, leaf night glow, torch halo discs, fireflies, Milky Way, rain splashes, block-break colored particles, all pixel-art sprites, etc.).
+- TypeScript compiles clean (0 errors). Game loads without JS errors (verified: `Game loaded: true`, `484 scene children`, no console errors).
+- `npm install` was needed before tsc — node_modules absent at session start.
+
+**Ideas for next time:**
+- **Passive mob head-bobbing**: chickens bob their heads forward/back while walking (a short -0.05 Z oscillation on the head mesh at movePhase frequency) — quick add to `PassiveMob.ts` update loop
+- **Hit flash colour tint**: arrows currently use white (0xffffff) flash — could use teal (0x44ccee) to differentiate from melee (already red)
+- **Taiga snow particles**: when `biome === "taiga"` and `weather.intensity > 0.1`, replace rain streaks with slow white dot particles — biome-specific atmosphere
+- **Bookshelf item-entity glow**: dropped item entities float and spin; adding a tiny `PointLight(color, 0.4, 1.5)` child to the entity group for rare/enchanted item drops would make them visually pop
+- **Moon phase icon** next to "Day N" in the HUD — show which of the 8 moon phases we're on using the existing moon canvas texture system
+- **Enchanting table achievement**: "Enchanting Time" — unlock when player first places an enchanting table (wire into `onBlockPlaced` alongside the aura)
+
 ## 2026-06-05 — Campfire smoke wisps + always-on torch/campfire FX
 
 **What was done:**
