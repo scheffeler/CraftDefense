@@ -1,5 +1,26 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-05 — Campfire decorative block (3D mesh + animated fire + point light)
+
+**What was done:**
+- Added `"campfire"` to `BlockId` type (types.ts) and block definition in Map.ts (transparent, hardness 1.5). Campfire is skipped by the chunk geometry builder (like torch) so it renders as a dedicated 3D group.
+- Added block behavior (`axe`, drops itself), crafting recipe (2×wood + coal_ore + stick in 2×3 shape → 1 campfire), and item entry (color 0xff6600, stackSize 16) in config/blocks.ts, config/recipes.ts, config/items.ts.
+- Campfire 3D group (`addCampfireLight`): stone slab base (BoxGeometry 0.9×0.15×0.9), two crossed dark-brown log bars forming an X pattern, an ember disc (horizontal PlaneGeometry with additive blending, orange tint), and a wider billboard fire Sprite (24×48 canvas texture, brighter than torch flame). A `PointLight(0xff5500, 2.2, 9)` with a random flicker phase completes the visual.
+- `buildCampfireFlameTexture()` static method: larger (24×48) canvas fire texture with wider flame body and richer orange-to-yellow gradient than the torch flame.
+- Animate in update loop: triple-harmonic light intensity flicker (4.3/9.7/17.1 Hz) and dual-harmonic flame scale breathing (5.8/11.3 Hz). Each campfire has an independent random phase so multiple campfires don't pulse together.
+- `scanWorldCampfires()` scans on world init (called alongside `scanWorldTorches`). `onBlockPlaced`/`onBlockBroken` hooks wire placement and breaking.
+- Pre-placed campfire in WorldGen at (32, G+1, 37) — the open clearing south of the central cobblestone well.
+- TypeScript compiles clean. Verified in browser: 1 light + 1 mesh + 1 flame sprite spawned on load; warm orange glow visible illuminating surrounding blocks.
+
+**Ideas for next time:**
+- Moon phase visual: change moon disc texture offset each game-day for crescent/half/full visual variety
+- Leaves emissive at night: give leaf blocks near player a faint emissive value after dark so the canopy glows
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Biome ambient sound: distinct ambient drone/chirp audio per biome (desert wind, taiga crickets, forest birds)
+- Hit flash colour tint: change non-lethal hit flash from white to weapon colour (sword=red, magic=purple)
+- Chicken wing-flap animation in PassiveMob.ts: oscillate wing pivot ±0.5 rad over 0.15 s
+- Campfire warmth: when player stands within 3 blocks of a campfire, apply a subtle "warmth" screen tint (slight orange vignette)
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
