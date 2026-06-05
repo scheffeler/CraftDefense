@@ -15,3 +15,7 @@ scripts/atlas-*.mjs
 scripts/shadow-*.mjs
 scripts/take-screenshots-*.mjs
 scripts/blocks-screenshot.mjs
+scripts/firefly-*.mjs
+scripts/firefly-*.png
+scripts/milkyway-*.mjs
+scripts/milkyway-*.png
