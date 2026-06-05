@@ -1,5 +1,27 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-05 — Firefly glow sprites at night
+
+**What was done:**
+- Added a `Firefly` interface (sprite, velocity, bob direction, blink phase + frequency) to `src/SceneManager.ts`.
+- Added `_fireflies: Firefly[]` and `_fireflyTime: number` fields to `SceneManager`.
+- `buildFireflies()`: creates a shared soft radial-gradient canvas texture (24×24, chartreuse core → transparent edge) and 14 `THREE.Sprite` instances scattered across the clearing interior (x: 19–45, y: 8–11, z: 19–45). Each sprite gets its own `SpriteMaterial` (shared texture, individual opacity). `AdditiveBlending + fog: false` ensures they glow against the dark sky without being fogged out.
+- Update loop inside `updateDayNight()`: each frame, fireflies drift horizontally (0.25–0.70 m/s) and gently bob vertically (0.28 m/s), bouncing off clearing bounds. Blink is driven by `max(0, sin(t × blinkFreq × 2π + phase))²` — the squared half-sine gives a sharp insect-like pulse. Opacity = `nightness × 0.9 × glow²`, scale = 0.15–0.25 depending on glow. When nightness < 0.01 (day), all sprites are silently set to opacity 0.
+- Verified: 14 fireflies spawned at correct positions, varying opacities (0.0–0.61) at midnight matching staggered blink cycles. TypeScript compiles clean.
+
+**Notes:**
+- Oriented fresh from remote `auto-iterate` (already had campfire, shockwave rings, Milky Way, star fog fix, hit flash tinting, arm bob, wave pulse, etc.).
+- `npm install` was needed before `npx tsc -p tsconfig.emit.json` could pass — node_modules were absent in this session.
+- Firefly blink frequency is 0.7–2.0 Hz, each firefly asynchronous — gives a natural scattered-blink field effect.
+
+**Ideas for next time:**
+- **Leaves emissive at night**: traverse chunk leaf meshes near player, set soft `emissiveIntensity` ~0.08 at midnight. Mentioned in 5 previous sessions — high priority.
+- **Torch halo disc**: flat `PlaneGeometry(1.2, 1.2)` with radial gradient texture at base of torch, `AdditiveBlending` — warm pool-of-light on ground.
+- **Moon texture phases**: build 8 distinct canvas textures (full → new moon) and swap as `_totalDays` advances mod 8, rather than the shadow-disc trick.
+- **Passive mob animations**: chicken wing-flap oscillation (±0.5 rad, 0.15 s period), pig snout twitch.
+- **Arrow trail density**: bump `if (Math.random() > 0.45)` to `> 0.65` — very low risk, one-line change.
+- **Smoke column above campfire**: slow upward grey particle stream from campfire mesh position.
+
 ## 2026-06-04 — Milky Way nebula band + star fog fix
 
 **What was done:**

@@ -55,6 +55,17 @@ function sampleDayCycle(t: number): Omit<DayFrame, "t"> {
 
 // ---------------------------------------------------------------------------
 
+interface Firefly {
+  sprite: THREE.Sprite;
+  vx: number;
+  vz: number;
+  vyDir: number;   // +1 or -1 for slow vertical bob direction
+  phase: number;   // blink phase offset (radians)
+  blinkFreq: number; // blinks per second
+}
+
+// ---------------------------------------------------------------------------
+
 export class SceneManager {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
@@ -120,6 +131,10 @@ export class SceneManager {
 
   // Player ground-shadow blob
   private _playerShadowBlob!: THREE.Mesh;
+
+  // Fireflies — glow sprites drifting in the clearing at night
+  private readonly _fireflies: Firefly[] = [];
+  private _fireflyTime = 0;
 
   onPointerLockChange: (locked: boolean) => void = () => {};
 
@@ -211,6 +226,8 @@ export class SceneManager {
       this._playerShadowBlob.visible = false;
       this.scene.add(this._playerShadowBlob);
     }
+
+    this.buildFireflies();
 
     window.addEventListener("resize", () => this.onResize());
   }
@@ -377,6 +394,39 @@ export class SceneManager {
     }
     if (this.cloudMat) {
       this.cloudMat.opacity = 0.5 + frame.ambientInt * 0.4;
+    }
+
+    // Fireflies: drift + blink at night, invisible by day
+    this._fireflyTime += dt;
+    if (nightness > 0.01) {
+      for (const ff of this._fireflies) {
+        const p = ff.sprite.position;
+
+        // Gentle horizontal drift
+        p.x += ff.vx * dt;
+        p.z += ff.vz * dt;
+
+        // Slow vertical bob — reverse direction at height limits
+        p.y += ff.vyDir * 0.28 * dt;
+        if (p.y > 11.0) { p.y = 11.0; ff.vyDir = -1; }
+        if (p.y < 7.8)  { p.y = 7.8;  ff.vyDir =  1; }
+
+        // Bounce off clearing bounds (fortress interior + surroundings)
+        if (p.x < 18) { p.x = 18; ff.vx =  Math.abs(ff.vx); }
+        if (p.x > 46) { p.x = 46; ff.vx = -Math.abs(ff.vx); }
+        if (p.z < 18) { p.z = 18; ff.vz =  Math.abs(ff.vz); }
+        if (p.z > 46) { p.z = 46; ff.vz = -Math.abs(ff.vz); }
+
+        // Blink: half-sine-cycle pulse — squared for a sharper, more insect-like flash
+        const raw = Math.max(0, Math.sin(this._fireflyTime * ff.blinkFreq * Math.PI * 2 + ff.phase));
+        const glow = raw * raw;
+        (ff.sprite.material as THREE.SpriteMaterial).opacity = nightness * 0.9 * glow;
+        ff.sprite.scale.setScalar(0.15 + 0.10 * glow);
+      }
+    } else {
+      for (const ff of this._fireflies) {
+        (ff.sprite.material as THREE.SpriteMaterial).opacity = 0;
+      }
     }
   }
 
@@ -1720,6 +1770,52 @@ export class SceneManager {
   /** Hide the player shadow (e.g., during title screen). */
   hidePlayerShadow(): void {
     this._playerShadowBlob.visible = false;
+  }
+
+  private buildFireflies(): void {
+    // Shared glow texture: soft chartreuse radial gradient
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 24;
+    const ctx = canvas.getContext("2d")!;
+    const grad = ctx.createRadialGradient(12, 12, 0, 12, 12, 12);
+    grad.addColorStop(0,    "rgba(220,255,80,1)");
+    grad.addColorStop(0.30, "rgba(160,240,40,0.7)");
+    grad.addColorStop(0.65, "rgba(60,180,10,0.2)");
+    grad.addColorStop(1,    "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 24, 24);
+    const tex = new THREE.CanvasTexture(canvas);
+
+    for (let i = 0; i < 14; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        fog: false,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.setScalar(0.15);
+
+      // Scatter across the clearing interior (fortress + surrounding open area)
+      const px = 19 + Math.random() * 26;
+      const py = 8.0 + Math.random() * 3.0;
+      const pz = 19 + Math.random() * 26;
+      sprite.position.set(px, py, pz);
+
+      const angle = Math.random() * Math.PI * 2;
+      const spd   = 0.25 + Math.random() * 0.45;
+      this.scene.add(sprite);
+      this._fireflies.push({
+        sprite,
+        vx:        Math.cos(angle) * spd,
+        vz:        Math.sin(angle) * spd,
+        vyDir:     Math.random() < 0.5 ? 1 : -1,
+        phase:     Math.random() * Math.PI * 2,
+        blinkFreq: 0.7 + Math.random() * 1.3,
+      });
+    }
   }
 
   private setupLighting(): void {
