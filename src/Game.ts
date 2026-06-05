@@ -75,6 +75,14 @@ export class Game {
   });
   // Flame sprites for per-frame flicker animation
   private readonly _torchFlameMeshes: THREE.Sprite[] = [];
+  // Warm pool-of-light halo projected on the ground under each torch
+  private readonly _torchHaloGeo = new THREE.CircleGeometry(0.88, 20);
+  private readonly _torchHaloMat = new THREE.MeshBasicMaterial({
+    map: Game.buildHaloTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
 
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
@@ -1681,6 +1689,12 @@ export class Game {
       this.gameMap.setWaterSkyTint(skyBg.r, skyBg.g, skyBg.b, this.scene.daylight);
     }
 
+    // Leaf canopy night glow — subtle bioluminescent green at midnight
+    {
+      const nightness = Math.max(0, 1 - this.scene.daylight * 4);
+      this.gameMap.setLeafEmissive(nightness);
+    }
+
     // Freeplay: flow field tracks player (recomputed every 3 s)
     if (this.mode === "freeplay" && this.enemies.getAliveEnemies().length > 0) {
       this._flowUpdateTimer += dt;
@@ -2666,6 +2680,26 @@ export class Game {
     return tex;
   }
 
+  private static buildHaloTexture(): THREE.CanvasTexture {
+    const S = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = S;
+    const ctx = canvas.getContext("2d")!;
+    const cx = S / 2, cy = S / 2;
+    // Warm radial gradient: bright orange-yellow core → golden mid → transparent rim
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx);
+    grad.addColorStop(0.00, "rgba(255, 220, 100, 0.70)");
+    grad.addColorStop(0.30, "rgba(255, 160,  40, 0.45)");
+    grad.addColorStop(0.65, "rgba(200,  80,  10, 0.15)");
+    grad.addColorStop(1.00, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, S, S);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+  }
+
   private torchKey(wx: number, wy: number, wz: number): string {
     return `${wx},${wy},${wz}`;
   }
@@ -2709,6 +2743,13 @@ export class Game {
     flame.position.set(0, 0.72 + 0.16, 0);
     group.add(flame);
     this._torchFlameMeshes.push(flame);
+
+    // Warm halo disc — flat circle at ground level, additive blending for a soft light pool
+    const halo = new THREE.Mesh(this._torchHaloGeo, this._torchHaloMat);
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.set(0, 0.02, 0);
+    halo.renderOrder = 1;
+    group.add(halo);
 
     group.position.set(wx + 0.5, wy, wz + 0.5);
     this.scene.scene.add(group);

@@ -117,6 +117,7 @@ class Chunk {
   lavaMesh: THREE.Mesh | null = null;
   wheatMesh: THREE.Mesh | null = null;
   floraMesh: THREE.Mesh | null = null;
+  leafMesh: THREE.Mesh | null = null;
   dirty = true;
 
   constructor(cx: number, cz: number) {
@@ -209,6 +210,8 @@ export class VoxelWorld {
   private readonly floraMat: THREE.MeshLambertMaterial;
   // Shared opaque-block material — all chunk meshes share it so wetness is one uniform
   private readonly _chunkMat: THREE.MeshLambertMaterial;
+  // Shared leaf material — emissive intensity updated each frame for night glow
+  private readonly leafMat: THREE.MeshLambertMaterial;
   private readonly _chunkWetUniforms: { uWetness: THREE.IUniform<number> } = { uWetness: { value: 0.0 } };
   private _fluidTime = 0;
   private _floraWindUniforms!: { uTime: THREE.IUniform<number> };
@@ -222,6 +225,7 @@ export class VoxelWorld {
     scene.add(this.chunkMeshGroup);
     this.blockTex = VoxelWorld.makeBlockTexture();
     this._chunkMat = VoxelWorld.makeChunkMaterial(this.blockTex, this._chunkWetUniforms);
+    this.leafMat = VoxelWorld.makeLeafMaterial(this.blockTex);
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
     // Snapshot the lava canvas pixels so we can restore them between hotspot updates
@@ -333,6 +337,23 @@ export class VoxelWorld {
       );
     };
     return mat;
+  }
+
+  private static makeLeafMaterial(blockTex: THREE.Texture): THREE.MeshLambertMaterial {
+    return new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      map: blockTex,
+      side: THREE.DoubleSide,
+      alphaTest: 0.1,
+      transparent: false,
+      emissive: new THREE.Color(0x003300),
+      emissiveIntensity: 0.0,
+    });
+  }
+
+  /** Set leaf canopy emissive glow — call each frame with nightness (0=day, 1=midnight). */
+  setLeafEmissive(nightness: number): void {
+    this.leafMat.emissiveIntensity = Math.max(0, Math.min(1, nightness)) * 0.10;
   }
 
   private static makeFluidMaterial(type: "water" | "lava"): THREE.MeshLambertMaterial {
@@ -1284,6 +1305,11 @@ export class VoxelWorld {
       chunk.floraMesh.geometry.dispose();
       chunk.floraMesh = null;
     }
+    if (chunk.leafMesh) {
+      this.chunkMeshGroup.remove(chunk.leafMesh);
+      chunk.leafMesh.geometry.dispose();
+      chunk.leafMesh = null;
+    }
 
     const positions: number[] = [];
     const normals: number[]   = [];
@@ -1295,6 +1321,10 @@ export class VoxelWorld {
     // Separate geometry for animated fluid (water/lava) top faces
     const wPos: number[] = [], wUV: number[] = [], wIdx: number[] = []; let wvi = 0;
     const lPos: number[] = [], lUV: number[] = [], lIdx: number[] = []; let lvi = 0;
+
+    // Separate geometry for leaf blocks — gets its own emissive material for night glow
+    const lfPos: number[] = [], lfNorm: number[] = [], lfCol: number[] = [], lfUV: number[] = [];
+    const lfIdx: number[] = []; let lfVi = 0;
 
     // Wheat cross geometry: collect positions during main pass, build at end
     const wheatEntries: [number, number, number, number][] = []; // [wx, wy, wz, stage]
@@ -1339,6 +1369,39 @@ export class VoxelWorld {
         indices.push(vi+1, vi+3, vi, vi+3, vi+2, vi);
       }
       vi += 4;
+    };
+
+    // addLeafFace: same signature as addFace, but writes to separate leaf geometry arrays
+    const addLeafFace = (
+      ox: number, oy: number, oz: number,
+      ax: number, ay: number, az: number,
+      bx: number, by: number, bz: number,
+      nx: number, ny: number, nz: number,
+      r: number, g: number, b: number,
+      shade: number,
+      texIdx = 13,
+      ao0 = 1.0, ao1 = 1.0, ao2 = 1.0, ao3 = 1.0
+    ) => {
+      lfPos.push(ox, oy, oz, ox+ax, oy+ay, oz+az, ox+bx, oy+by, oz+bz, ox+ax+bx, oy+ay+by, oz+az+bz);
+      for (let i = 0; i < 4; i++) lfNorm.push(nx, ny, nz);
+      const s = shade;
+      lfCol.push(
+        r*s*ao0, g*s*ao0, b*s*ao0,
+        r*s*ao1, g*s*ao1, b*s*ao1,
+        r*s*ao2, g*s*ao2, b*s*ao2,
+        r*s*ao3, g*s*ao3, b*s*ao3,
+      );
+      const col = texIdx % 16;
+      const row = Math.floor(texIdx / 16);
+      const u0 = col / 16, u1 = (col + 1) / 16;
+      const v0 = row * 0.5, v1 = v0 + 0.5;
+      lfUV.push(u0, v0, u1, v0, u0, v1, u1, v1);
+      if (ao0 + ao3 > ao1 + ao2) {
+        lfIdx.push(lfVi, lfVi+1, lfVi+2, lfVi+1, lfVi+3, lfVi+2);
+      } else {
+        lfIdx.push(lfVi+1, lfVi+3, lfVi, lfVi+3, lfVi+2, lfVi);
+      }
+      lfVi += 4;
     };
 
     const offX = chunk.cx * CHUNK_SIZE;
@@ -1459,7 +1522,8 @@ export class VoxelWorld {
             const ao2 = vertAO(s1n, s2p, skipAO ? false : isSolidAO(wx - tax + tbx, wy - tay + tby, wz - taz + tbz));
             const ao3 = vertAO(s1p, s2p, skipAO ? false : isSolidAO(wx + tax + tbx, wy + tay + tby, wz + taz + tbz));
 
-            addFace(
+            const emitFace = id === "leaves" ? addLeafFace : addFace;
+            emitFace(
               wx + (f.n[0] < 0 ? 0 : f.n[0] > 0 ? 1 : 0),
               wy + (f.n[1] < 0 ? 0 : f.n[1] > 0 ? 1 : 0),
               wz + (f.n[2] < 0 ? 0 : f.n[2] > 0 ? 1 : 0),
@@ -1589,6 +1653,21 @@ export class VoxelWorld {
       chunk.floraMesh.receiveShadow = false;
       this.chunkMeshGroup.add(chunk.floraMesh);
     }
+
+    // Build leaf mesh — separate from main chunk mesh so emissive can be animated at night
+    if (lfPos.length > 0) {
+      const lfGeo = new THREE.BufferGeometry();
+      lfGeo.setAttribute("position", new THREE.Float32BufferAttribute(lfPos, 3));
+      lfGeo.setAttribute("normal",   new THREE.Float32BufferAttribute(lfNorm, 3));
+      lfGeo.setAttribute("color",    new THREE.Float32BufferAttribute(lfCol, 3));
+      lfGeo.setAttribute("uv",       new THREE.Float32BufferAttribute(lfUV, 2));
+      lfGeo.setIndex(lfIdx);
+      lfGeo.computeBoundsTree();
+      chunk.leafMesh = new THREE.Mesh(lfGeo, this.leafMat);
+      chunk.leafMesh.receiveShadow = true;
+      chunk.leafMesh.castShadow = false;
+      this.chunkMeshGroup.add(chunk.leafMesh);
+    }
   }
 
   /** Return world-space positions of all blocks with the given id. */
@@ -1631,6 +1710,10 @@ export class GameMap {
 
   setWaterSkyTint(r: number, g: number, b: number, ambientInt: number): void {
     this.world.setWaterSkyTint(r, g, b, ambientInt);
+  }
+
+  setLeafEmissive(nightness: number): void {
+    this.world.setLeafEmissive(nightness);
   }
 
   scanForBlock(id: import("./types").BlockId): Array<[number, number, number]> {
