@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-06 — Passive mob head-bob animation + rain puddle ripple rings
+
+**What was done:**
+- **Passive mob head-bobbing** (`src/PassiveMob.ts`): All four mob species now have species-specific head animations.
+  - *Chicken*: classic forward-peck motion — head moves +0.07 m forward and –0.045 m down on each step half-cycle (`sin(movePhase × 0.5)`), with a subtle 0.18 rad rotation tilt. Looks exactly like a chicken pecking while walking.
+  - *Cow*: gentle vertical nod (`sin(movePhase × 0.6) × 0.025 m` Y + 0.08 rad tilt) — quiet, weighty head movement that matches the cow's mass.
+  - *Sheep/Pig*: subtle upward bob (`|sin| × 0.012 m`) — barely visible, just enough to signal life.
+  - All head-detail meshes (beak, comb, wattle for chicken; snout, nostrils, ears for pig; horns for cow; headWool, face strip, ears for sheep) **reparented from the group to the head mesh** with relative coordinates. Previously they were group siblings at absolute positions, so they would float when the head moved. Now they correctly ride the head animation.
+  - Head mesh reference and base positions stored in `group.userData` for the update loop.
+- **Rain puddle ripple rings** (`src/Particles.ts` + `src/Game.ts`):
+  - `spawnRainRipple(x, y, z)`: spawns a tiny flat `RingGeometry(0.04, 0.12, 20)` via the existing `_rings` infrastructure. Max radius 0.4–0.75 m, lifetime 0.55–0.9 s, pale blue `0x88aadd` with `AdditiveBlending`.
+  - `ShockwaveRing` interface gained `maxOpacity?: number` field (default 0.55). Rain ripples use 0.22 (subtle). War-cry rings unaffected.
+  - `_rainRippleTimer` in `Game.ts` fires every 0.28–0.50 s, spawning 1–3 ripples in a 10 m radius around the player when `weather.intensity > 0.1`.
+- TypeScript compiles clean (0 errors). `npm install` needed before tsc (node_modules absent at session start).
+
+**Notes:**
+- Fresh session from remote `auto-iterate` (already had: taiga snow, block-place dust, footstep dust, melee sparks, enchanting book aura, campfire smoke, leaf night glow, torch halo, fireflies, Milky Way, war-cry shockwave rings, death flash, arm bob, wave pulse, etc.).
+- Passive mob head-bobbing was listed as "high priority" across 4+ previous sessions. Finally done.
+- Browser launch blocked (Playwright browser download fails in container) — TypeScript verification and code review confirm correctness.
+
+**Ideas for next time:**
+- **Moon phase icon in HUD**: show current phase (full/half/crescent) next to "Day N" display — uses existing moon canvas texture system, just needs a small sprite in the UI overlay
+- **Rain lens drops**: small `Sprite` overlays on a foreground pass that slowly slide down the screen during rain — classic atmospheric lens effect
+- **Underwater vignette**: when `player.position.y` is below a water block, overlay a slow blue ripple animation on screen edges (canvas overlay or postprocess)
+- **Enemy type death particles**: more variety by enemy type (skeleton → bone shards, goblin → green dust, troll → rock chunks)
+- **Bookshelf item-entity glow**: when a bookshelf item drops, add a tiny `PointLight(0xffdd88, 0.4, 1.5)` child to give it a warm glow — quick add following the campfire/torch pattern
+
+---
+
 ## 2026-06-06 — Taiga snow flurry + block-place dust puff
 
 **What was done:**
