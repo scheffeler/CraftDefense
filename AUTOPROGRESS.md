@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-06 — Rain lens drops + underwater ripple vignette
+
+**What was done:**
+- **Rain lens drops** (`src/SceneManager.ts`): Added a `RainLensDrop` interface and a persistent HTML `<canvas>` overlay element (z-index 5, pointer-events none) created in the `SceneManager` constructor and layered on top of the Three.js game canvas. `_updateRainLens(dt)` is called each frame from `render()`. During rain (`intensity ≥ 0.08`) it spawns teardrop-shaped water drops that appear to have landed on the camera lens. Each drop is drawn as a bezier teardrop path with a blue-white radial gradient fill (glassy look) and a small highlight ellipse at upper-left to simulate light refraction. Drops slide downward at 28–83 px/s, fade in over the first 10% of their life and out over the last 22%, and are capped at 18 active at once. Spawn rate scales with weather intensity (0.43–1.35 drops/s). Existing drops drain gracefully (life capped at 0.8 s) when rain stops.
+- **Underwater ripple vignette** (`src/SceneManager.ts`): The same canvas overlay is repurposed when `_underwaterEffect` is true. Draws a dark blue radial vignette at screen edges plus two concentric rings that pulse inward at 0.9 Hz and 1.7 Hz (different phases) simulating water pressure ripples. A shimmer band at the top (~35% of screen height) pulses at 2.3 Hz with a 3.7 Hz harmonic to simulate caustic light filtering from above the surface. Entering water clears all in-flight rain drops and resets the animation timer.
+- Canvas is resized in `onResize()` alongside the WebGLRenderer, keeping it in sync.
+- TypeScript compiles clean (0 errors, strict + noUnusedLocals).
+
+**Notes:**
+- Fresh session; `npm install` needed before `tsc`.
+- Remote `auto-iterate` already had taiga snow, footstep dust, melee sparks, enchanting book aura, campfire smoke, leaf night glow, torch halo, fireflies, Milky Way, war-cry shockwave rings, death flash, arm bob, wave pulse, passive mob head-bob, rain puddle ripples, and more.
+- Rain lens drops were requested in the "ideas for next time" sections of 3+ previous sessions.
+- Browser launch blocked in container — TypeScript and code review confirm correctness.
+
+**Ideas for next time:**
+- **Moon phase icon in HUD**: show current phase (full/half/crescent) next to "Day N" text — uses the existing 8-day moon cycle (`_totalDays % 8`), draw a small canvas sprite in UI.ts
+- **Enemy type death particles**: skeleton → bone shard decals on ground that persist 2 s; goblin → green puff cloud; troll → rock chunk particles
+- **Bookshelf item-entity glow**: dropped bookshelf items get a tiny `PointLight(0xffdd88, 0.4, 1.5)` child so they glow warmly on the ground (same as campfire/torch pattern)
+- **Cloud shadow on terrain**: moving subtle dark patches on the ground under cloud meshes (could use projected decal or vertex color pass)
+- **Block break particle colour matching block**: currently generic; sample block atlas texture at the block's UV to get a representative colour for break particles
+
+---
+
 ## 2026-06-06 — Passive mob head-bob animation + rain puddle ripple rings
 
 **What was done:**
