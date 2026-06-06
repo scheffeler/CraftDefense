@@ -747,6 +747,7 @@ export class Game {
 
     this.blockInteraction.onBlockPlaced = (wx, wy, wz, id) => {
       this.audio.play("block_place", 0.5);
+      this.particles.spawnBlockPlace(wx, wy, wz, id);
       if (id === "torch")             this.addTorchLight(wx, wy, wz);
       if (id === "campfire")          this.addCampfireLight(wx, wy, wz);
       if (id === "enchanting_table")  this.addEnchantAura(wx, wy, wz);
@@ -1784,6 +1785,7 @@ export class Game {
     this._fogFarCurrent += (this._fogFarTarget - this._fogFarCurrent) * Math.min(1, dt * 0.5);
     this.scene.setFogFarBase(this._fogFarCurrent);
     this.scene.setBiome(biome);
+    this.weather.setTaigaSnow(biome === "taiga");
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);

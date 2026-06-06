@@ -559,6 +559,47 @@ export class ParticleSystem {
     }
   }
 
+  /** Small colored puff spawned on the top face of a newly placed block. */
+  spawnBlockPlace(wx: number, wy: number, wz: number, blockId: string): void {
+    let colors: number[];
+    switch (blockId) {
+      case "grass":       colors = [0x5d9e3a, 0x4a8a28, 0x8b5c2a]; break;
+      case "dirt": case "farmland": colors = [0x8b5c2a, 0x7a4e20, 0xa06030]; break;
+      case "stone":       colors = [0x888888, 0x777777, 0xaaaaaa]; break;
+      case "cobblestone": colors = [0x888070, 0x777060, 0x999888]; break;
+      case "wood":        colors = [0x8b5c2a, 0x9e6a3a, 0xb0784a]; break;
+      case "planks":      colors = [0xc8a060, 0xb89050, 0xd8b070]; break;
+      case "sand":        colors = [0xd4c484, 0xc8b870, 0xe0d090]; break;
+      case "snow":        colors = [0xeef4ff, 0xdde8ff, 0xffffff]; break;
+      case "leaves":      colors = [0x3a7a25, 0x5d9e3a, 0x4a8a28]; break;
+      case "glass":       colors = [0x99ccdd, 0xaaddee, 0xbbcccc]; break;
+      default:            colors = [0xaaaaaa, 0x999999];
+    }
+    const count = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      const c = colors[i % colors.length];
+      const w = 0.07 + Math.random() * 0.07;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, w * 0.5, w),
+        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.7, depthWrite: false }),
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const r = 0.15 + Math.random() * 0.25;
+      mesh.position.set(
+        wx + 0.5 + Math.cos(angle) * r,
+        wy + 1.05,
+        wz + 0.5 + Math.sin(angle) * r,
+      );
+      const spd = 0.5 + Math.random() * 0.7;
+      this.spawnParticle(mesh,
+        Math.cos(angle) * spd * 0.3,
+        0.6 + Math.random() * 0.6,
+        Math.sin(angle) * spd * 0.3,
+        0.20 + Math.random() * 0.12,
+      );
+    }
+  }
+
   /** Bright metallic sparks that fly out when a melee weapon connects. */
   spawnMeleeSparks(x: number, y: number, z: number, fireAspect = false): void {
     const count = 6 + Math.floor(Math.random() * 4);
