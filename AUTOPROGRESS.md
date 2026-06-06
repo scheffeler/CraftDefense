@@ -1,5 +1,22 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-06 — Campfire decorative block (crossed logs + animated fire + warm point light)
+
+**What was done:**
+- Added `campfire` to `BlockId` (types.ts), added block def with `transparent: true` to Map.ts (so chunk renderer skips it like torch), and added block behavior to config/blocks.ts.
+- `WorldGen.ts` places 3 campfires inside the fortress: SW corner (25, G+1, 38), SE corner (39, G+1, 38), north gate entrance (32, G+1, 23).
+- `Game.ts` new campfire system: `campfireLights` + `campfireMeshes` Maps, shared log geometries (`_campfireLogGeoA/B`) and log material (`_campfireLogMat`). `initCampfires()` called at startup via `scanForBlock("campfire")`. `addCampfireLight(wx,wy,wz)` creates a `THREE.Group` with: 4 crossed log boxes (cabin-log X/Z pattern), 2 crossed DoubleSide fire planes (orange, depthWrite:false), 1 billboard flame Sprite (reuses `_torchFlameMat`, scaled 0.48×0.72), and a wide warm-orange PointLight (0xff6610, intensity 2.2, range 14). `removeCampfireLight` cleans up properly.
+- Per-frame tick: campfire lights flicker with larger amplitude than torches; flame sprites scale-wobble in X and Y independently; fire planes gently rotate for organic movement.
+- TypeScript compiles clean. 3 campfires verified in-browser: `campfireLights.size === 3`, no JS errors. Night screenshots confirm warm orange area illumination that dramatically improves fortress atmosphere.
+
+**Ideas for next time:**
+- Moon phase visual: change the moon sprite/canvas each in-game day for crescent→half→full cycle
+- Leaves emissive at night: traverse leaf blocks near player, bump `emissiveIntensity` so the canopy glows faintly
+- Boss war-cry shockwave ring: `RingGeometry` particle that expands + fades when uruk_captain activates war cry
+- Campfire smoke: `PointsMaterial` smoke particles rising from campfire position (spawn 1-2 grey puffs per second, drift upward + sideways with wind)
+- Campfire interactive: player standing adjacent takes 0.5 HP/s burn; extinguishing with water removes it from scene
+- Hit flash colour tint: non-lethal hit flashes use weapon color (sword=red, magic=purple) instead of white
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
