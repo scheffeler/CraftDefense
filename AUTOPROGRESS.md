@@ -1,5 +1,27 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-06 — Taiga snow flurry + block-place dust puff
+
+**What was done:**
+- **Taiga snow flurry** (`src/Weather.ts`): Added a `THREE.Points`-based snow particle system (600 flakes) to `WeatherSystem`. Each flake has its own random fall speed (0.9–1.9 m/s), a per-flake horizontal drift direction, and a height-based sine sway so flakes spiral gently. Snow fades in/out smoothly using a 0.8× lerp rate and is completely independent of rain weather. `setTaigaSnow(active: boolean)` method added. Snow follows the camera with box-wrapping so the view is always filled.
+- **Game.ts wiring**: `this.weather.setTaigaSnow(biome === "taiga")` called every frame alongside the existing `setBiome()` — snow activates automatically whenever the player is in a taiga biome zone.
+- **Block-place dust puff** (`src/Particles.ts`): `spawnBlockPlace(wx, wy, wz, blockId)` spawns 3–5 colored flat-box puffs bursting upward from the top face of a just-placed block. Colors match block type (grass=green-brown, stone=gray, sand=tan, snow=pale blue, glass=cyan, etc.). Called from `onBlockPlaced` in `Game.ts`.
+- TypeScript compiles clean. Playwright test confirmed `hasSnow: true` and `hasBlockPlace: true` with no JS errors.
+
+**Notes:**
+- `npm install` needed before `tsc` — `node_modules` absent at session start.
+- `setTaigaSnow` is called every frame (cheap boolean assignment), same pattern as `setBiome`.
+- Snow color `0xddeeff` (pale blue-white) is subtle — visible against dark sky/terrain but not distracting.
+
+**Ideas for next time:**
+- **Passive mob head-bobbing**: chickens/cows bob head forward-back while walking — store `userData.head` reference, oscillate `head.position.z` by ±0.05 at `movePhase` frequency in `PassiveMob.update()`
+- **Rain lens drops**: small Sprite overlays on a foreground pass that slowly slide down during rain — atmospheric screen lens effect
+- **Underwater vignette**: when `player.position.y` is below a water block, overlay a slow rippling blue vignette (screen-space canvas texture sprite)
+- **Enemy type death particles**: skeleton already spawns bone dust — could add a bone-shard `decal` on ground that persists 2–3 s
+- **Boss war-cry shockwave ring**: expand + fade `RingGeometry` when `uruk_captain` activates war cry — mentioned 4 sessions running, time to implement it
+
+---
+
 ## 2026-06-06 — Footstep dust puffs + metallic melee impact sparks
 
 **What was done:**
