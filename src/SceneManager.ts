@@ -55,6 +55,18 @@ function sampleDayCycle(t: number): Omit<DayFrame, "t"> {
 
 // ---------------------------------------------------------------------------
 
+interface RainLensDrop {
+  x: number;      // normalized 0–1 screen x of drop centre
+  y: number;      // normalized 0–1 screen y of drop top
+  w: number;      // half-width in px
+  h: number;      // half-height in px
+  speed: number;  // downward slide in px/s
+  age: number;    // seconds elapsed
+  life: number;   // total lifetime in seconds
+}
+
+// ---------------------------------------------------------------------------
+
 interface Firefly {
   sprite: THREE.Sprite;
   vx: number;
@@ -136,6 +148,14 @@ export class SceneManager {
   private readonly _fireflies: Firefly[] = [];
   private _fireflyTime = 0;
 
+  // Rain lens drops + underwater vignette — canvas overlay
+  private readonly _rainLensCanvas: HTMLCanvasElement;
+  private readonly _rainLensCtx: CanvasRenderingContext2D;
+  private readonly _rainLensDrops: RainLensDrop[] = [];
+  private _rainLensSpawnTimer = 0;
+  private _rainLensIntensity = 0;
+  private _underwaterVigTime = 0; // drives ripple animation when underwater
+
   onPointerLockChange: (locked: boolean) => void = () => {};
 
   constructor(container: HTMLElement) {
@@ -149,6 +169,17 @@ export class SceneManager {
     this.renderer.autoClear = false;
     this.renderer.domElement.id = "game-canvas";
     container.appendChild(this.renderer.domElement);
+
+    // Rain lens drop overlay — transparent canvas on top of game canvas
+    {
+      const lc = document.createElement("canvas");
+      lc.width  = window.innerWidth;
+      lc.height = window.innerHeight;
+      lc.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:5;";
+      container.appendChild(lc);
+      this._rainLensCanvas = lc;
+      this._rainLensCtx    = lc.getContext("2d")!;
+    }
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x7ec8e3);
@@ -438,6 +469,11 @@ export class SceneManager {
 
   /** Enable/disable the underwater fog effect. */
   setUnderwaterEffect(inWater: boolean): void {
+    if (inWater && !this._underwaterEffect) {
+      // Drain rain drops when submerging
+      this._rainLensDrops.length = 0;
+      this._underwaterVigTime = 0;
+    }
     this._underwaterEffect = inWater;
   }
 
@@ -452,6 +488,7 @@ export class SceneManager {
 
   /** 0 = clear, 1 = heavy rain — darkens sky, tightens fog. */
   setWeatherIntensity(intensity: number): void {
+    this._rainLensIntensity = intensity;
     if (this._underwaterEffect || this._inLavaEffect || intensity < 0.01) return;
     const frame = sampleDayCycle(this._dayTime);
     const rainyZenith = 0x2a3340;
@@ -1664,6 +1701,7 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
     this.renderer.clearDepth();
     this.renderArm(dt);
+    this._updateRainLens(dt);
   }
 
   private renderArm(dt: number): void {
@@ -1851,5 +1889,145 @@ export class SceneManager {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this._rainLensCanvas.width  = window.innerWidth;
+    this._rainLensCanvas.height = window.innerHeight;
+  }
+
+  private _updateRainLens(dt: number): void {
+    const W   = this._rainLensCanvas.width;
+    const H   = this._rainLensCanvas.height;
+    const ctx = this._rainLensCtx;
+    const raw = this._rainLensIntensity;
+
+    // Clear previous frame
+    ctx.clearRect(0, 0, W, H);
+
+    // ── Underwater ripple vignette ──────────────────────────────────────────
+    if (this._underwaterEffect) {
+      this._underwaterVigTime += dt;
+      const t = this._underwaterVigTime;
+
+      // Multiple additive radial-gradient rings that pulse inward at different rates
+      const cx = W * 0.5;
+      const cy = H * 0.5;
+      const diag = Math.hypot(cx, cy);
+
+      // Base vignette (dark edges, always present)
+      const baseGrad = ctx.createRadialGradient(cx, cy, diag * 0.40, cx, cy, diag * 1.05);
+      baseGrad.addColorStop(0, "rgba(0,30,80,0)");
+      baseGrad.addColorStop(0.65, "rgba(0,20,70,0.28)");
+      baseGrad.addColorStop(1, "rgba(0,10,50,0.72)");
+      ctx.fillStyle = baseGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Slow ripple 1 — large, slow
+      const r1 = diag * (0.55 + Math.sin(t * 0.9) * 0.07);
+      const g1 = ctx.createRadialGradient(cx, cy, r1 * 0.82, cx, cy, r1);
+      g1.addColorStop(0, "rgba(0,60,160,0)");
+      g1.addColorStop(1, "rgba(0,40,120,0.14)");
+      ctx.fillStyle = g1;
+      ctx.fillRect(0, 0, W, H);
+
+      // Fast ripple 2 — smaller, faster, offset phase
+      const r2 = diag * (0.45 + Math.sin(t * 1.7 + 1.2) * 0.05);
+      const g2 = ctx.createRadialGradient(cx, cy, r2 * 0.80, cx, cy, r2);
+      g2.addColorStop(0, "rgba(0,80,180,0)");
+      g2.addColorStop(1, "rgba(0,50,140,0.10)");
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, W, H);
+
+      // Caustic shimmer top-edge (light rays from above)
+      const shim = 0.04 + Math.sin(t * 2.3) * 0.02 + Math.sin(t * 3.7 + 0.8) * 0.015;
+      const shimGrad = ctx.createLinearGradient(0, 0, 0, H * 0.35);
+      shimGrad.addColorStop(0, `rgba(100,200,255,${shim.toFixed(3)})`);
+      shimGrad.addColorStop(1, "rgba(0,100,200,0)");
+      ctx.fillStyle = shimGrad;
+      ctx.fillRect(0, 0, W, H * 0.35);
+
+      return; // skip rain drops while underwater
+    }
+    // ── End underwater ──────────────────────────────────────────────────────
+
+    // Suppress drops when not actively raining (also covers underwater/lava/clear)
+    if (raw < 0.08) {
+      // Drain existing drops when rain stops
+      for (let i = this._rainLensDrops.length - 1; i >= 0; i--) {
+        this._rainLensDrops[i].life = Math.min(this._rainLensDrops[i].life, this._rainLensDrops[i].age + 0.8);
+      }
+    }
+
+    // Advance existing drops
+    for (let i = this._rainLensDrops.length - 1; i >= 0; i--) {
+      const d = this._rainLensDrops[i];
+      d.y   += d.speed * dt / H;
+      d.age += dt;
+      if (d.age >= d.life || d.y > 1.12) {
+        this._rainLensDrops.splice(i, 1);
+      }
+    }
+
+    // Spawn new drops when raining
+    if (raw >= 0.08 && this._rainLensDrops.length < 18) {
+      this._rainLensSpawnTimer -= dt;
+      if (this._rainLensSpawnTimer <= 0) {
+        const rate = 0.35 + raw * 1.0; // 0.43–1.35 drops/s at intensity 0.08–1
+        this._rainLensSpawnTimer = 1 / rate + Math.random() * 0.3;
+        const hw = 6  + Math.random() * 10;   // half-width  6–16 px
+        const hh = hw * (1.5 + Math.random() * 0.8); // half-height 1.5–2.3× width
+        this._rainLensDrops.push({
+          x:     0.04 + Math.random() * 0.92,
+          y:    -0.06 - Math.random() * 0.08,
+          w: hw,
+          h: hh,
+          speed: 28 + Math.random() * 55,
+          age:   0,
+          life:  2.0 + Math.random() * 3.0,
+        });
+      }
+    }
+
+    // Draw drops
+    for (const d of this._rainLensDrops) {
+      const t       = d.age / d.life;
+      const fadeIn  = Math.min(1, t / 0.10);
+      const fadeOut = Math.min(1, (1 - t) / 0.22);
+      const alpha   = fadeIn * fadeOut * (0.14 + raw * 0.12);
+      if (alpha < 0.005) continue;
+
+      const cx = d.x * W;
+      const cy = d.y * H + d.h; // centre of body (below top)
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(cx, cy);
+
+      // Teardrop body via bezier path
+      ctx.beginPath();
+      ctx.moveTo(0, -d.h);
+      ctx.bezierCurveTo( d.w * 1.15, -d.h + d.h * 0.4,  d.w, d.h * 0.4,  0,  d.h);
+      ctx.bezierCurveTo(-d.w, d.h * 0.4, -d.w * 1.15, -d.h + d.h * 0.4,  0, -d.h);
+      ctx.closePath();
+
+      // Glassy blue-white gradient fill
+      const gr = ctx.createRadialGradient(-d.w * 0.15, -d.h * 0.5, 0, 0, 0, Math.hypot(d.w, d.h) * 0.9);
+      gr.addColorStop(0,   "rgba(230,245,255,0.55)");
+      gr.addColorStop(0.4, "rgba(190,225,255,0.28)");
+      gr.addColorStop(1,   "rgba(150,200,255,0.04)");
+      ctx.fillStyle = gr;
+      ctx.fill();
+
+      // Subtle stroke
+      ctx.strokeStyle = "rgba(160,210,255,0.28)";
+      ctx.lineWidth   = 0.7;
+      ctx.stroke();
+
+      // Highlight oval (upper-left interior — simulates refraction highlight)
+      ctx.beginPath();
+      ctx.ellipse(-d.w * 0.22, -d.h * 0.55, d.w * 0.28, d.h * 0.22, -0.35, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.60)";
+      ctx.fill();
+
+      ctx.restore();
+    }
   }
 }
