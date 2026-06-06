@@ -1,5 +1,24 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-06 — Footstep dust puffs + metallic melee impact sparks
+
+**What was done:**
+- `spawnFootstepDust(x, y, z, blockId)` in `Particles.ts`: 3–5 tiny flat box particles burst at foot level on every footstep. Colors match the surface block (dirt = brown, sand = tan, grass = green-brown mix, snow = pale blue-white, stone/cobble/planks = gray shades). Low upward velocity (0.4–0.9 m/s) + short radial spread + 0.22–0.34 s life. Called from the existing `_stepTimer` block in `Game.ts` whenever the player is moving on solid non-water ground.
+- `spawnMeleeSparks(x, y, z, fireAspect)` in `Particles.ts`: 6–9 elongated bright `MeshBasicMaterial` sparks radiate outward from the hit point at high speed (3.5–8.5 m/s). Normal hits produce white/yellow sparks; fire_aspect hits mix in orange/red. Added alongside the existing `spawnMeleeHit()` call inside `tryMeleeAttack()` in `Game.ts`.
+- TypeScript compiles clean. No JS errors expected (pattern matches existing particle methods).
+
+**Notes:**
+- Session was fresh. Remote `auto-iterate` already had campfire, moon phase, leaf night glow, death flash, arm bob, wave pulse, TNT sprites, footprint decals, fireflies, shockwave rings, enchanting book aura, and denser arrow trails.
+- No browser available for visual verification (Playwright download blocked). Code review confirms correctness.
+
+**Ideas for next time:**
+- **Boss war-cry shockwave ring**: expand + fade `RingGeometry` when `uruk_captain` activates war cry — mentioned 3 sessions running
+- **Hit flash colour tint**: weapon-specific flash is already there for most cases; ensure sword hit on blocks also has the red tint
+- **Block placing "click" dust**: when placing a block, spawn 2-3 colored sparks at the placed block position
+- **Rain lens drops**: when raining, draw small rain-drop Sprites on a foreground pass that slowly slide down — atmospheric lens effect
+- **Enemy type death particles**: already typed by enemy type but could use more variety (e.g., skeleton leaves bone shard decal on ground)
+- **Underwater ripple vignette**: when player head is underwater, add a slow blue ripple animation on the screen edges (screen-space post-process or overlay sprite)
+
 ## 2026-06-05 — Enchanting table floating book aura + denser arrow trails
 
 **What was done:**
