@@ -414,6 +414,14 @@ function generateInterior(world: VoxelWorld): void {
   }
   world.setBlock(24, G + 3, 30, "torch");
   world.setBlock(22, G + 1, 30, "chest");
+
+  // Campfires — pre-placed decorative fires; Game.ts scans and builds visuals on load
+  // Southwest corner: cosy firepit away from the west shack
+  world.setBlock(25, G + 1, 38, "campfire");
+  // Southeast corner: mirrored firepit near the east shack
+  world.setBlock(39, G + 1, 38, "campfire");
+  // North entrance: welcoming fire by the inner gate
+  world.setBlock(32, G + 1, 23, "campfire");
 }
 
 function generateSpawnMarkers(world: VoxelWorld): void {

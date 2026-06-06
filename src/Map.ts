@@ -50,6 +50,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
   tnt:              { id: "tnt",              name: "TNT",              color: 0xcc2222, topColor: 0xeeeeee, hardness: 0.0,  placeable: true,  transparent: false },
   lava:             { id: "lava",             name: "Lava",             color: 0xff6600, topColor: 0xff4400, hardness: 0,    placeable: true,  transparent: true  },
   fire:             { id: "fire",             name: "Fire",             color: 0xff8800, topColor: 0xffcc00, hardness: 0.0,  placeable: false, transparent: true  },
+  campfire:         { id: "campfire",         name: "Campfire",         color: 0x8b5a2b,                   hardness: 0.5,  placeable: false, transparent: true  },
 };
 
 const BLOCK_ID_INDEX: BlockId[] = Object.keys(BLOCK_DEFS) as BlockId[];
@@ -1348,7 +1349,7 @@ export class VoxelWorld {
         for (let lz = 0; lz < CHUNK_SIZE; lz++) {
           const id = chunk.getBlock(lx, ly, lz);
           if (id === "air") continue;
-          if (id === "torch") continue; // rendered as dedicated 3D mesh, not chunk geometry
+          if (id === "torch" || id === "campfire") continue; // rendered as dedicated 3D meshes
           const wx = offX + lx, wy = ly, wz = offZ + lz;
           // Wheat renders as crossed quads, not a solid cube
           if (id === "wheat_0" || id === "wheat_1" || id === "wheat_2" || id === "wheat_3") {

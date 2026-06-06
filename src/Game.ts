@@ -76,6 +76,15 @@ export class Game {
   // Flame sprites for per-frame flicker animation
   private readonly _torchFlameMeshes: THREE.Sprite[] = [];
 
+  // Campfire point lights + visual meshes keyed by "wx,wy,wz"
+  private readonly campfireLights  = new Map<string, THREE.PointLight>();
+  private readonly campfireMeshes  = new Map<string, THREE.Group>();
+  // Shared campfire geometry/materials (created once, disposed with the game)
+  private readonly _campfireLogGeoA = new THREE.BoxGeometry(0.85, 0.16, 0.23);
+  private readonly _campfireLogGeoB = new THREE.BoxGeometry(0.23, 0.16, 0.85);
+  private readonly _campfireLogMat  = new THREE.MeshLambertMaterial({ color: 0x5a2f0f });
+  private readonly _campfireFlames: THREE.Sprite[] = [];
+
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
 
@@ -200,6 +209,7 @@ export class Game {
   start(): void {
     this.buildSystems();
     this.initTorchLights();
+    this.initCampfires();
     // Expose camera for screenshot tooling
     (window as any).__GAME_CAMERA__ = this.scene.camera;
     requestAnimationFrame(t => this.loop(t));
@@ -696,7 +706,8 @@ export class Game {
         if (fortuneMult > 1)
           this.ui.showFloatingNumber(`×${fortuneMult}`, "#aaff44", window.innerWidth / 2, window.innerHeight * 0.45);
       }
-      if (id === "torch") this.removeTorchLight(wx, wy, wz);
+      if (id === "torch")    this.removeTorchLight(wx, wy, wz);
+      if (id === "campfire") this.removeCampfireLight(wx, wy, wz);
       if (id === "lava")  { this.removeLavaLight(wx, wy, wz); this.lavaSourceBlocks.delete(`${wx},${wy},${wz}`); }
       if (id === "dispenser") this.dispenserBlocks.delete(`${wx},${wy},${wz}`);
       // TNT: re-place and start fuse instead of dropping item
@@ -1604,21 +1615,45 @@ export class Game {
     // TNT fuses countdown
     this.updateTNT(dt);
 
-    // Torch flicker — per-torch random phase so all torches flicker independently
-    if (this.torchLights.size > 0) {
+    // Torch + campfire flicker — independent per-light random phase for organic look
+    {
       const t = performance.now() * 0.001;
       for (const light of this.torchLights.values()) {
         const p = (light.userData.flickerPhase as number) ?? 0;
         light.intensity = 1.6
           + Math.sin(t * 7.3  + p)       * 0.25
           + Math.sin(t * 12.1 + p * 1.7) * 0.12
-          + Math.sin(t * 19.7 + p * 0.9) * 0.05; // third harmonic for organic crackle
+          + Math.sin(t * 19.7 + p * 0.9) * 0.05;
       }
-      // Flame sprites: each reads its own phase from userData (same phase as its sibling light)
       for (const flame of this._torchFlameMeshes) {
         const p = (flame.userData.flickerPhase as number) ?? 0;
         const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
         flame.scale.set(0.22 * fs, 0.32 * fs, 1);
+      }
+      // Campfire lights: larger flicker range for more dramatic fire effect
+      for (const light of this.campfireLights.values()) {
+        const p = (light.userData.flickerPhase as number) ?? 0;
+        light.intensity = 2.2
+          + Math.sin(t * 5.9  + p)       * 0.55
+          + Math.sin(t * 11.3 + p * 1.9) * 0.28
+          + Math.sin(t * 17.1 + p * 0.7) * 0.12;
+      }
+      // Campfire flames: scale-wobble to simulate fire breathing
+      for (const flame of this._campfireFlames) {
+        const p = (flame.userData.flickerPhase as number) ?? 0;
+        const fx = 1.0 + Math.sin(t * 6.7 + p) * 0.18 + Math.sin(t * 13.1 + p * 1.5) * 0.09;
+        const fy = 1.0 + Math.sin(t * 5.3 + p) * 0.22 + Math.sin(t * 11.9 + p * 1.2) * 0.11;
+        flame.scale.set(0.48 * fx, 0.72 * fy, 1);
+      }
+      // Campfire fire planes: gentle rotation and scale wobble
+      for (const group of this.campfireMeshes.values()) {
+        const planes = group.children.find(c => c.userData.campfirePlanes) as THREE.Mesh | undefined;
+        if (planes) {
+          const p = (group.children.find(c => c instanceof THREE.Sprite) as THREE.Sprite | undefined)
+            ?.userData.flickerPhase as number ?? 0;
+          planes.rotation.y = Math.sin(t * 1.4 + p) * 0.15;
+          planes.scale.y = 0.88 + Math.sin(t * 8.9 + p) * 0.14;
+        }
       }
     }
 
@@ -2686,6 +2721,105 @@ export class Game {
       }
       this.scene.scene.remove(mesh);
       this.torchMeshes.delete(key);
+    }
+  }
+
+  /** Scan for all campfire blocks placed by WorldGen and add visuals. */
+  private initCampfires(): void {
+    const positions = this.gameMap.scanForBlock("campfire");
+    for (const [wx, wy, wz] of positions) this.addCampfireLight(wx, wy, wz);
+  }
+
+  private addCampfireLight(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    if (this.campfireLights.has(key)) return;
+
+    // Warm orange-red point light — wide radius so it illuminates the surrounding area
+    const phase = Math.random() * Math.PI * 2;
+    const light = new THREE.PointLight(0xff6610, 2.2, 14, 2);
+    light.position.set(wx + 0.5, wy + 0.9, wz + 0.5);
+    light.userData.flickerPhase = phase;
+    this.scene.scene.add(light);
+    this.campfireLights.set(key, light);
+
+    // Visual group: crossed log base + animated fire planes + flame sprite
+    const group = new THREE.Group();
+
+    // Bottom log layer: two logs running along X, stacked side-by-side in Z
+    const lb1 = new THREE.Mesh(this._campfireLogGeoA, this._campfireLogMat);
+    lb1.position.set(0, -0.08, -0.22);
+    group.add(lb1);
+    const lb2 = new THREE.Mesh(this._campfireLogGeoA, this._campfireLogMat);
+    lb2.position.set(0, -0.08, 0.22);
+    group.add(lb2);
+
+    // Top log layer: two logs running along Z, crossing the bottom pair
+    const lt1 = new THREE.Mesh(this._campfireLogGeoB, this._campfireLogMat);
+    lt1.position.set(-0.22, 0.08, 0);
+    group.add(lt1);
+    const lt2 = new THREE.Mesh(this._campfireLogGeoB, this._campfireLogMat);
+    lt2.position.set(0.22, 0.08, 0);
+    group.add(lt2);
+
+    // Two crossed fire planes rising from the log stack center
+    const hw = 0.28, hh = 0.48;
+    const firePositions = new Float32Array([
+      -hw, 0, 0,    hw, 0, 0,    hw, hh*2, 0,    -hw, hh*2, 0,   // plane along X
+       0, 0, -hw,    0, 0, hw,    0, hh*2, hw,     0, hh*2, -hw,  // plane along Z
+    ]);
+    const fireIndices = new Uint16Array([
+      0,1,2, 0,2,3, 2,1,0, 3,2,0,
+      4,5,6, 4,6,7, 6,5,4, 7,6,4,
+    ]);
+    const fireGeo = new THREE.BufferGeometry();
+    fireGeo.setAttribute("position", new THREE.BufferAttribute(firePositions, 3));
+    fireGeo.setIndex(new THREE.BufferAttribute(fireIndices, 1));
+    const fireMat = new THREE.MeshBasicMaterial({
+      color: 0xff6e10, transparent: true, opacity: 0.88,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const firePlanes = new THREE.Mesh(fireGeo, fireMat);
+    firePlanes.position.set(0, 0.18, 0);
+    firePlanes.userData.campfirePlanes = true;
+    group.add(firePlanes);
+
+    // Large billboard flame sprite above fire planes
+    const flame = new THREE.Sprite(this._torchFlameMat);
+    flame.userData.flickerPhase = phase;
+    flame.scale.set(0.48, 0.72, 1);
+    flame.position.set(0, 0.78, 0);
+    group.add(flame);
+    this._campfireFlames.push(flame);
+
+    group.position.set(wx + 0.5, wy + 0.5, wz + 0.5);
+    this.scene.scene.add(group);
+    this.campfireMeshes.set(key, group);
+  }
+
+  private removeCampfireLight(wx: number, wy: number, wz: number): void {
+    const key = `${wx},${wy},${wz}`;
+    const light = this.campfireLights.get(key);
+    if (light) {
+      this.scene.scene.remove(light);
+      light.dispose();
+      this.campfireLights.delete(key);
+    }
+    const mesh = this.campfireMeshes.get(key);
+    if (mesh) {
+      // Remove flame sprite from flicker list
+      const flame = mesh.children.find(c => c instanceof THREE.Sprite) as THREE.Sprite | undefined;
+      if (flame) {
+        const idx = this._campfireFlames.indexOf(flame);
+        if (idx !== -1) this._campfireFlames.splice(idx, 1);
+      }
+      // Dispose fire plane geometry + material
+      const planes = mesh.children.find(c => c.userData.campfirePlanes) as THREE.Mesh | undefined;
+      if (planes) {
+        planes.geometry.dispose();
+        (planes.material as THREE.Material).dispose();
+      }
+      this.scene.scene.remove(mesh);
+      this.campfireMeshes.delete(key);
     }
   }
 
