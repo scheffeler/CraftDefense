@@ -142,6 +142,7 @@ export class Game {
   private _nightSpawnTimer  = 0;
   private _flowUpdateTimer  = 0;
   private _rainSplashTimer  = 0;
+  private _rainRippleTimer  = 0;
   private readonly activeCrops = new Map<string, number>(); // "x,y,z" → growth timer
   // Arrow dispensers: keyed by "wx,wy,wz", value = {x,y,z,timer}
   private readonly dispenserBlocks = new Map<string, { x: number; y: number; z: number; timer: number }>();
@@ -1774,6 +1775,21 @@ export class Game {
           const sx = cx + (Math.random() - 0.5) * 14;
           const sz = cz + (Math.random() - 0.5) * 14;
           this.particles.spawnRainSplash(sx, cy, sz);
+        }
+      }
+
+      // Rain puddle ripple rings — slower, atmospheric expanding circles
+      this._rainRippleTimer -= dt;
+      if (this._rainRippleTimer <= 0) {
+        this._rainRippleTimer = 0.28 + Math.random() * 0.22;
+        const cx = this.player.position.x;
+        const cy = this.player.position.y - 1.7;
+        const cz = this.player.position.z;
+        const rippleCount = Math.ceil(this.weather.intensity * 3);
+        for (let r = 0; r < rippleCount; r++) {
+          const rx = cx + (Math.random() - 0.5) * 10;
+          const rz = cz + (Math.random() - 0.5) * 10;
+          this.particles.spawnRainRipple(rx, cy, rz);
         }
       }
     }

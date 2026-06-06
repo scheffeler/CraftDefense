@@ -20,6 +20,7 @@ interface ShockwaveRing {
   life: number;       // Starts at -delay; active when >= 0
   maxLife: number;    // Active duration after life reaches 0
   maxRadius: number;
+  maxOpacity?: number; // Peak opacity (default 0.55)
 }
 
 interface SmokeParticle {
@@ -405,6 +406,31 @@ export class ParticleSystem {
     }
   }
 
+  /** Tiny expanding puddle ripple ring for rain ground impact. */
+  spawnRainRipple(x: number, y: number, z: number): void {
+    const geo = new THREE.RingGeometry(0.04, 0.12, 20);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x88aadd,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y + 0.02, z);
+    mesh.scale.setScalar(0.01);
+    this.scene.add(mesh);
+    this._rings.push({
+      mesh,
+      life: 0,
+      maxLife: 0.55 + Math.random() * 0.35,
+      maxRadius: 0.4 + Math.random() * 0.35,
+      maxOpacity: 0.22,
+    });
+  }
+
   /** Three staggered expanding ground rings + radiating embers for the Uruk Captain war cry. */
   spawnWarCryShockwave(x: number, y: number, z: number): void {
     const rings = [
@@ -678,7 +704,8 @@ export class ParticleSystem {
       if (r.life < 0) continue; // Waiting for delay
       const t = r.life / r.maxLife;
       r.mesh.scale.setScalar(Math.max(0.01, r.maxRadius * t));
-      (r.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - t) * 0.55;
+      const peakOp = r.maxOpacity ?? 0.55;
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - t) * peakOp;
     }
 
     // Ground decals (footprints etc.) — flat, no gravity, linear fade

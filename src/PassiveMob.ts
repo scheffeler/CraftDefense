@@ -134,6 +134,29 @@ export class PassiveMobManager {
         wings[0].rotation.z =  flapAngle;
         wings[1].rotation.z = -flapAngle;
       }
+
+      // Head-bob animation — species-specific
+      const head = mob.group.userData.head as THREE.Mesh | undefined;
+      const headBaseY = mob.group.userData.headBaseY as number | undefined;
+      const headBaseZ = mob.group.userData.headBaseZ as number | undefined;
+      if (head && headBaseY !== undefined && headBaseZ !== undefined) {
+        if (mob.type === "chicken") {
+          // Classic chicken peck: head bobs forward-down on each step half-cycle
+          const peckT = moving ? Math.sin(mob.movePhase * 0.5) : 0;
+          head.position.z = headBaseZ + peckT * 0.07;
+          head.position.y = headBaseY - Math.abs(peckT) * 0.045;
+          head.rotation.x = moving ? peckT * 0.18 : 0;
+        } else if (mob.type === "cow") {
+          // Gentle vertical nod while walking
+          const nodT = moving ? Math.sin(mob.movePhase * 0.6) : 0;
+          head.position.y = headBaseY + nodT * 0.025;
+          head.rotation.x = moving ? nodT * 0.08 : 0;
+        } else {
+          // Sheep/pig: subtle lateral sway
+          const swayT = moving ? Math.sin(mob.movePhase * 0.7) : 0;
+          head.position.y = headBaseY + Math.abs(swayT) * 0.012;
+        }
+      }
     }
   }
 
@@ -200,11 +223,14 @@ export class PassiveMobManager {
     body.castShadow = true;
     group.add(body);
 
-    // Head
+    // Head — stored for head-bob animation
     const head = new THREE.Mesh(new THREE.BoxGeometry(def.headSz, def.headSz, def.headSz), headMat);
     head.position.set(0, headY, headZ);
     head.castShadow = true;
     group.add(head);
+    group.userData.head = head;
+    group.userData.headBaseY = headY;
+    group.userData.headBaseZ = headZ;
 
     // Legs — pivot objects at body base allow diagonal gait rotation
     const lx = def.bodyW * 0.28, lz = def.bodyD * 0.32;
@@ -227,24 +253,22 @@ export class PassiveMobManager {
     // ── Per-species detail props ──────────────────────────────────────────────
 
     if (type === "chicken") {
-      // Beak — yellow trapezoid
+      // Beak, comb, wattle — parented to head so they follow the head-bob
       const beakMat = new THREE.MeshLambertMaterial({ color: 0xffcc00 });
       const beak = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.11), beakMat);
-      beak.position.set(0, headY - 0.02, headZ + def.headSz * 0.55);
-      group.add(beak);
+      beak.position.set(0, -0.02, def.headSz * 0.55);
+      head.add(beak);
 
-      // Red comb — small box on top of head
       const combMat = new THREE.MeshLambertMaterial({ color: 0xdd2222 });
       const comb = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.12), combMat);
-      comb.position.set(0, headY + def.headSz * 0.55, headZ - 0.01);
-      group.add(comb);
+      comb.position.set(0, def.headSz * 0.55, -0.01);
+      head.add(comb);
 
-      // Red wattle — tiny box below beak
       const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.05), combMat);
-      wattle.position.set(0, headY - 0.1, headZ + def.headSz * 0.45);
-      group.add(wattle);
+      wattle.position.set(0, -0.1, def.headSz * 0.45);
+      head.add(wattle);
 
-      // Wings — flat panels on body sides, stored for flap animation
+      // Wings — parented to group (body-attached, not head-attached)
       const wingMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
       const wings: THREE.Mesh[] = [];
       for (const sx of [-1, 1]) {
@@ -257,30 +281,28 @@ export class PassiveMobManager {
     }
 
     if (type === "pig") {
-      // Snout — protruding pink disk (BoxGeometry)
+      // Snout, nostrils, ears — parented to head
       const snoutMat = new THREE.MeshLambertMaterial({ color: 0xffaaaa });
       const snout = new THREE.Mesh(new THREE.BoxGeometry(def.headSz * 0.55, def.headSz * 0.4, 0.10), snoutMat);
-      snout.position.set(0, headY - 0.02, headZ + def.headSz * 0.52);
-      group.add(snout);
+      snout.position.set(0, -0.02, def.headSz * 0.52);
+      head.add(snout);
 
-      // Nostril dots — two tiny dark boxes on snout face
       const nostrilMat = new THREE.MeshLambertMaterial({ color: 0xcc7777 });
       for (const nx of [-0.07, 0.07]) {
         const nostril = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.02), nostrilMat);
-        nostril.position.set(nx, headY - 0.02, headZ + def.headSz * 0.58);
-        group.add(nostril);
+        nostril.position.set(nx, -0.02, def.headSz * 0.58);
+        head.add(nostril);
       }
 
-      // Ears — small flat boxes angled outward on head top
       const earMat = new THREE.MeshLambertMaterial({ color: 0xffbbbb });
       for (const [ex, rot] of [[-1, 0.4], [1, -0.4]] as [number, number][]) {
         const ear = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.07), earMat);
-        ear.position.set(ex * def.headSz * 0.52, headY + def.headSz * 0.45, headZ - 0.04);
+        ear.position.set(ex * def.headSz * 0.52, def.headSz * 0.45, -0.04);
         ear.rotation.z = rot;
-        group.add(ear);
+        head.add(ear);
       }
 
-      // Curly tail — tiny angled box at rear
+      // Curly tail — body-attached, stays on group
       const tailMat = new THREE.MeshLambertMaterial({ color: 0xffbbbb });
       const tail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.12), tailMat);
       tail.position.set(0, bodyY + 0.06, -def.bodyD * 0.52);
@@ -289,22 +311,21 @@ export class PassiveMobManager {
     }
 
     if (type === "cow") {
-      // Horns — two small beige boxes on head top
+      // Horns — parented to head
       const hornMat = new THREE.MeshLambertMaterial({ color: 0xddcc88 });
       for (const [hx, rot] of [[-1, -0.3], [1, 0.3]] as [number, number][]) {
         const horn = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.18, 0.07), hornMat);
-        horn.position.set(hx * def.headSz * 0.42, headY + def.headSz * 0.55, headZ - 0.06);
+        horn.position.set(hx * def.headSz * 0.42, def.headSz * 0.55, -0.06);
         horn.rotation.z = rot;
-        group.add(horn);
+        head.add(horn);
       }
 
-      // Udder — pink box underneath body near rear legs
+      // Udder and teats — body-attached
       const udderMat = new THREE.MeshLambertMaterial({ color: 0xffcccc });
       const udder = new THREE.Mesh(new THREE.BoxGeometry(def.bodyW * 0.5, 0.12, def.bodyD * 0.25), udderMat);
       udder.position.set(0, def.legH + 0.06, -def.bodyD * 0.18);
       group.add(udder);
 
-      // Teat nubs — four tiny boxes hanging below udder
       const teatMat = new THREE.MeshLambertMaterial({ color: 0xffbbbb });
       for (const [tx, tz] of [[-0.09, 0.04], [0.09, 0.04], [-0.09, -0.04], [0.09, -0.04]]) {
         const teat = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.04), teatMat);
@@ -314,30 +335,28 @@ export class PassiveMobManager {
     }
 
     if (type === "sheep") {
-      // Fluffy wool overlay on body (slightly larger than body)
+      // Wool on body — group-parented
       const woolMat = new THREE.MeshLambertMaterial({ color: woolColor });
       const wool = new THREE.Mesh(new THREE.BoxGeometry(def.bodyW + 0.13, def.bodyH + 0.11, def.bodyD + 0.13), woolMat);
       wool.position.copy(body.position);
       group.add(wool);
 
-      // Wool puff on head (sheep heads are covered in wool too)
+      // Head wool, face strip, ears — parented to head so they follow head-bob
       const headWool = new THREE.Mesh(new THREE.BoxGeometry(def.headSz + 0.08, def.headSz + 0.08, def.headSz + 0.08), woolMat);
-      headWool.position.copy(head.position);
-      group.add(headWool);
+      headWool.position.set(0, 0, 0);
+      head.add(headWool);
 
-      // Dark face strip — shows through wool on front of head
       const faceMat = new THREE.MeshLambertMaterial({ color: 0x333322 });
       const face = new THREE.Mesh(new THREE.BoxGeometry(def.headSz * 0.7, def.headSz * 0.55, 0.03), faceMat);
-      face.position.set(0, headY - 0.02, headZ + def.headSz * 0.52);
-      group.add(face);
+      face.position.set(0, -0.02, def.headSz * 0.52);
+      head.add(face);
 
-      // Ears — flat flaps on sides of head, tinted slightly toward wool color
       const earMat = new THREE.MeshLambertMaterial({ color: woolColor });
       for (const [ex, rot] of [[-1, 0.5], [1, -0.5]] as [number, number][]) {
         const ear = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.13, 0.10), earMat);
-        ear.position.set(ex * (def.headSz * 0.6), headY - 0.03, headZ - 0.02);
+        ear.position.set(ex * (def.headSz * 0.6), -0.03, -0.02);
         ear.rotation.z = rot;
-        group.add(ear);
+        head.add(ear);
       }
     }
 
