@@ -521,6 +521,74 @@ export class ParticleSystem {
     }
   }
 
+  /** Tiny dust puff when player steps on a surface. Matches the block color. */
+  spawnFootstepDust(x: number, y: number, z: number, blockId: string): void {
+    let colors: number[];
+    switch (blockId) {
+      case "grass":       colors = [0x7a5c30, 0x5a8a2a, 0x6a7040]; break;
+      case "dirt":
+      case "farmland":    colors = [0x8b5c2a, 0x7a4e20, 0xa06030]; break;
+      case "sand":        colors = [0xd4c484, 0xc8b870, 0xe0d090]; break;
+      case "gravel":      colors = [0x888880, 0x777770, 0x999990]; break;
+      case "snow":        colors = [0xddeeff, 0xeef4ff, 0xffffff]; break;
+      case "planks":      colors = [0xc8a060, 0xb89050, 0xd8b070]; break;
+      default:            colors = [0xaaaaaa, 0x999999, 0x888888]; break; // stone/cobblestone/default
+    }
+    const count = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      const c = colors[i % colors.length];
+      const w = 0.06 + Math.random() * 0.06;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, w * 0.4, w),
+        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.65, depthWrite: false }),
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 0.1 + Math.random() * 0.2;
+      mesh.position.set(
+        x + Math.cos(angle) * radius,
+        y + 0.08 + Math.random() * 0.05,
+        z + Math.sin(angle) * radius,
+      );
+      const spd = 0.3 + Math.random() * 0.5;
+      this.spawnParticle(mesh,
+        Math.cos(angle) * spd * 0.4,
+        0.4 + Math.random() * 0.5,
+        Math.sin(angle) * spd * 0.4,
+        0.22 + Math.random() * 0.12,
+      );
+    }
+  }
+
+  /** Bright metallic sparks that fly out when a melee weapon connects. */
+  spawnMeleeSparks(x: number, y: number, z: number, fireAspect = false): void {
+    const count = 6 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < count; i++) {
+      const isFire = fireAspect && Math.random() < 0.55;
+      const c = isFire
+        ? (Math.random() < 0.5 ? 0xff6600 : 0xffaa00)
+        : (Math.random() < 0.5 ? 0xffffff : 0xffee66);
+      const s = 0.022 + Math.random() * 0.022;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(s * 2.5, s * 0.5, s),
+        new THREE.MeshBasicMaterial({ color: c }),
+      );
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.25,
+        y + (Math.random() - 0.5) * 0.25,
+        z + (Math.random() - 0.5) * 0.25,
+      );
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = (Math.random() * 0.6 + 0.2) * Math.PI;
+      const spd   = 3.5 + Math.random() * 5.0;
+      this.spawnParticle(mesh,
+        Math.sin(phi) * Math.cos(theta) * spd,
+        Math.abs(Math.cos(phi)) * spd + 0.5,
+        Math.sin(phi) * Math.sin(theta) * spd,
+        0.10 + Math.random() * 0.08,
+      );
+    }
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

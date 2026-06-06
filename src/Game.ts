@@ -1550,6 +1550,12 @@ export class Game {
         const surfaceBlock = this.gameMap.world.getBlock(fx, Math.floor(this.player.position.y) - 1, fz);
         const sfx = SURFACE_STEP_SOUND[surfaceBlock as keyof typeof SURFACE_STEP_SOUND] ?? "step_stone";
         this.audio.play(sfx as any, 0.35);
+        // Footstep dust puff — only on solid non-water surfaces
+        if (surfaceBlock && surfaceBlock !== "air" && surfaceBlock !== "water" && surfaceBlock !== "lava") {
+          this.particles.spawnFootstepDust(
+            this.player.position.x, this.player.position.y, this.player.position.z, surfaceBlock,
+          );
+        }
       }
       this._headBob = Math.min(1, this._headBob + dt * 8);
     } else {
@@ -2284,6 +2290,7 @@ export class Game {
         this.audio.play("hit", 0.4);
         this.showDamageNumber(damage, pos.x, pos.y + 1.8, pos.z);
         this.particles.spawnMeleeHit(pos.x, pos.y + 1.0, pos.z);
+        this.particles.spawnMeleeSparks(pos.x, pos.y + 1.0, pos.z, hasFireAspect);
         hitSomething = true;
         if (hasFireAspect) {
           // Set enemy on fire for 4 seconds
