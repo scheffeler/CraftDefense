@@ -1,5 +1,33 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-06 — Campfire decorative block (crossed logs + flame + warm PointLight)
+
+**What was done:**
+- Added `"campfire"` to `BlockId` union in `src/types.ts`.
+- Added campfire to `BLOCK_DEFS` in `src/Map.ts` — transparent, hardness 1.5, dark-brown color, so it doesn't render as a solid cube.
+- Added `if (id === "campfire") continue;` in the chunk-geometry builder (same treatment as `"torch"`) so the block is invisible as a voxel; its visuals come entirely from dedicated meshes.
+- Added `campfire` to `BLOCK_BEHAVIORS` in `src/config/blocks.ts` — axe tool, drops itself when broken.
+- Added `campfire` item definition in `src/config/items.ts` with `placesBlock:"campfire"` so it can be held and placed.
+- Placed two campfires in `src/WorldGen.ts` (`generateInterior()`): `(26, G+1, 36)` (west-center) and `(38, G+1, 36)` (east-center) — symmetric, warm gathering spots flanking the central well.
+- In `src/Game.ts`:
+  - Added `campfireLights`, `campfireMeshes`, `_campfireFlames` fields and shared log geometry/material.
+  - `initCampfireLights()` scans world for campfire blocks at startup and calls `addCampfire()`.
+  - `addCampfire(wx,wy,wz)`: creates a `THREE.Group` with two crossed log `BoxGeometry` meshes (dark brown), a large flame `Sprite` reusing the existing torch-flame material (scale 0.50×0.70), and a `PointLight(0xff5511, 2.5, 14, 2)` with random flicker phase.
+  - `removeCampfire(wx,wy,wz)`: disposes light + removes group from scene.
+  - Hooked into `onBlockRemoved` / `onBlockPlaced` so campfires respond to player interaction.
+  - Campfire flicker update in main loop — more energetic than torches (intensity 2.3 ± 0.55 + harmonics).
+- Verified: TypeScript compiles clean; `campfireLights.size = 2` confirmed in headless Playwright test; orange glow visible in night screenshot.
+
+**Ideas for next time:**
+- Moon phase visual: change moon sprite texture each game-day for crescent/half/full cycle
+- Leaves emissive at night: traverse leaf blocks near player, add tiny emissive glow after dark
+- Boss war-cry shockwave ring: expand + fade `RingGeometry` when uruk_captain activates war cry
+- Campfire particle embers: occasional spark particles rising from campfire (upward motion with fade)
+- Hit flash colour tint: non-lethal hit from sword=red, magic=purple, ice=blue for feedback differentiation
+- Campfire crafting recipe: make campfire craftable from 3 wood + 2 coal + 2 sticks
+
+---
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**

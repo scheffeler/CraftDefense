@@ -18,7 +18,7 @@ export type BlockId =
   | "snow" | "cactus"
   | "bookshelf" | "enchanting_table"
   | "bed" | "tnt" | "lava" | "fire"
-  | "dispenser";
+  | "dispenser" | "campfire";
 
 export interface BlockDef {
   id: BlockId;

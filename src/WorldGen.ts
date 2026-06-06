@@ -414,6 +414,10 @@ function generateInterior(world: VoxelWorld): void {
   }
   world.setBlock(24, G + 3, 30, "torch");
   world.setBlock(22, G + 1, 30, "chest");
+
+  // Campfires: warm gathering spots flanking the well
+  world.setBlock(26, G + 1, 36, "campfire");
+  world.setBlock(38, G + 1, 36, "campfire");
 }
 
 function generateSpawnMarkers(world: VoxelWorld): void {
