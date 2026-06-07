@@ -408,6 +408,29 @@ export class ParticleSystem {
     }
   }
 
+  /** Tiny orange/red ember that drifts upward from a torch flame. */
+  spawnTorchEmber(x: number, y: number, z: number): void {
+    const colors = [0xff8c00, 0xff6600, 0xffaa22, 0xff4400, 0xffcc00];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const size = 0.022 + Math.random() * 0.018;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(size, size, size),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    mesh.position.set(
+      x + (Math.random() - 0.5) * 0.12,
+      y,
+      z + (Math.random() - 0.5) * 0.12,
+    );
+    const upSpeed = 0.55 + Math.random() * 0.65;
+    this.spawnParticle(mesh,
+      (Math.random() - 0.5) * 0.22,
+      upSpeed,
+      (Math.random() - 0.5) * 0.22,
+      0.45 + Math.random() * 0.55,
+    );
+  }
+
   private spawnParticle(mesh: THREE.Mesh, vx: number, vy: number, vz: number, maxLife: number): void {
     this.particles.push({ mesh, vx, vy, vz, life: 0, maxLife });
     this.scene.add(mesh);

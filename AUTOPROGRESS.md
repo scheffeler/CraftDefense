@@ -1,5 +1,23 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-07 — Torch glow halo + rising ember particles
+
+**What was done:**
+- **Torch glow halo sprite** (`src/Game.ts`): Added `_torchGlowMat` (shared `SpriteMaterial` with additive blending) and `_torchGlowSprites: THREE.Sprite[]` field. Each torch now has a third child sprite at the same height as the flame: a 64×64 radial-gradient canvas texture (amber core → orange rim → transparent) with `THREE.AdditiveBlending` and `depthWrite: false`. The glow scale pulses with a slightly offset phase from the flame (using `sin(t*6.7 + p + 0.3)`) so each torch breathes independently. Static method `buildGlowTexture()` generates the canvas (4-stop gradient: 52% opacity at center → 0% at edge). Cleanup handled in `removeTorchLight()` via `children[2]` index. Visual result: warm amber bloom ring around every torch flame — visible even in daylight but most dramatic at night.
+- **Rising ember particles** (`src/Particles.ts` + `src/Game.ts`): Added `spawnTorchEmber(x, y, z)` to `ParticleSystem` — spawns a tiny 0.022–0.04 unit box mesh (color randomly from orange/red/gold palette) with upward velocity (0.55–1.2 m/s) and 0.45–1.0 s lifetime. In `Game.ts`, a `_torchEmberTimer` (0.33 s interval) picks a random torch light position and spawns one ember above the flame. This produces ~3 rising sparks per second across all torches, rotating randomly through them, with no per-torch overhead that scales with torch count.
+
+**Notes:**
+- Branch: `claude/dreamy-cerf-7WC1b` (auto-iterate for this session)
+- TypeScript compiles clean. Verified via Playwright screenshots: night interior shows warm amber halos around each torch flame, clearly visible from 2–8 blocks away. Ember particles spawn and drift upward.
+- The glow halo dramatically improves torch visual appeal — previously torches looked like tiny sprites with invisible PointLights; now they visually "bloom" like real flames.
+
+**Ideas for next time:**
+- **Campfire block**: cross-pane fire Sprite + PointLight — the most-requested unimplemented feature; needs new BlockId + atlas entry
+- **Leaf wind sway**: separate GPU shader material for leaf blocks (like existing flora/wheat wind shaders); leaves are everywhere in forest so high visual impact
+- **Day/night transition smoother**: sky gradient dome already exists, but dusk/dawn could add a subtle god-ray streak effect on the horizon
+- **Enemy health bar polish**: current HP bars are thin quads; upgrading to rounded-corner canvas-texture sprites would look more polished
+- **Torch intensity scale with night**: torch PointLight distance increases from ~10 to ~15 at night since darkness makes them the primary light source — more atmospheric
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**

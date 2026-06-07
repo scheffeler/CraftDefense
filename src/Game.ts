@@ -73,8 +73,16 @@ export class Game {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-  // Flame sprites for per-frame flicker animation
+  private readonly _torchGlowMat = new THREE.SpriteMaterial({
+    map: Game.buildGlowTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  // Flame + glow sprites for per-frame flicker animation
   private readonly _torchFlameMeshes: THREE.Sprite[] = [];
+  private readonly _torchGlowSprites: THREE.Sprite[] = [];
+  private _torchEmberTimer = 0;
 
   // Best endless wave (persisted in localStorage)
   private _bestEndlessWave = parseInt(localStorage.getItem("craftdefense_best_endless") ?? "0", 10);
@@ -1620,6 +1628,23 @@ export class Game {
         const fs = 1.0 + Math.sin(t * 9.1 + p) * 0.13 + Math.sin(t * 14.7 + p * 1.3) * 0.07;
         flame.scale.set(0.22 * fs, 0.32 * fs, 1);
       }
+      // Glow halo sprites: breathe slightly out of phase with the flame for organic feel
+      for (const glow of this._torchGlowSprites) {
+        const p = (glow.userData.flickerPhase as number) ?? 0;
+        const gs = 0.90 + Math.sin(t * 6.7 + p + 0.3) * 0.09 + Math.sin(t * 13.2 + p * 1.5) * 0.04;
+        glow.scale.set(0.85 * gs, 0.85 * gs, 1);
+      }
+    }
+
+    // Torch embers — ~3 rising sparks per second from random torches
+    if (this.torchLights.size > 0) {
+      this._torchEmberTimer += dt;
+      if (this._torchEmberTimer >= 0.33) {
+        this._torchEmberTimer = 0;
+        const lights = Array.from(this.torchLights.values());
+        const light = lights[Math.floor(Math.random() * lights.length)];
+        this.particles.spawnTorchEmber(light.position.x, light.position.y + 0.1, light.position.z);
+      }
     }
 
     // Lava light pulse — sync all lava PointLights to the bubbling emissive rhythm
@@ -2576,6 +2601,25 @@ export class Game {
     this._tntCountdownSprites.delete(key);
   }
 
+  private static buildGlowTexture(): THREE.CanvasTexture {
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+    const cx = size / 2;
+    const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+    grad.addColorStop(0,   "rgba(255,190,70,0.52)");
+    grad.addColorStop(0.35,"rgba(255,120,20,0.22)");
+    grad.addColorStop(0.7, "rgba(255,70,0,0.07)");
+    grad.addColorStop(1,   "rgba(255,40,0,0.0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+  }
+
   private static buildFlameTexture(): THREE.CanvasTexture {
     const W = 16, H = 32;
     const canvas = document.createElement("canvas");
@@ -2663,6 +2707,14 @@ export class Game {
     group.add(flame);
     this._torchFlameMeshes.push(flame);
 
+    // Soft additive glow halo behind the flame — simulates bloom/lens glow
+    const glow = new THREE.Sprite(this._torchGlowMat);
+    glow.userData.flickerPhase = flickerPhase;
+    glow.scale.set(0.85, 0.85, 1);
+    glow.position.set(0, 0.72 + 0.16, 0);
+    group.add(glow);
+    this._torchGlowSprites.push(glow);
+
     group.position.set(wx + 0.5, wy, wz + 0.5);
     this.scene.scene.add(group);
     this.torchMeshes.set(key, group);
@@ -2678,11 +2730,17 @@ export class Game {
     }
     const mesh = this.torchMeshes.get(key);
     if (mesh) {
-      // Remove flame sprite from flicker list
+      // Remove flame sprite from flicker list (children[1])
       const flame = mesh.children[1] as THREE.Sprite | undefined;
       if (flame) {
         const idx = this._torchFlameMeshes.indexOf(flame);
         if (idx !== -1) this._torchFlameMeshes.splice(idx, 1);
+      }
+      // Remove glow sprite from glow list (children[2])
+      const glow = mesh.children[2] as THREE.Sprite | undefined;
+      if (glow) {
+        const idx = this._torchGlowSprites.indexOf(glow);
+        if (idx !== -1) this._torchGlowSprites.splice(idx, 1);
       }
       this.scene.scene.remove(mesh);
       this.torchMeshes.delete(key);
