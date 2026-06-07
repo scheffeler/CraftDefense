@@ -19,3 +19,6 @@ scripts/firefly-*.mjs
 scripts/firefly-*.png
 scripts/milkyway-*.mjs
 scripts/milkyway-*.png
+scripts/campfire-*.mjs
+scripts/campfire-*.png
+test-results/
