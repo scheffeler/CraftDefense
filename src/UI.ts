@@ -742,7 +742,7 @@ export class UI {
     this.updateDayClock(0.38);
   }
 
-  updateDayClock(dayTime: number): void {
+  updateDayClock(dayTime: number, moonPhase = 0): void {
     const c = this.dayClockCanvas;
     if (!c) return;
     const ctx = c.getContext("2d")!;
@@ -766,15 +766,51 @@ export class UI {
     ctx.fillStyle = "#3a8bbf";
     ctx.fill();
 
-    // Sun or moon indicator
+    // Sun or moon phase indicator dot on the clock ring
     const angle = dayTime * Math.PI * 2 - Math.PI / 2;
     const sx = cx + Math.cos(angle) * (r - 5);
     const sy = cy + Math.sin(angle) * (r - 5);
     const isDay = dayTime >= dayStart && dayTime <= dayEnd;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-    ctx.fillStyle = isDay ? "#ffee44" : "#ddeeff";
-    ctx.fill();
+    if (isDay) {
+      // Sun: simple yellow disc
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffee44";
+      ctx.fill();
+    } else {
+      // Moon: lit disc with dark shadow overlay showing the phase
+      const mr = 4;
+      ctx.beginPath();
+      ctx.arc(sx, sy, mr, 0, Math.PI * 2);
+      ctx.fillStyle = "#ddeeff";
+      ctx.fill();
+      // Shadow disc: offset left for waxing, right for waning
+      // phase=0 → full (no visible shadow), phase=0.5 → new (fully dark)
+      const shadowShift = mr * 1.85 * (1 - moonPhase * 2); // positive=right, negative=left
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(sx + shadowShift, sy, mr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      // After destination-out, re-draw faint moon outline for context
+      ctx.beginPath();
+      ctx.arc(sx, sy, mr, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(180,200,255,0.5)";
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Moon phase label in center of clock (night only)
+    if (!isDay) {
+      const phaseIdx = Math.round(moonPhase * 8) % 8;
+      const phaseEmoji = ["🌕", "🌖", "🌗", "🌘", "🌑", "🌒", "🌓", "🌔"][phaseIdx];
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(180,200,255,0.7)";
+      ctx.fillText(phaseEmoji, cx, cy);
+    }
 
     // Clock border
     ctx.beginPath();

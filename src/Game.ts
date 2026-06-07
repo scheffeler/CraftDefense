@@ -1805,7 +1805,7 @@ export class Game {
 
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
-    this.ui.updateDayClock(this.scene.dayTime);
+    this.ui.updateDayClock(this.scene.dayTime, this.scene.moonPhase);
     this.ui.updateActiveEffects(this.player.activeEffects);
     this.refreshHotbar();
 

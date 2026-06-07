@@ -138,6 +138,39 @@ export class ParticleSystem {
         const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
         const [vx, vy, vz] = randVel(3 + r() * 4); this.spawnParticle(mesh, vx, vy, vz, 0.5 + r() * 0.4);
       }
+    } else if (enemyType === "goblin" || enemyType === "goblin_miner") {
+      // Green dust cloud + tiny coin glints
+      const goblinCols = [0x33aa44, 0x22883a, 0x44bb55, 0x1a6628];
+      for (let i = 0; i < 14; i++) {
+        const c = i < 10 ? goblinCols[Math.floor(r() * goblinCols.length)] : (i % 2 === 0 ? 0xddcc00 : 0xffee44);
+        const s = 0.04 + r() * 0.06;
+        const mesh = box(s, s * (i < 10 ? 1 : 0.3), s, c, i >= 10);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const spd = i < 10 ? 2.5 + r() * 3.5 : 4 + r() * 5;
+        const [vx, vy, vz] = randVel(spd); this.spawnParticle(mesh, vx, vy, vz, 0.35 + r() * 0.3);
+      }
+    } else if (enemyType === "orc") {
+      // Heavy grey-green muscle chunks + dark blood drops
+      const orcCols = [0x556644, 0x445533, 0x667755, 0x8b0000];
+      for (let i = 0; i < 12; i++) {
+        const c = orcCols[Math.floor(r() * orcCols.length)];
+        const s = 0.09 + r() * 0.11;
+        const mesh = box(s, s * (0.6 + r() * 0.8), s, c);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const [vx, vy, vz] = randVel(1.8 + r() * 2.5); this.spawnParticle(mesh, vx, vy, vz, 0.7 + r() * 0.5);
+      }
+    } else if (enemyType === "uruk_captain") {
+      // Dark metal plate shards + blood red flash
+      const uCols = [0x222222, 0x333322, 0x8b0000, 0xcc2200, 0x111111];
+      for (let i = 0; i < 16; i++) {
+        const c = uCols[Math.floor(r() * uCols.length)];
+        const isPlate = i < 10;
+        const s = isPlate ? 0.06 + r() * 0.10 : 0.04 + r() * 0.05;
+        const mesh = box(isPlate ? s * 1.8 : s, isPlate ? s * 0.25 : s, isPlate ? s : s, c, !isPlate);
+        const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
+        const spd = isPlate ? 3 + r() * 4.5 : 5 + r() * 6;
+        const [vx, vy, vz] = randVel(spd); this.spawnParticle(mesh, vx, vy, vz, isPlate ? 0.55 + r() * 0.4 : 0.25 + r() * 0.2);
+      }
     } else {
       // Default: same-color cubes with slight hue variation
       const cr = (color >> 16) & 0xff, cg = (color >> 8) & 0xff, cb = color & 0xff;

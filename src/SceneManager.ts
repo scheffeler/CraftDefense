@@ -108,6 +108,8 @@ export class SceneManager {
   // Clouds
   private readonly cloudMeshes: THREE.Object3D[] = [];
   private cloudMat!: THREE.MeshLambertMaterial;
+  private readonly cloudShadowMeshes: THREE.Mesh[] = [];
+  private _cloudShadowMat!: THREE.MeshBasicMaterial;
 
   // Sun glow halo
   private sunGlow!: THREE.Mesh;
@@ -271,6 +273,7 @@ export class SceneManager {
   }
   get dayNumber(): number { return Math.floor(this._totalDays) + 1; }
   get isDay(): boolean { return this.daylight > 0.3; }
+  get moonPhase(): number { return (this._totalDays % 8) / 8; }
   skipToMorning(): void { this._dayTime = 0.25; }
 
   lockPointer():   void { this.controls.lock(); }
@@ -418,13 +421,19 @@ export class SceneManager {
     (this.sunGlow.material as THREE.MeshBasicMaterial).opacity = sunOpacity * 0.45;
     (this.sunGlow.material as THREE.MeshBasicMaterial).color.setHex(lerpHex(0xff6600, 0xffcc44, Math.min(1, (frame.ambientInt - 0.3) * 4)));
 
-    // Drift clouds and tint them with day cycle
-    for (const cloud of this.cloudMeshes) {
-      cloud.position.x += 0.8 * dt;
-      if (cloud.position.x > 80) cloud.position.x = -16;
+    // Drift clouds + matching ground shadows with day cycle
+    for (let ci = 0; ci < this.cloudMeshes.length; ci++) {
+      this.cloudMeshes[ci].position.x += 0.8 * dt;
+      if (this.cloudMeshes[ci].position.x > 80) this.cloudMeshes[ci].position.x = -16;
+      if (this.cloudShadowMeshes[ci]) {
+        this.cloudShadowMeshes[ci].position.x = this.cloudMeshes[ci].position.x;
+      }
     }
     if (this.cloudMat) {
       this.cloudMat.opacity = 0.5 + frame.ambientInt * 0.4;
+      if (this._cloudShadowMat) {
+        this._cloudShadowMat.opacity = frame.ambientInt * 0.16;
+      }
     }
 
     // Fireflies: drift + blink at night, invisible by day
@@ -500,6 +509,9 @@ export class SceneManager {
     (this.scene.fog as THREE.Fog).far = this._fogFarBase - this._nightFarReduction - t * 70; // rain + night
     this.ambientLight.intensity = frame.ambientInt * (1 - t * 0.4);
     this.cloudMat.opacity = 0.7 + t * 0.25; // clouds thicken
+    if (this._cloudShadowMat) {
+      this._cloudShadowMat.opacity = frame.ambientInt * 0.16 * Math.max(0, 1 - t * 1.2);
+    }
     this.skyZenith.setHex(lerpHex(frame.topSky, rainyZenith, t * 0.7));
     this.skyHorizon.setHex(lerpHex(frame.sky, rainyHorizon, t * 0.7));
   }
@@ -1641,6 +1653,26 @@ export class SceneManager {
     this.cloudMat = new THREE.MeshLambertMaterial({
       color: 0xfafafa, transparent: true, opacity: 0.88,
     });
+
+    // Shared soft-edge alphaMap for all cloud shadow planes
+    const shadowCanvas = document.createElement("canvas");
+    shadowCanvas.width = shadowCanvas.height = 64;
+    const sctx = shadowCanvas.getContext("2d")!;
+    const sgrad = sctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    sgrad.addColorStop(0,    "rgba(255,255,255,0.92)");
+    sgrad.addColorStop(0.45, "rgba(255,255,255,0.65)");
+    sgrad.addColorStop(0.78, "rgba(255,255,255,0.22)");
+    sgrad.addColorStop(1,    "rgba(0,0,0,0)");
+    sctx.fillStyle = sgrad;
+    sctx.fillRect(0, 0, 64, 64);
+    this._cloudShadowMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.0,
+      depthWrite: false,
+      alphaMap: new THREE.CanvasTexture(shadowCanvas),
+    });
+
     // Expanded cloud positions — more coverage across the map, including far edges
     const positions: [number, number][] = [
       [10, 8], [28, 5], [48, 12], [15, 42], [45, 38],
@@ -1687,6 +1719,19 @@ export class SceneManager {
       cloud.position.set(cx, 22, cz);
       this.scene.add(cloud);
       this.cloudMeshes.push(cloud);
+
+      // Ground shadow — soft ellipse at terrain surface directly below the cloud
+      const shadowW = w * 1.8;
+      const shadowD = d * 1.8;
+      const shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(shadowW, shadowD),
+        this._cloudShadowMat,
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.renderOrder = 1;
+      shadow.position.set(cx, 7.05, cz);
+      this.scene.add(shadow);
+      this.cloudShadowMeshes.push(shadow);
     }
   }
 
