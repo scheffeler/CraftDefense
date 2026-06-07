@@ -770,6 +770,9 @@ export class Game {
         const deathColor = isElite ? 0xff8800 : state.config.color;
         const deathType  = isElite ? undefined : state.config.type;
         this.particles.spawnEnemyDeath(pos.x, pos.y, pos.z, deathColor, deathType);
+        if (state.config.type === "skeleton") {
+          this.particles.spawnBoneDecals(pos.x, pos.y, pos.z);
+        }
         if (state.config.xpReward) {
           this.particles.spawnXPOrbs(pos.x, pos.y, pos.z, Math.min(state.config.xpReward, 8));
         }

@@ -13,6 +13,7 @@ interface Decal {
   mesh: THREE.Mesh;
   life: number;
   maxLife: number;
+  maxOpacity?: number;
 }
 
 interface ShockwaveRing {
@@ -421,6 +422,33 @@ export class ParticleSystem {
     this.decals.push({ mesh, life: 0, maxLife: lifetime });
   }
 
+  /** Flat bone-shard decals left on the ground when a skeleton dies. Persist 2–3 s then fade. */
+  spawnBoneDecals(x: number, y: number, z: number): void {
+    const r = Math.random;
+    const boneCols = [0xeeeeee, 0xe8e8d8, 0xddddc8, 0xf0ede0];
+    const count = 4 + Math.floor(r() * 3); // 4–6 shards
+    for (let i = 0; i < count; i++) {
+      const w = 0.22 + r() * 0.34;   // 0.22–0.56 m long
+      const d = 0.05 + r() * 0.09;   // 0.05–0.14 m wide
+      const geo = new THREE.BoxGeometry(w, 0.012, d);
+      const mat = new THREE.MeshBasicMaterial({
+        color: boneCols[Math.floor(r() * boneCols.length)],
+        transparent: true,
+        opacity: 0.50,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      // Scatter within ~1.1 m of death position
+      const angle = r() * Math.PI * 2;
+      const dist  = 0.2 + r() * 0.9;
+      mesh.position.set(x + Math.cos(angle) * dist, y + 0.02, z + Math.sin(angle) * dist);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = r() * Math.PI * 2; // random in-plane rotation
+      this.scene.add(mesh);
+      this.decals.push({ mesh, life: 0, maxLife: 2.0 + r() * 1.2, maxOpacity: 0.50 });
+    }
+  }
+
   /** Tiny water ring-splash when a raindrop hits a flat surface. */
   spawnRainSplash(x: number, y: number, z: number): void {
     const count = 4 + Math.floor(Math.random() * 3);
@@ -776,7 +804,7 @@ export class ParticleSystem {
         this.decals.splice(i, 1);
         continue;
       }
-      (d.mesh.material as THREE.MeshBasicMaterial).opacity = 0.22 * (1 - d.life / d.maxLife);
+      (d.mesh.material as THREE.MeshBasicMaterial).opacity = (d.maxOpacity ?? 0.22) * (1 - d.life / d.maxLife);
     }
   }
 

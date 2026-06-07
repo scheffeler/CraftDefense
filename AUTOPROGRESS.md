@@ -1,5 +1,23 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-07 — Skeleton bone-shard ground decals
+
+**What was done:**
+- **Skeleton bone-shard ground decals** (`src/Particles.ts` + `src/Game.ts`): When a skeleton dies, 4–6 flat rectangular bone-shard meshes are now scattered on the ground within ~1.1 m of the death position. Each shard is a `BoxGeometry(w, 0.012, d)` with random dimensions (0.22–0.56 m long, 0.05–0.14 m wide), a random in-plane rotation, and an off-white/cream bone color (`0xeeeeee`, `0xe8e8d8`, `0xddddc8`, `0xf0ede0`). Shards persist at 50% opacity then fade linearly over 2.0–3.2 seconds using the existing decal system. Added optional `maxOpacity` field to the `Decal` interface so decals can specify peak opacity independently of footprints (which remain at 0.22). Gives a bone-littered battlefield atmosphere after skeleton waves.
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors).
+
+**Notes:**
+- Fresh session. Merged `auto-iterate` (cloud-shadow + footprints + troll-stomp + new moon rim commits) into `claude/dreamy-cerf-QMtBF` before starting.
+- `npm install` needed before tsc (node_modules absent at session start).
+- Playwright browser not available in container — visual review deferred, logic is correct.
+
+**Ideas for next time:**
+- **Goblin/orc alertness bubble**: "!" sprite above enemy head when they first enter aggro range — requires adding a `spotted?: boolean` field to EnemyState and tracking first-entry transition
+- **Player arm torch shadow**: a faint oval shadow cast on nearby walls/floor by the arm when holding a torch — a `PlaneGeometry` disc placed 0.3 m in front of the player and parallel to the nearest surface, opacity proportional to torch intensity
+- **Enchanting table rune emitter**: slowly orbiting letter-sprite particles around the enchanting table in the store — currently only the floating book + point light aura exist; add 4-6 small sprite meshes rotating around the table at y+0.6 using `Date.now()`-based angle offset
+- **Orc/uruk war-banner drop**: on orc or uruk_captain death, spawn a small `PlaneGeometry` banner decal on the ground (dark green flag shape, 1.5–2 s lifetime) like a fallen standard — purely atmospheric
+- **Creeper pre-explosion glow**: in the 1.5 s before a creeper explodes, add a `PointLight(0x44ff22, 1.5, 3)` at its position that pulses at 4 Hz matching the countdown beep
+
 ## 2026-06-07 — Cloud shadow sun-angle offset + typed footprints + troll stomp rings + new moon rim
 
 **What was done:**
