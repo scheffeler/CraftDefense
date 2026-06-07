@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-07 — Cloud ground shadows + moon phase HUD + per-enemy death particles
+
+**What was done:**
+- **Cloud ground shadows** (`src/SceneManager.ts`): Each of the 23 cloud objects now has a paired soft-edge shadow plane at y=7.05 (terrain surface). Shared `_cloudShadowMat` with a 64×64 radial-gradient alphaMap (opaque center → transparent rim). Shadow X tracks the cloud drift each frame. Opacity scales with `frame.ambientInt × 0.16` so shadows are clear at noon, faint at dawn/dusk, invisible at night. During rain `setWeatherIntensity` reduces shadow opacity proportionally (rain = overcast = diffuse light = no hard shadows). The loop was refactored from `for…of` to an indexed loop to sync cloud and shadow positions. Visual result: moving dappled shadow patches drift across the terrain as clouds pass overhead.
+- **Moon phase HUD clock** (`src/UI.ts`, `src/SceneManager.ts`): Added `moonPhase` getter to SceneManager (`(_totalDays % 8) / 8`). `updateDayClock(dayTime, moonPhase=0)` now draws the moon dot on the clock ring with correct lit/shadow geometry: a full disc clipped by a `destination-out` shadow circle offset by `shadowShift = mr×1.85×(1 − phase×2)` — same formula as the 3D moon. A Unicode phase emoji (🌕🌖🌗🌘🌑🌒🌓🌔) appears in the center of the clock at night so players can read the current phase at a glance. Game.ts passes `this.scene.moonPhase` to the call.
+- **Per-type enemy death particles** (`src/Particles.ts`): Added custom burst effects for goblin/goblin_miner (14-particle green dust cloud + bright coin-glint flats), orc (12 heavy grey-green muscle chunks + dark blood drops, slow tumble), and uruk_captain (16 dark steel plate shards + blood-red emissive flashes, high velocity). Previously all three fell through to the generic hue-variation default.
+- TypeScript compiles clean (0 errors, strict + noUnusedLocals). `npm install` needed before tsc (node_modules absent at session start).
+
+**Notes:**
+- Fresh session; remote `auto-iterate` was ahead — had rain lens drops, underwater vignette, passive mob head-bob, rain ripples, taiga snow, block-place dust, and much more.
+- Block break particle colours are already implemented (spawnBlockBreak has per-block color matching including blockId).
+- Screen shake on heavy hits already exists (Game.ts calls scene.shake() for orc/troll/troll_king hits).
+
+**Ideas for next time:**
+- **Cloud shadow offset by sun angle**: at dawn/dusk shadows should be offset east/west instead of directly below — compute `shadowShift = (dayTime - 0.5) × 20` in x and subtract from shadow.position.x for a sun-angle effect
+- **Goblin/orc chat bubble**: brief "!" or speech-bubble sprite above enemy head when they spot the player (alertness indicator)
+- **Enemy footprint colour by type**: goblin = green footprint, orc = dark mud, troll = heavy crater decal
+- **Block break particle colour for more block types**: iron_ore, obsidian, gold_ore, diamond_ore already covered; add glass (cyan sparkle), lava (orange ember), wood_log (brown chips)
+- **Ambient wind audio**: low-volume wind sound that varies with time of day/night and biome (desert wind, forest rustle, taiga howl)
+- **Moon corona at new moon**: at phase≈0.5 (new moon), still render a dark disc with a faint grey rim at night to hint the moon is there
+
+---
+
 ## 2026-06-06 — Rain lens drops + underwater ripple vignette
 
 **What was done:**
