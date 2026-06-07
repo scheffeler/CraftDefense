@@ -76,12 +76,17 @@ const WAR_CRY_SPEED_MULT    = 1.7;  // 70% speed boost for nearby enemies
 const WAR_CRY_BUFF_DURATION = 6;    // seconds the buff lasts
 const WAR_CRY_FLASH_DURATION = 1.0; // seconds the boss flashes gold
 
+// Alertness "!" sprite shown when enemy first enters detection range
+const ALERT_DETECTION_RANGE = 13;  // world units — close enough to threaten the player
+const ALERT_DURATION        = 1.4; // seconds the sprite is visible
+
 export class EnemyManager {
   private readonly enemies   = new Map<number, EnemyState>();
   private readonly meshes    = new Map<number, THREE.Group>();
   private readonly healthBars = new Map<number, { bar: THREE.Mesh; bg: THREE.Mesh }>();
   private readonly skeletonArrows: SkeletonArrow[] = [];
   private readonly spiderWebs: SpiderWeb[] = [];
+  private readonly alertSprites = new Map<number, THREE.Sprite>();
   private idCounter = 0;
 
   private flowField: FlowField | null = null;
@@ -331,6 +336,36 @@ export class EnemyManager {
       }
 
       this.updateHealthBar(id, state, group.position);
+
+      // Alertness "!" — fires once per enemy on first close approach to player
+      if (!state.spotted) {
+        const adx = this._playerX - group.position.x;
+        const adz = this._playerZ - group.position.z;
+        if (adx * adx + adz * adz < ALERT_DETECTION_RANGE * ALERT_DETECTION_RANGE) {
+          state.spotted = true;
+          state.alertTimer = ALERT_DURATION;
+          this.spawnAlertSprite(id, group.position);
+        }
+      }
+      if ((state.alertTimer ?? 0) > 0) {
+        state.alertTimer = (state.alertTimer ?? 0) - dt;
+        const alertSprite = this.alertSprites.get(id);
+        if (alertSprite) {
+          const isSpider = state.config.type === "spider";
+          const yOff = isSpider ? 1.5 : 1.7 * state.config.scale + 1.0;
+          const bobY = Math.sin((state.alertTimer ?? 0) * Math.PI * 3) * 0.07;
+          alertSprite.position.set(
+            group.position.x,
+            group.position.y + yOff + bobY,
+            group.position.z,
+          );
+          const t = Math.max(0, state.alertTimer ?? 0) / ALERT_DURATION;
+          const fadeIn  = t > 0.85 ? (1 - t) / 0.15 : 1.0;
+          const fadeOut = t < 0.20 ? t / 0.20 : 1.0;
+          (alertSprite.material as THREE.SpriteMaterial).opacity = fadeIn * fadeOut;
+          if ((state.alertTimer ?? 0) <= 0) this.removeAlertSprite(id);
+        }
+      }
     }
 
     // Update skeleton arrows
@@ -1515,6 +1550,57 @@ export class EnemyManager {
     hb.bar.lookAt(this.camera.position);
   }
 
+  // ─── Alert "!" sprites ─────────────────────────────────────────────────────
+
+  private spawnAlertSprite(id: number, pos: THREE.Vector3): void {
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+
+    // Dark semi-transparent background disc
+    ctx.beginPath();
+    ctx.arc(32, 32, 29, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(10,0,0,0.55)";
+    ctx.fill();
+
+    // "!" glyph — outlined in black then filled bright yellow-gold
+    ctx.font = "bold 46px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 5;
+    ctx.strokeText("!", 32, 33);
+    ctx.fillStyle = "#ffd000";
+    ctx.fillText("!", 32, 33);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthTest: false,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(0.65, 0.65, 0.65);
+    sprite.renderOrder = 5;
+
+    const state = this.enemies.get(id);
+    const scale   = state?.config.scale ?? 1;
+    const yOff    = state?.config.type === "spider" ? 1.5 : 1.7 * scale + 1.0;
+    sprite.position.set(pos.x, pos.y + yOff, pos.z);
+
+    this.scene.add(sprite);
+    this.alertSprites.set(id, sprite);
+  }
+
+  private removeAlertSprite(id: number): void {
+    const sprite = this.alertSprites.get(id);
+    if (!sprite) return;
+    this.scene.remove(sprite);
+    const mat = sprite.material as THREE.SpriteMaterial;
+    mat.map?.dispose();
+    mat.dispose();
+    this.alertSprites.delete(id);
+  }
+
   // ─── Visual effects ────────────────────────────────────────────────────────
 
   private flashHit(id: number, color = 0xffffff): void {
@@ -2089,6 +2175,7 @@ export class EnemyManager {
       hb.bar.geometry.dispose(); (hb.bar.material as THREE.Material).dispose();
       this.healthBars.delete(id);
     }
+    this.removeAlertSprite(id);
     this.enemies.delete(id);
   }
 }

@@ -117,6 +117,9 @@ export interface EnemyState {
   berserking?: boolean;
   // Death flash
   deathFlashTimer?: number;
+  // Alertness "!" bubble
+  spotted?: boolean;
+  alertTimer?: number;
 }
 
 // TowerState kept as a stub type so UI.ts stubs compile without error
