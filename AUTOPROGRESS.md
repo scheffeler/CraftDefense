@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-07 — Enemy alertness "!" bubble sprite
+
+**What was done:**
+- **Alertness "!" sprite** (`src/Enemy.ts`, `src/types.ts`): Added a floating "!" bubble above enemy heads that fires once per enemy on first close approach to the player (within 13 world units). Canvas texture: 64×64 with a dark semi-transparent disc background and bold yellow-gold "!" glyph with black stroke outline. `THREE.Sprite` with `depthTest: false` so it always renders in front. The sprite fades in over the first 15% of its 1.4 s lifetime, holds at full opacity, then fades out over the final 20%. Gentle sine-wave bob adds vitality. Position tracks enemy head height (spider=1.5 above, others=1.7×scale+1.0 above).
+- **EnemyState** gains `spotted?: boolean` (set once when alert fires, prevents repeat triggers) and `alertTimer?: number` (1.4 s countdown).
+- **Cleanup**: `removeAlertSprite(id)` disposes texture + material; called from `despawn()` so sprites never leak when enemies die or wave resets.
+- TypeScript compiles clean (0 errors, strict + noUnusedLocals). Dev server hot-reloaded successfully.
+
+**Notes:**
+- Fresh session. Remote `auto-iterate` was at 198a07b (cloud shadow sun-angle offset, typed footprints, troll stomp rings, new moon rim).
+- `npm install` needed before tsc (node_modules absent at session start).
+- Browser/Playwright not available in container — TypeScript verification and code review confirm correctness.
+
+**Ideas for next time:**
+- **Skeleton bone-shard ground decals**: at death, 2-3 thin white rectangle meshes placed on the ground (1.5–2 s lifetime) using the existing decals infrastructure — battlefield bone scatter
+- **Player arm shadow**: faint shadow of player arm projected onto nearby walls when holding a torch — adds immersion
+- **Enchanting table rune orbit**: slow-spinning letter sprites (`Sprite` with canvas-drawn runes) orbiting the enchanting table at a fixed radius — the floating book is already there, runes would complement it
+- **Bookshelf item-entity glow**: dropped bookshelf items get a tiny `PointLight(0xffdd88, 0.4, 1.5)` child for warm glow on the ground
+- **Hit flash colour tint**: change the non-lethal flash from white to a weapon-dependent colour (sword=red, magic=purple, frost arrow=cyan) for combat feedback differentiation
+- **Spider web trail**: when a spider web projectile is in flight, leave a thin `Line` geometry behind it for a classic sticky-web look
+
+---
+
 ## 2026-06-07 — Cloud shadow sun-angle offset + typed footprints + troll stomp rings + new moon rim
 
 **What was done:**
