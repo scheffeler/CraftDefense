@@ -1,5 +1,27 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-07 — Cloud shadow sun-angle offset + typed footprints + troll stomp rings + new moon rim
+
+**What was done:**
+- **Cloud shadow sun-angle offset** (`src/SceneManager.ts`): Cloud ground-shadow planes now shift along X based on the sun's elevation angle. At noon (sun overhead) shadows sit directly below clouds; at dawn/dusk (sun near horizon) shadows stretch up to 20 units away from the sun — east at game-start morning, west at dusk. Formula: `shadowXShift = clamp(-sunVX * 14.95 / (sunVY - 22), ±20)` using the visual sun disc's horizontal position relative to the cloud height (22) and shadow plane (7.05). `sunVY` is clamped to a minimum of 30 to avoid singularity near the horizon.
+- **Per-enemy-type footprint colors and sizes** (`src/Particles.ts` + `src/Game.ts`): `spawnFootprint` now accepts `color`, `radius`, and `lifetime` parameters (all with sensible defaults so existing calls are unaffected). Game.ts assigns per-type values: goblins leave mossy-green marks (`0x1a3008`), orcs leave dark muddy brown (`0x1c0e06`), zombies leave murky greenish-black (`0x0e1a0a`), spiders leave dark red-brown (`0x180808`), uruk captains leave near-black with a red hint. Troll prints are 0.40 radius and 0.9 s lifetime; Troll King prints are 0.52 radius and 1.2 s; Golem prints are 0.34 radius; others 0.22.
+- **Troll/Golem footstep ground-dust rings** (`src/Particles.ts` + `src/Game.ts`): Added `spawnFootstepRing(x, y, z, veryHeavy)` using the existing `_rings` shockwave infrastructure. Each ring expands from radius 0.05 to 1.4 (troll) or 2.0 (troll_king) over ~0.5 s with an earth-brown additive glow (`0x776655` or `0x998866`). Called every 0.35 s footprint tick for troll, troll_king, and golem types, making their heavy footfalls visually impactful.
+- **New moon corona rim** (`src/SceneManager.ts`): The moon's glow ring (`RingGeometry(7.5, 22)`) previously went fully dark at new moon. It now shows a faint grey-blue halo (`0x334466`, opacity ~0.04 at midnight) to hint that the dark moon disc is there. Full-moon corona remains blue-white (`0xaaccff`, opacity 0.28 × nightness) unchanged. The color interpolates from grey-blue → blue-white as moonFullness increases, driven by `lerpHex(0x334466, 0xaaccff, moonFullness/0.12)`.
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors).
+
+**Notes:**
+- Fresh session. Remote `auto-iterate` was at ce2abfc (cloud shadows, moon phase HUD, per-enemy death particles).
+- `npm install` needed before tsc (node_modules absent at session start).
+- Playwright browser not downloadable in container — visual review deferred, but code is logically sound.
+- All enemy death particle types are already implemented (skeleton, creeper, spider, golem/troll, zombie, goblin, orc, uruk_captain).
+
+**Ideas for next time:**
+- **Goblin/orc alertness bubble**: "!" sprite above enemy head when they first enter aggro range — requires adding a `spotted?: boolean` field to EnemyState and tracking first-entry transition
+- **Cloud shadow sun-angle Z shift**: Currently only X is shifted. If the sun ever moves in Z (future biome rotation), add a Z component to the formula
+- **Skeleton bone-shard ground decals**: at death, 2-3 thin rectangle meshes left on the ground (white/grey, 1-2 s lifetime) using the existing decals array — gives the battlefield a bone-strewn look
+- **Player arm shadow**: a faint shadow cast by the player's arm on nearby walls when holding a torch
+- **Enchanting table rune particle emitter**: slow-spinning letter sprites around the table — currently the aura group just has the floating book + point light
+
 ## 2026-06-07 — Cloud ground shadows + moon phase HUD + per-enemy death particles
 
 **What was done:**

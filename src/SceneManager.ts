@@ -397,9 +397,16 @@ export class SceneManager {
     this.moonShadow.quaternion.copy(this.camera.quaternion);
     (this.moonShadow.material as THREE.MeshBasicMaterial).opacity = nightness * 0.95;
 
-    // Moon corona glow: strongest at full moon (phase≈0 or 1), zero at new moon (phase≈0.5).
+    // Moon corona glow: blue-white at full moon, faint grey halo at new moon.
     const moonFullness = Math.abs(1 - moonPhase * 2); // 1=full, 0=new
-    (this.moonGlow.material as THREE.MeshBasicMaterial).opacity = nightness * moonFullness * 0.28;
+    // At new moon a faint grey halo hints at the dark disc in the sky.
+    const newMoonRim = Math.max(0, 0.28 - moonFullness * 0.56); // peaks at phase=0.5
+    const coronaOpacity = nightness * (moonFullness * 0.28 + newMoonRim * 0.14);
+    const coronaColor = moonFullness > 0.12
+      ? 0xaaccff                                             // full/crescent — blue-white
+      : lerpHex(0x334466, 0xaaccff, moonFullness / 0.12);   // fades to dark grey-blue at new
+    (this.moonGlow.material as THREE.MeshBasicMaterial).color.setHex(coronaColor);
+    (this.moonGlow.material as THREE.MeshBasicMaterial).opacity = coronaOpacity;
     this.moonGlow.position.copy(this.moon.position).addScaledVector(camFwd, -0.3);
     this.moonGlow.quaternion.copy(this.camera.quaternion);
 
@@ -421,12 +428,18 @@ export class SceneManager {
     (this.sunGlow.material as THREE.MeshBasicMaterial).opacity = sunOpacity * 0.45;
     (this.sunGlow.material as THREE.MeshBasicMaterial).color.setHex(lerpHex(0xff6600, 0xffcc44, Math.min(1, (frame.ambientInt - 0.3) * 4)));
 
-    // Drift clouds + matching ground shadows with day cycle
+    // Drift clouds + matching ground shadows with day cycle.
+    // Shadow offset is driven by sun elevation: at dawn/dusk the sun is near the horizon
+    // so shadows stretch away from the sun (cast eastward at dusk, westward at dawn).
+    // Cloud height ≈ 22, shadow plane at y=7.05 → height diff = 14.95.
+    const sunVX = Math.cos(angle) * 130;
+    const sunVY = Math.max(30, Math.abs(Math.sin(angle)) * 130); // clamp avoids singularity near horizon
+    const shadowXShift = Math.max(-20, Math.min(20, -sunVX * 14.95 / (sunVY - 22)));
     for (let ci = 0; ci < this.cloudMeshes.length; ci++) {
       this.cloudMeshes[ci].position.x += 0.8 * dt;
       if (this.cloudMeshes[ci].position.x > 80) this.cloudMeshes[ci].position.x = -16;
       if (this.cloudShadowMeshes[ci]) {
-        this.cloudShadowMeshes[ci].position.x = this.cloudMeshes[ci].position.x;
+        this.cloudShadowMeshes[ci].position.x = this.cloudMeshes[ci].position.x + shadowXShift;
       }
     }
     if (this.cloudMat) {

@@ -407,18 +407,18 @@ export class ParticleSystem {
     this.spawnParticle(mesh, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, (Math.random() - 0.5) * spd, 0.18 + Math.random() * 0.12);
   }
 
-  /** Faint oval decal placed at ground level under an enemy step. Fades over 0.5 s. */
-  spawnFootprint(x: number, y: number, z: number): void {
-    const geo = new THREE.CircleGeometry(0.22, 8);
+  /** Faint oval decal placed at ground level under an enemy step. Fades over lifetime. */
+  spawnFootprint(x: number, y: number, z: number, color = 0x111111, radius = 0.22, lifetime = 0.5): void {
+    const geo = new THREE.CircleGeometry(radius, 8);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x111111, transparent: true, opacity: 0.22,
+      color, transparent: true, opacity: 0.24,
       depthWrite: false, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y + 0.02, z);
     mesh.rotation.x = -Math.PI / 2;
     this.scene.add(mesh);
-    this.decals.push({ mesh, life: 0, maxLife: 0.5 });
+    this.decals.push({ mesh, life: 0, maxLife: lifetime });
   }
 
   /** Tiny water ring-splash when a raindrop hits a flat surface. */
@@ -461,6 +461,30 @@ export class ParticleSystem {
       maxLife: 0.55 + Math.random() * 0.35,
       maxRadius: 0.4 + Math.random() * 0.35,
       maxOpacity: 0.22,
+    });
+  }
+
+  /** Small ground-dust ring for a heavy enemy footstep (troll, golem). */
+  spawnFootstepRing(x: number, y: number, z: number, veryHeavy = false): void {
+    const geo = new THREE.RingGeometry(0.05, 0.20, 24);
+    const mat = new THREE.MeshBasicMaterial({
+      color: veryHeavy ? 0x998866 : 0x776655,
+      transparent: true, opacity: 0.0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y + 0.02, z);
+    mesh.scale.setScalar(0.01);
+    this.scene.add(mesh);
+    this._rings.push({
+      mesh,
+      life: 0,
+      maxLife: 0.45 + Math.random() * 0.20,
+      maxRadius: veryHeavy ? 2.0 : 1.4,
+      maxOpacity: veryHeavy ? 0.42 : 0.32,
     });
   }
 

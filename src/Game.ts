@@ -2207,7 +2207,7 @@ export class Game {
   private updateCombat(dt: number): void {
     this.enemies.update(dt);
 
-    // Enemy footprint decals — dark fading circles under moving enemies
+    // Enemy footprint decals — type-coloured fading circles under moving enemies
     this._footprintTimer += dt;
     if (this._footprintTimer >= 0.35) {
       this._footprintTimer -= 0.35;
@@ -2215,7 +2215,29 @@ export class Game {
         if (!state.alive || state.dying) continue;
         const pos = this.enemies.getEnemyPosition(state.id);
         if (!pos) continue;
-        this.particles.spawnFootprint(pos.x, pos.y - 0.9, pos.z);
+        const t = state.config.type;
+        const fpColor =
+          t === "goblin" || t === "goblin_miner" ? 0x1a3008 :  // mossy green
+          t === "orc"                             ? 0x1c0e06 :  // dark brown mud
+          t === "zombie"                          ? 0x0e1a0a :  // murky green-black
+          t === "spider"                          ? 0x180808 :  // dark red-brown
+          t === "uruk_captain"                    ? 0x0c0808 :  // near-black with red hint
+          0x111111;                                             // default dark
+        const fpRadius =
+          t === "troll_king" ? 0.52 :
+          t === "troll"      ? 0.40 :
+          t === "orc"        ? 0.30 :
+          t === "golem"      ? 0.34 :
+          0.22;
+        const fpLife =
+          t === "troll_king" ? 1.2 :
+          t === "troll"      ? 0.9 :
+          0.5;
+        this.particles.spawnFootprint(pos.x, pos.y - 0.9, pos.z, fpColor, fpRadius, fpLife);
+        // Heavy enemies leave a ground-dust ring on each step
+        if (t === "troll" || t === "troll_king" || t === "golem") {
+          this.particles.spawnFootstepRing(pos.x, pos.y - 0.9, pos.z, t === "troll_king");
+        }
       }
     }
 
