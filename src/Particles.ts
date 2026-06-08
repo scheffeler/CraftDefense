@@ -13,6 +13,7 @@ interface Decal {
   mesh: THREE.Mesh;
   life: number;
   maxLife: number;
+  peakOpacity?: number;
 }
 
 interface ShockwaveRing {
@@ -100,6 +101,8 @@ export class ParticleSystem {
         const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
         const [vx, vy, vz] = randVel(3.5 + r() * 4); this.spawnParticle(mesh, vx, vy, vz, 0.5 + r() * 0.4);
       }
+      // Persistent bone-shard scatter on the ground
+      this.spawnBoneDecals(x, y, z);
     } else if (enemyType === "creeper") {
       // Bright green sparks + sulfur flash
       for (let i = 0; i < 14; i++) {
@@ -419,6 +422,31 @@ export class ParticleSystem {
     mesh.rotation.x = -Math.PI / 2;
     this.scene.add(mesh);
     this.decals.push({ mesh, life: 0, maxLife: lifetime });
+  }
+
+  /** Flat bone-shard decals scattered at skeleton death position — linger for several seconds. */
+  private spawnBoneDecals(x: number, y: number, z: number): void {
+    const groundY = y - 1.4; // approximate ground surface from enemy center
+    const count = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < count; i++) {
+      const len  = 0.10 + Math.random() * 0.14;
+      const wide = 0.025 + Math.random() * 0.015;
+      const geo  = new THREE.BoxGeometry(wide, 0.008, len);
+      const grey = 0.75 + Math.random() * 0.22;
+      const mat  = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(grey, grey, grey),
+        transparent: true, opacity: 0.52, depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.9,
+        groundY + 0.01,
+        z + (Math.random() - 0.5) * 0.9,
+      );
+      mesh.rotation.y = Math.random() * Math.PI;
+      this.scene.add(mesh);
+      this.decals.push({ mesh, life: 0, maxLife: 5 + Math.random() * 3, peakOpacity: 0.52 });
+    }
   }
 
   /** Tiny water ring-splash when a raindrop hits a flat surface. */
@@ -776,7 +804,7 @@ export class ParticleSystem {
         this.decals.splice(i, 1);
         continue;
       }
-      (d.mesh.material as THREE.MeshBasicMaterial).opacity = 0.22 * (1 - d.life / d.maxLife);
+      (d.mesh.material as THREE.MeshBasicMaterial).opacity = (d.peakOpacity ?? 0.22) * (1 - d.life / d.maxLife);
     }
   }
 

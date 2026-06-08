@@ -47,6 +47,13 @@ interface SpiderWeb {
   vel: THREE.Vector3;
   life: number;
   active: boolean;
+  trailTimer: number;
+}
+
+interface WebTrailDrop {
+  mesh: THREE.Mesh;
+  life: number;
+  maxLife: number;
 }
 
 const SKELETON_ARROW_POOL    = 30;
@@ -87,6 +94,8 @@ export class EnemyManager {
   private readonly skeletonArrows: SkeletonArrow[] = [];
   private readonly spiderWebs: SpiderWeb[] = [];
   private readonly alertSprites = new Map<number, THREE.Sprite>();
+  private readonly _webTrailDrops: WebTrailDrop[] = [];
+  private readonly _webTrailGeo = new THREE.SphereGeometry(0.05, 4, 3);
   private idCounter = 0;
 
   private flowField: FlowField | null = null;
@@ -135,7 +144,7 @@ export class EnemyManager {
       const mesh = new THREE.Mesh(webGeo, webMat);
       mesh.visible = false;
       scene.add(mesh);
-      this.spiderWebs.push({ mesh, vel: new THREE.Vector3(), life: 0, active: false });
+      this.spiderWebs.push({ mesh, vel: new THREE.Vector3(), life: 0, active: false, trailTimer: 0 });
     }
   }
 
@@ -411,6 +420,18 @@ export class EnemyManager {
       // Simple rotation for visual flair
       web.mesh.rotation.x += dt * 3;
       web.mesh.rotation.z += dt * 2;
+      // Spawn sticky thread-drop trail
+      web.trailTimer -= dt;
+      if (web.trailTimer <= 0) {
+        web.trailTimer = 0.07;
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xe8e8d8, transparent: true, opacity: 0.55, depthWrite: false,
+        });
+        const drop = new THREE.Mesh(this._webTrailGeo, mat);
+        drop.position.copy(web.mesh.position);
+        this.scene.add(drop);
+        this._webTrailDrops.push({ mesh: drop, life: 0, maxLife: 0.45 });
+      }
       // Check hit against player
       const dx = web.mesh.position.x - this._playerX;
       const dy = web.mesh.position.y - this._playerY;
@@ -420,6 +441,18 @@ export class EnemyManager {
         web.active = false;
         web.mesh.visible = false;
       }
+    }
+    // Fade and remove spent web trail drops
+    for (let i = this._webTrailDrops.length - 1; i >= 0; i--) {
+      const d = this._webTrailDrops[i];
+      d.life += dt;
+      if (d.life >= d.maxLife) {
+        this.scene.remove(d.mesh);
+        (d.mesh.material as THREE.Material).dispose(); // geometry is shared — not disposed here
+        this._webTrailDrops.splice(i, 1);
+        continue;
+      }
+      (d.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55 * (1 - d.life / d.maxLife);
     }
   }
 
@@ -514,6 +547,12 @@ export class EnemyManager {
     this.idCounter = 0;
     // Clear in-flight webs
     for (const w of this.spiderWebs) { w.active = false; w.mesh.visible = false; }
+    // Clear web trail drops
+    for (const d of this._webTrailDrops) {
+      this.scene.remove(d.mesh);
+      (d.mesh.material as THREE.Material).dispose();
+    }
+    this._webTrailDrops.length = 0;
   }
 
   getEnemyProgress(id: number): number {
