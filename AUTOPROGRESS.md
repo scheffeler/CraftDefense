@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-08 — Spider web sticky thread trail + skeleton bone-shard ground decals
+
+**What was done:**
+- **Spider web thread trail** (`src/Enemy.ts`): Added `trailTimer: number` to `SpiderWeb` interface. Every 70 ms while a web projectile is in flight, a wispy sphere drop (radius 0.05, color `0xe8e8d8`, additive-like via `depthWrite: false`) is cloned from a shared `_webTrailGeo` and placed at the web's current position. Each drop fades from opacity 0.55 → 0 over 0.45 s then is disposed. The `_webTrailDrops: WebTrailDrop[]` array is cleaned up in `reset()` (wave end). The result: flying web globs leave a ghostly tail of sticky-looking white wisps, making the spider's attack much more readable.
+- **Skeleton bone-shard ground decals** (`src/Particles.ts`): Added `peakOpacity?: number` to the `Decal` interface and updated the fade formula to `(d.peakOpacity ?? 0.22) * (1 - t)`. Added private `spawnBoneDecals(x, y, z)` method: places 3–5 flat elongated `BoxGeometry(0.025, 0.008, 0.10–0.24)` meshes at ground level (`y - 1.4`), randomly rotated on Y, with `peakOpacity: 0.52` and `maxLife: 5–8 s`. Called from inside the `skeleton` branch of `spawnEnemyDeath`. Battlefields now show scattered white bone fragments that linger after a skeleton is killed.
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors).
+
+**Notes:**
+- Fresh session. Remote `auto-iterate` was at `a22f33b` (campfire canvas gradient + placeable).
+- `npm install` needed before tsc (node_modules absent).
+- Playwright browser available at `/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell` — use that exact path in test scripts.
+- Pre-existing bug: `flashDeath()` in Enemy.ts crashes when the skeleton head/torso have multi-material arrays (casting array to `MeshLambertMaterial` gives `undefined` emissive). Not introduced by this session; workaround: guard with `if (Array.isArray(mat)) return` inside `flashDeath`.
+
+**Ideas for next time:**
+- **Fix flashDeath multi-material crash**: add `if (Array.isArray(mat)) mat.forEach(m => { m.emissive?.setHex(0xffffff); m.emissiveIntensity = 1.3; }); else { mat.emissive.setHex(0xffffff); ... }` — pre-existing bug affecting skeleton and any other multi-material enemy mesh
+- **Campfire smoke column**: current `spawnCampfireSmoke` wisps rise gently but there's no tight vertical column; add a secondary tighter ribbon of smaller dark-grey spheres (radius 0.04, vy 0.9) that rise straight up for 1.5 units before dispersing
+- **Hit flash colour tint**: change `damage-vignette` CSS to support weapon-dependent colours — sword (red `#cc2200`), magic (purple `#8844cc`), frost arrow (cyan `#22aaff`); requires a `flashDamage(color: string)` method in UI.ts
+- **Zombie rot-blob ground decal**: 1–2 greenish-black `CircleGeometry(0.15)` decals at zombie death position, lifetime 4 s — matches the green dust cloud particles
+- **Orc blood puddle**: dark red `CircleGeometry(0.20)` at orc death, lifetime 6 s, peak opacity 0.35
+- **Campfire ash decal**: `CircleGeometry(0.4)` dark brown disc under campfire when broken (`removeCampfireLight`), lifetime 8 s
+
+---
+
 ## 2026-06-08 — Campfire: canvas-gradient flame texture + player-placeable + crafting recipe
 
 **What was done:**
