@@ -2993,6 +2993,8 @@ export class Game {
       this.scene.scene.remove(group);
       this.campfireGroups.delete(key);
     }
+    // Ash/char stain on the ground where the campfire stood
+    this.particles.spawnFootprint(wx + 0.5, wy + 0.06, wz + 0.5, 0x1a0e06, 0.38, 9);
   }
 
   private addEnchantAura(wx: number, wy: number, wz: number): void {

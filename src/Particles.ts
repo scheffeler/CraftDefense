@@ -141,6 +141,10 @@ export class ParticleSystem {
         const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
         const [vx, vy, vz] = randVel(3 + r() * 4); this.spawnParticle(mesh, vx, vy, vz, 0.5 + r() * 0.4);
       }
+      // Rot blob ground stains — greenish-black decay puddles
+      this.spawnGroundStain(x, y, z, 0x0c1c0c, 0.18, 4 + r() * 2, 0.30);
+      if (r() > 0.35) this.spawnGroundStain(x, y, z, 0x0a1808, 0.11, 3 + r() * 2, 0.22,
+        (r() - 0.5) * 0.7, (r() - 0.5) * 0.7);
     } else if (enemyType === "goblin" || enemyType === "goblin_miner") {
       // Green dust cloud + tiny coin glints
       const goblinCols = [0x33aa44, 0x22883a, 0x44bb55, 0x1a6628];
@@ -152,6 +156,8 @@ export class ParticleSystem {
         const spd = i < 10 ? 2.5 + r() * 3.5 : 4 + r() * 5;
         const [vx, vy, vz] = randVel(spd); this.spawnParticle(mesh, vx, vy, vz, 0.35 + r() * 0.3);
       }
+      // Ash-green ground spot
+      this.spawnGroundStain(x, y, z, 0x162614, 0.11, 2.5 + r() * 1.5, 0.20);
     } else if (enemyType === "orc") {
       // Heavy grey-green muscle chunks + dark blood drops
       const orcCols = [0x556644, 0x445533, 0x667755, 0x8b0000];
@@ -162,6 +168,10 @@ export class ParticleSystem {
         const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
         const [vx, vy, vz] = randVel(1.8 + r() * 2.5); this.spawnParticle(mesh, vx, vy, vz, 0.7 + r() * 0.5);
       }
+      // Dark blood puddle — main large circle + optional satellite
+      this.spawnGroundStain(x, y, z, 0x3a0000, 0.23, 6 + r() * 2, 0.36);
+      if (r() > 0.45) this.spawnGroundStain(x, y, z, 0x280000, 0.12, 4 + r() * 2, 0.26,
+        (r() - 0.5) * 0.9, (r() - 0.5) * 0.9);
     } else if (enemyType === "uruk_captain") {
       // Dark metal plate shards + blood red flash
       const uCols = [0x222222, 0x333322, 0x8b0000, 0xcc2200, 0x111111];
@@ -173,6 +183,12 @@ export class ParticleSystem {
         const [px, py, pz] = randPos(); mesh.position.set(px, py, pz);
         const spd = isPlate ? 3 + r() * 4.5 : 5 + r() * 6;
         const [vx, vy, vz] = randVel(spd); this.spawnParticle(mesh, vx, vy, vz, isPlate ? 0.55 + r() * 0.4 : 0.25 + r() * 0.2);
+      }
+      // Boss blood splatter — large dark-crimson puddle + 2 satellite drops
+      this.spawnGroundStain(x, y, z, 0x3a0005, 0.28, 8 + r() * 3, 0.40);
+      for (let i = 0; i < 2; i++) {
+        this.spawnGroundStain(x, y, z, 0x250000, 0.12 + r() * 0.06, 5 + r() * 3, 0.28,
+          (r() - 0.5) * 1.2, (r() - 0.5) * 1.2);
       }
     } else {
       // Default: same-color cubes with slight hue variation
@@ -422,6 +438,24 @@ export class ParticleSystem {
     mesh.rotation.x = -Math.PI / 2;
     this.scene.add(mesh);
     this.decals.push({ mesh, life: 0, maxLife: lifetime });
+  }
+
+  /** Ground-circle stain decal — used for blood puddles, rot blobs, ash spots after enemy death. */
+  private spawnGroundStain(
+    x: number, y: number, z: number,
+    color: number, radius: number, lifetime: number, peakOpacity: number,
+    scatterX = 0, scatterZ = 0,
+  ): void {
+    const groundY = y - 1.35;
+    const geo = new THREE.CircleGeometry(radius * (0.85 + Math.random() * 0.30), 10);
+    const mat = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: peakOpacity, depthWrite: false, side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x + scatterX, groundY, z + scatterZ);
+    mesh.rotation.x = -Math.PI / 2;
+    this.scene.add(mesh);
+    this.decals.push({ mesh, life: 0, maxLife: lifetime, peakOpacity });
   }
 
   /** Flat bone-shard decals scattered at skeleton death position — linger for several seconds. */

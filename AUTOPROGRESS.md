@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-08 — Enemy death ground stains + multi-material flash crash fix
+
+**What was done:**
+- **Fixed multi-material crash** (`src/Enemy.ts`): `flashDeath`, `flashHit`, `applySlowTint`, `clearSlowTint`, `applyRageTint`, `setBossWarCryGlow`, `clearBossWarCryGlow`, and `applyWarCryTint` all previously cast `m.material` directly to `MeshLambertMaterial`, which crashes when the material is an array (skeleton torso/head use per-face material arrays). Added private static helper `getLambertMats(m)` that handles both single and array material, returning `MeshLambertMaterial[]`. Also fixed the dying-update death-flash fade loop with the same pattern. Skeleton can now be killed without a JS exception.
+- **Zombie rot-blob ground stains** (`src/Particles.ts`): Added `spawnGroundStain()` private helper — `CircleGeometry` disc flat on the ground, using the existing `decals` array for linear fade. At zombie death: spawns a dark greenish-black main stain (radius ~0.18, lifetime 4–6 s, opacity 0.30) plus a ~65% chance of a smaller satellite nearby. Gives battlefields a sickly puddle feel.
+- **Orc blood puddle** (`src/Particles.ts`): At orc death: spawns a dark-red main puddle (radius ~0.23, lifetime 6–8 s, opacity 0.36) plus a ~55% chance of a smaller satellite splatter. Orcs now leave clearly visible crimson marks.
+- **Goblin ash spot** (`src/Particles.ts`): At goblin/goblin_miner death: 1 small dark ash-green stain (radius ~0.11, lifetime 2.5–4 s, opacity 0.20) — subtle but consistent.
+- **Uruk captain blood splatter** (`src/Particles.ts`): At boss death: 1 large dark-crimson circle (radius ~0.28, lifetime 8–11 s, opacity 0.40) + 2 satellite drops scattered up to ±0.6 units away. Boss deaths leave a dramatic blood mark.
+- **Campfire ash decal** (`src/Game.ts`): When a campfire block is removed (`removeCampfireLight`), `particles.spawnFootprint()` is called with dark-brown color, radius 0.38, lifetime 9 s — leaves a burnt char-disc on the ground where the campfire was.
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors). Verified via headless Playwright: 7 stains from 4 death calls, skeleton flash-death no-crash confirmed.
+
+**Notes:**
+- Fresh session. Remote `auto-iterate` was at `1699f9e` (spider web trail + bone decals).
+- `npm install` needed before tsc (node_modules absent at session start).
+- Playwright screenshot timeout in headless environment — logic verified via `page.evaluate()` return values.
+
+**Ideas for next time:**
+- **Hit flash colour tint per weapon**: change non-lethal hit flash from white to weapon-dependent colours — sword (red `0xcc2200`), magic arrow (purple `0x8844cc`), frost arrow (cyan `0x22aaff`). Requires passing `flashColor` down from the damage call; weapon type is available via `this.projectile.type` or item `id`.
+- **Campfire smoke column**: secondary tight vertical ribbon of dark-grey sphere particles (radius 0.04, vy 0.9) rising 1.5 units from campfire center, denser than current wisps.
+- **Troll/Troll-King death crater**: at troll death, spawn a dark `CircleGeometry(0.55)` stain + 2-3 indented `BoxGeometry(0.3, 0.01, 0.3)` slab marks to simulate ground impact.
+- **Block texture improvement**: dirt/grass side-face transition band — the top row of pixels on dirt-side faces could shade darker to simulate the grass→soil transition (no new atlas tile needed — just a UV-space color multiply).
+- **Day/night star field twinkle**: vary emissive intensity of stars each frame by ±0.1 using a per-star phase offset — makes the Milky Way feel alive.
+
 ## 2026-06-08 — Spider web sticky thread trail + skeleton bone-shard ground decals
 
 **What was done:**

@@ -288,7 +288,7 @@ export class EnemyManager {
           group.traverse(c => {
             const m = c as THREE.Mesh;
             if (!m.isMesh) return;
-            (m.material as THREE.MeshLambertMaterial).emissiveIntensity = t * 1.3;
+            for (const mat of EnemyManager.getLambertMats(m)) mat.emissiveIntensity = t * 1.3;
           });
         }
 
@@ -1642,20 +1642,31 @@ export class EnemyManager {
 
   // ─── Visual effects ────────────────────────────────────────────────────────
 
+  /** Returns all MeshLambertMaterial instances on a mesh, handling both single and array material. */
+  private static getLambertMats(m: THREE.Mesh): THREE.MeshLambertMaterial[] {
+    if (Array.isArray(m.material)) {
+      return (m.material as THREE.Material[]).filter(
+        (x): x is THREE.MeshLambertMaterial => x instanceof THREE.MeshLambertMaterial
+      );
+    }
+    return m.material instanceof THREE.MeshLambertMaterial ? [m.material as THREE.MeshLambertMaterial] : [];
+  }
+
   private flashHit(id: number, color = 0xffffff): void {
     const group = this.meshes.get(id);
     if (!group) return;
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      const orig = mat.emissive.getHex();
-      mat.emissive.setHex(color);
-      mat.emissiveIntensity = color === 0xffffff ? 0.8 : 1.1;
-      setTimeout(() => {
-        mat.emissive.setHex(orig);
-        mat.emissiveIntensity = 0;
-      }, 110);
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        const orig = mat.emissive.getHex();
+        mat.emissive.setHex(color);
+        mat.emissiveIntensity = color === 0xffffff ? 0.8 : 1.1;
+        setTimeout(() => {
+          mat.emissive.setHex(orig);
+          mat.emissiveIntensity = 0;
+        }, 110);
+      }
     });
   }
 
@@ -1665,9 +1676,10 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(0xffffff);
-      mat.emissiveIntensity = 1.3;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        mat.emissive.setHex(0xffffff);
+        mat.emissiveIntensity = 1.3;
+      }
     });
   }
 
@@ -1677,9 +1689,10 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(0x3399ff);
-      mat.emissiveIntensity = 0.3;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        mat.emissive.setHex(0x3399ff);
+        mat.emissiveIntensity = 0.3;
+      }
     });
   }
 
@@ -1694,9 +1707,10 @@ export class EnemyManager {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
       if (m.name === "boss_eye") return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(eliteEmissive);
-      mat.emissiveIntensity = eliteIntensity;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        mat.emissive.setHex(eliteEmissive);
+        mat.emissiveIntensity = eliteIntensity;
+      }
     });
   }
 
@@ -1706,9 +1720,10 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh || m.name === "boss_eye") return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(0xff2200);
-      mat.emissiveIntensity = 0.4;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        mat.emissive.setHex(0xff2200);
+        mat.emissiveIntensity = 0.4;
+      }
     });
   }
 
@@ -1718,13 +1733,9 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh || m.name === "boss_eye") return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      if (on) {
-        mat.emissive.setHex(0xffaa00);
-        mat.emissiveIntensity = 1.0;
-      } else {
-        mat.emissive.setHex(0xff2200);
-        mat.emissiveIntensity = 0.4;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        if (on) { mat.emissive.setHex(0xffaa00); mat.emissiveIntensity = 1.0; }
+        else     { mat.emissive.setHex(0xff2200); mat.emissiveIntensity = 0.4; }
       }
     });
   }
@@ -1738,9 +1749,10 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh || m.name === "boss_eye") return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(isRaging ? 0xff2200 : 0x000000);
-      mat.emissiveIntensity = isRaging ? 0.4 : 0;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        mat.emissive.setHex(isRaging ? 0xff2200 : 0x000000);
+        mat.emissiveIntensity = isRaging ? 0.4 : 0;
+      }
     });
   }
 
@@ -1750,9 +1762,10 @@ export class EnemyManager {
     group.traverse(c => {
       const m = c as THREE.Mesh;
       if (!m.isMesh) return;
-      const mat = m.material as THREE.MeshLambertMaterial;
-      mat.emissive.setHex(0xcc6600);
-      mat.emissiveIntensity = 0.45;
+      for (const mat of EnemyManager.getLambertMats(m)) {
+        mat.emissive.setHex(0xcc6600);
+        mat.emissiveIntensity = 0.45;
+      }
     });
   }
 
