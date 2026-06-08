@@ -1,5 +1,30 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-08 — Campfire decorative block
+
+**What was done:**
+- Added `"campfire"` to the `BlockId` union in `src/types.ts`.
+- Added `campfire` to `BLOCK_DEFS` in `src/Map.ts` (transparent=true so chunk geometry skips it, handled as a dedicated mesh like torch).
+- Added campfire to `getBlockTexIndex()` (falls through to wood texture as base, harmless since it's never rendered as a chunk face).
+- Added campfire skip line in chunk geometry builder alongside torch.
+- Added `campfire` to `BLOCK_BEHAVIORS` (drops itself when broken with axe) and `ITEM_DEFS` (category=block, placesBlock=campfire) and a crafting recipe (stick + coal + stick on top, wood × 3 on bottom → 1 campfire).
+- Added campfire visual system to `Game.ts`:
+  - `campfireLights: Map<string, THREE.PointLight>` — warm orange `0xff6622` point light, range 14, intensity 2.4 with 4-sine organic flicker.
+  - `campfireMeshes: Map<string, THREE.Group>` — each campfire renders 2 crossed log sections (dark brown `BoxGeometry(0.18, 0.15, 0.72)`) plus an emissive coal/ember bed (thin flat box `0x1a0800` with orange emissive) plus 2 fire `Sprite`s using the same flame canvas as torches but at 0.42×0.6 scale.
+  - `_campfireFlames: THREE.Sprite[]` animated each frame with independent X and Y scale flicker (larger amplitude than torches for a more dramatic fire effect).
+  - `initCampfires()` scans for campfire blocks using existing `scanForBlock()` and is called during `start()`.
+  - Block place/remove handlers wired to `addCampfireVisual` / `removeCampfireVisual`.
+- Pre-placed one campfire in the fortress interior at `(32, G+1, 37)` — south of the central well, making the gathering area feel lived-in.
+- Player starts with 2 campfire items in inventory; campfire is also craftable.
+- TypeScript compiles clean. Verified 1 campfire mesh created at runtime. Night glow visible in screenshots.
+
+**Ideas for next time:**
+- Moon phase visual — update moon canvas each game-day for crescent/half/full cycle (already have `_totalDays % 8` scaffolding in SceneManager)
+- Leaves emissive at night — traverse leaf blocks near player, add faint green emissive after dark for atmospheric forest glow
+- Hit flash colour tint — change non-lethal flash from white to weapon colour (sword=red, magic=purple)
+- Boss war-cry shockwave ring — expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- Biome ambient sound — distinct looping audio per biome (desert wind, taiga crickets, forest birds)
+- Animated water surface normals — per-frame vertex displacement or normal map scroll for more realistic water
 ## 2026-06-08 — Leaf canopy wind sway + pixel art for 7 crafting-ingredient items
 
 **What was done:**

@@ -180,6 +180,7 @@ function getBlockTexIndex(id: BlockId, normalY: number): number {
     case "lava":             return 29;
     case "dispenser":        return isTop ? 0 : 30;
     case "bed":              return isTop ? 31 : 8;
+    case "campfire":         return isTop ? 7 : 6;
     default:                 return 13;
   }
 }

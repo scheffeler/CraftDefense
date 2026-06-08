@@ -1720,6 +1720,8 @@ export class Game {
     // TNT fuses countdown
     this.updateTNT(dt);
 
+
+
     // Lava light pulse — sync all lava PointLights to the bubbling emissive rhythm
     if (this.lavaLights.size > 0) {
       const glow = this.gameMap.lavaGlow;
