@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-08 — Campfire decorative block
+
+**What was done:**
+- Added `"campfire"` BlockId to `types.ts`, block definition in `Map.ts` (transparent, placeable), block behavior in `config/blocks.ts` (axe tool, drops campfire), and item entry in `config/items.ts` (category=block, placesBlock="campfire").
+- Campfire is skipped in the chunk mesh builder (like `"torch"`) and instead rendered as a dedicated `THREE.Group` containing:
+  - **4 crossed BoxGeometry logs** in an X pattern at two heights (0.05 and 0.15 local Y), dark brown MeshLambertMaterial
+  - **6-stone ring** of small BoxGeometry cubes (0.14 × 0.14 × 0.14) at 0.34 radius around the base, grey stone material
+  - **Billboard flame Sprite** using a new 32×64 canvas texture — larger than the torch flame, with deep-orange tip fading to white-hot base, AdditiveBlending
+  - **THREE.PointLight(0xff5500, 2.8, 16)** with a unique random flicker phase per campfire
+- Flicker animation runs in the game update loop — wider amplitude (±0.55, ±0.30, ±0.15) than torch for a more organic campfire feel.
+- Two campfires pre-placed in WorldGen interior: `(27, G+1, 34)` west of center and `(37, G+1, 34)` east of center — flanking the central well between the shacks.
+- `scanWorldCampfires()` called alongside `scanWorldTorches()` at game init; `addCampfireLight` / `removeCampfireLight` hooked into `onBlockPlaced` / `onBlockBroken`.
+- Verified at runtime: 2 lights at exact expected positions, 2 mesh groups, 2 flame sprites, no JS errors.
+
+**Notes:**
+- The campfire was the #1 most-requested feature across the last 3 sessions — now done.
+- TypeScript compiles clean. Branch: `claude/dreamy-cerf-FJW1P` (per session config).
+
+**Ideas for next time:**
+- **Campfire smoke**: slow-rising grey Sprite above the flame, per-frame Y translate + fade (0→1 opacity at bottom, 1→0 at top)
+- **Ember particles**: occasional upward-drifting orange/red sparks from campfire (similar to the lava ember particles already in Particles.ts)
+- **Moon phase visual**: update moon canvas texture each game-day to show crescent/half/full cycle
+- **Leaves emissive at night**: traverse leaf blocks near player, add tiny emissive so the canopy glows faintly after dark
+- **Boss war-cry shockwave ring**: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- **Biome ambient sound**: distinct ambient audio per biome (desert wind, taiga crickets, forest birds)
+- **Hit flash colour tint**: change non-lethal hit flash from white to weapon colour (sword=red, magic=purple)
+
+---
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
