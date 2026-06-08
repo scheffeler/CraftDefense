@@ -210,12 +210,13 @@ export class VoxelWorld {
   private readonly floraMat: THREE.MeshLambertMaterial;
   // Shared opaque-block material — all chunk meshes share it so wetness is one uniform
   private readonly _chunkMat: THREE.MeshLambertMaterial;
-  // Shared leaf material — emissive intensity updated each frame for night glow
+  // Shared leaf material — emissive intensity updated each frame for night glow; wind time updated every frame
   private readonly leafMat: THREE.MeshLambertMaterial;
   private readonly _chunkWetUniforms: { uWetness: THREE.IUniform<number> } = { uWetness: { value: 0.0 } };
   private _fluidTime = 0;
   private _floraWindUniforms!: { uTime: THREE.IUniform<number> };
   private _wheatWindUniforms!: { uTime: THREE.IUniform<number> };
+  private _leafWindUniforms!: { uTime: THREE.IUniform<number> };
   private _lavaHotTimer = 0;
   private _lavaOrigData: ImageData | null = null;
 
@@ -225,7 +226,9 @@ export class VoxelWorld {
     scene.add(this.chunkMeshGroup);
     this.blockTex = VoxelWorld.makeBlockTexture();
     this._chunkMat = VoxelWorld.makeChunkMaterial(this.blockTex, this._chunkWetUniforms);
-    this.leafMat = VoxelWorld.makeLeafMaterial(this.blockTex);
+    const { mat: leafMat, uniforms: leafWind } = VoxelWorld.makeLeafMaterial(this.blockTex);
+    this.leafMat = leafMat;
+    this._leafWindUniforms = leafWind;
     this.waterMat = VoxelWorld.makeFluidMaterial("water");
     this.lavaMat = VoxelWorld.makeFluidMaterial("lava");
     // Snapshot the lava canvas pixels so we can restore them between hotspot updates
@@ -283,9 +286,10 @@ export class VoxelWorld {
     // Color shifts: more yellow-white at intensity peaks (hottest), deeper orange at troughs
     const heat = Math.max(0, Math.sin(t * 1.73) * 0.5 + 0.5);
     this.lavaMat.emissive.setRGB(1.0, 0.18 + heat * 0.28, 0.0);
-    // Advance flora and wheat wind time
+    // Advance flora, wheat, and leaf wind time
     this._floraWindUniforms.uTime.value = t;
     this._wheatWindUniforms.uTime.value = t;
+    this._leafWindUniforms.uTime.value = t;
 
     // Animated lava hotspots: every ~0.13s restore original pixels then splat 4 bright
     // yellow-white blobs at random positions to simulate rising molten bubbles.
@@ -339,8 +343,9 @@ export class VoxelWorld {
     return mat;
   }
 
-  private static makeLeafMaterial(blockTex: THREE.Texture): THREE.MeshLambertMaterial {
-    return new THREE.MeshLambertMaterial({
+  private static makeLeafMaterial(blockTex: THREE.Texture): { mat: THREE.MeshLambertMaterial; uniforms: { uTime: THREE.IUniform<number> } } {
+    const windUniforms: { uTime: THREE.IUniform<number> } = { uTime: { value: 0.0 } };
+    const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
       map: blockTex,
       side: THREE.DoubleSide,
@@ -349,6 +354,22 @@ export class VoxelWorld {
       emissive: new THREE.Color(0x003300),
       emissiveIntensity: 0.0,
     });
+    // GPU wind sway: the whole leaf canopy sways as a mass — no rooting needed unlike grass.
+    // Spatial phase from position.x/z creates different sway between separate trees.
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = windUniforms.uTime;
+      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        float lWindPhase = position.x * 1.3 + position.z * 0.9 + uTime * 0.55;
+        float lSway = 0.032;
+        transformed.x += sin(lWindPhase) * lSway;
+        transformed.z += cos(lWindPhase * 0.71 + 0.5) * lSway * 0.65;
+        transformed.y += sin(lWindPhase * 0.53 + position.z * 0.5) * 0.011;`,
+      );
+    };
+    return { mat, uniforms: windUniforms };
   }
 
   /** Set leaf canopy emissive glow — call each frame with nightness (0=day, 1=midnight). */

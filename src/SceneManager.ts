@@ -1132,6 +1132,111 @@ export class SceneManager {
         return true;
       }
 
+      case "blaze_rod": {
+        // Glowing orange rod with fiery stripes and ember sparks
+        rect(6, 2, 4, 12, "#ff9900");
+        rect(7, 2, 2, 12, "#ffcc00");   // bright centre stripe
+        p(7, 2, "#ffee88"); p(8, 2, "#ffee88"); // hot tip
+        // Dark side shading
+        rect(6, 3, 1, 10, "#cc6600"); rect(9, 3, 1, 10, "#cc6600");
+        // Knob ends
+        rect(6, 1, 4, 1, "#ffaa00"); rect(6, 14, 4, 1, "#dd7700");
+        // Floating ember sparks
+        p(4, 5, "#ff8800"); p(11, 7, "#ffcc00"); p(5, 11, "#ff6600"); p(12, 4, "#ffaa00");
+        return true;
+      }
+
+      case "sugar": {
+        // White crystalline mound — pile of sugar cubes
+        rect(3, 10, 10, 5, "#f0f0f0");   // base pile
+        rect(5, 7, 6, 4, "#e8e8f8");     // mid mound
+        rect(7, 5, 2, 3, "#ffffff");      // peak
+        // Crystal glint lines
+        rect(4, 11, 3, 1, "#ccccee"); rect(9, 12, 3, 1, "#ccccee");
+        p(6, 8, "#aaaadd"); p(9, 9, "#aaaadd");
+        p(7, 6, "#ddeeff"); // sparkle
+        return true;
+      }
+
+      case "magma_cream": {
+        // Orange blob with dark black magma specks
+        rect(3, 5, 10, 8, "#ff6600");
+        rect(4, 4, 8, 9, "#ff7722");   // slightly lighter body
+        rect(5, 3, 6, 10, "#ff8833");  // highlights
+        // Dark lava cracks / specks
+        p(5, 6, "#221100"); p(8, 7, "#221100"); p(6, 10, "#221100");
+        p(10, 5, "#221100"); p(7, 12, "#331100"); p(4, 9, "#110000");
+        // Top gloss
+        rect(6, 4, 4, 1, "#ffaa55");
+        return true;
+      }
+
+      case "glistering_melon": {
+        // Green melon slice with gold nugget trim
+        // Rind ring
+        rect(3, 3, 10, 10, "#228822");
+        // Red flesh
+        rect(5, 5, 6, 6, "#cc3333");
+        rect(6, 4, 4, 8, "#dd4444");
+        // Seeds
+        p(7, 7, "#441111"); p(8, 7, "#441111"); p(7, 9, "#441111");
+        // Gold nuggets around the edge
+        p(4, 4, "#ddaa00"); p(11, 4, "#ddaa00"); p(4, 11, "#ddaa00"); p(11, 11, "#ddaa00");
+        p(7, 3, "#ffcc00"); p(8, 3, "#ffcc00"); p(7, 12, "#ffcc00"); p(8, 12, "#ffcc00");
+        p(3, 7, "#ffcc00"); p(3, 8, "#ffcc00"); p(12, 7, "#ffcc00"); p(12, 8, "#ffcc00");
+        return true;
+      }
+
+      case "sniper_ammo": {
+        // Long tapered brass cartridge — taller and thinner than a bullet
+        // Brass casing
+        rect(6, 5, 4, 9, "#b8982a");
+        rect(7, 5, 2, 9, "#d4b040");   // highlight stripe
+        // Casing base (slightly wider)
+        rect(5, 13, 6, 2, "#8a6a10");
+        // Pointed copper tip
+        p(8, 2, "#cc7733"); p(7, 3, "#dd8844"); p(8, 3, "#dd8844"); p(9, 3, "#dd8844");
+        rect(7, 4, 2, 2, "#cc7733");
+        // Primer at base
+        rect(5, 14, 6, 1, "#bbaa50");
+        return true;
+      }
+
+      case "shotgun_shell": {
+        // Red plastic shell with brass base and crimp top
+        // Brass base
+        rect(5, 11, 6, 4, "#c8a030");
+        rect(6, 11, 4, 4, "#ddb840");   // highlight
+        // Red body
+        rect(5, 4, 6, 7, "#cc2222");
+        rect(6, 4, 4, 7, "#dd3333");   // highlight stripe
+        // Crimped top (star pattern)
+        rect(6, 2, 4, 2, "#aa1a1a");
+        p(7, 1, "#cc2222"); p(8, 1, "#cc2222");
+        p(6, 2, "#881111"); p(9, 2, "#881111");
+        // Rim
+        rect(4, 11, 8, 1, "#e8c840");
+        return true;
+      }
+
+      case "energy_cell": {
+        // Glowing blue-white battery cell
+        // Dark casing
+        rect(4, 3, 8, 11, "#112244");
+        rect(5, 3, 6, 11, "#1a3366");
+        // Glowing core
+        rect(6, 5, 4, 7, "#0088ff");
+        rect(7, 6, 2, 5, "#44aaff");   // bright core
+        p(7, 7, "#88ddff"); p(8, 7, "#88ddff"); // hot spot
+        // Top cap
+        rect(5, 2, 6, 1, "#334488"); rect(6, 1, 4, 1, "#224477");
+        // Bottom cap
+        rect(5, 14, 6, 1, "#334488"); rect(6, 15, 4, 1, "#224477");
+        // Glow edge lines
+        rect(4, 4, 1, 9, "#0055bb"); rect(11, 4, 1, 9, "#0055bb");
+        return true;
+      }
+
       default:
         return false;
     }
