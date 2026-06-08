@@ -205,4 +205,7 @@ export const ITEMS: Record<string, ItemDef> = {
 
   // --- Defensive structures ---
   dispenser: { id:"dispenser", name:"Arrow Dispenser", category:"block", stackSize:16, color:0x555544, placesBlock:"dispenser" },
+
+  // --- Decorative / utility ---
+  campfire:  { id:"campfire",  name:"Campfire",        category:"block", stackSize:8,  color:0xff6622, placesBlock:"campfire"  },
 };

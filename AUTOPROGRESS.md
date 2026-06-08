@@ -1,5 +1,31 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-08 — Campfire: canvas-gradient flame texture + player-placeable + crafting recipe
+
+**What was done:**
+- **Canvas-gradient flame texture** (`src/Game.ts`): Added `buildCampfireFlameTexture()` static method — 32×64 canvas with seeded-noise jagged tip, yellow-white base fading to deep orange-red at the tip. The `_campfireFireMat` shared `MeshBasicMaterial` uses this as an additive-blend transparent texture. Campfire log flames now have a proper gradient rather than a flat solid color, making each campfire feel alive.
+- **Flame planes with UV mapping** (`src/Game.ts` — `addCampfireLight`): Updated the two crossed fire-plane geometry in `addCampfireLight` to include explicit UV attributes (both planes share `[0,0, 1,0, 1,1, 0,1]`) so the canvas texture renders correctly. Plane dimensions grown from 0.22×0.40 half-extents to 0.30×0.46 for a taller, more prominent flame.
+- **Campfire placeable** (`src/Map.ts`): Changed campfire BlockDef from `placeable: false, hardness: 1.0, color: 0xff6600` to `placeable: true, hardness: 1.5, color: 0x8b5a2b` — players can now place campfires as blocks.
+- **Campfire drops itself** (`src/config/blocks.ts`): `drops` corrected from `["wood"]` to `["campfire"]` so breaking a campfire returns the item.
+- **Campfire item** (`src/config/items.ts`): Added campfire entry (`category: "block"`, `stackSize: 8`, `placesBlock: "campfire"`) so it exists in the item registry and can occupy hotbar slots.
+- **Campfire crafting recipe** (`src/config/recipes.ts`): 3-wood + 2-sticks shaped recipe yields 1 campfire — players can now craft them from gathered materials.
+- **Starting inventory** (`src/Game.ts`): Added 2 campfires to starting hotbar so players have one from the first moment of play.
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors).
+
+**Notes:**
+- Fresh session continuing from previous context. Remote `auto-iterate` was at the enemy alertness commit; base reset to `origin/auto-iterate` to avoid rebase conflicts from an incompatible local campfire implementation.
+- `npm install` needed before tsc (node_modules absent at session start).
+- Playwright browser not downloadable in container — visual review deferred.
+
+**Ideas for next time:**
+- **Campfire smoke column**: thin dark `MeshBasicMaterial` planes rising from campfire centre (small billboard sprites, additive blend, alpha fade at top) — the current ember particles rise but there's no distinct smoke column
+- **Campfire ash-spread decal**: at campfire death (block broken), leave a dark 1×1 disc decal on the ground for a few seconds
+- **Skeleton bone-shard ground decals**: at death, 2-3 thin white rectangle meshes placed on the ground (1.5–2 s lifetime) using the existing decals infrastructure — battlefield bone scatter
+- **Player arm shadow**: faint shadow of player arm projected onto nearby walls when holding a torch — adds immersion
+- **Hit flash colour tint**: change the non-lethal flash from white to a weapon-dependent colour (sword=red, magic=purple, frost arrow=cyan) for combat feedback differentiation
+
+---
+
 ## 2026-06-07 — Enemy alertness "!" bubble sprite
 
 **What was done:**

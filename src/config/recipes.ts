@@ -672,6 +672,17 @@ export const RECIPES: Recipe[] = [
     ],
     result: { itemId: "dispenser", count: 1 },
   },
+
+  // --- Campfire (3 wood + 2 sticks) ---
+  {
+    id: "campfire",
+    pattern: [
+      [null,        r("stick"), null      ],
+      [r("wood"),   r("stick"), r("wood") ],
+      [r("wood"),   null,       null      ],
+    ],
+    result: { itemId: "campfire", count: 1 },
+  },
 ];
 
 // Silence unused helper warning

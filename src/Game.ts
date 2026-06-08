@@ -121,6 +121,14 @@ export class Game {
   private readonly _campfireLogGeo  = new THREE.BoxGeometry(0.72, 0.10, 0.14);
   private readonly _campfireLogMat  = new THREE.MeshLambertMaterial({ color: 0x6b3a1a });
   private readonly _campfireAshesMat = new THREE.MeshLambertMaterial({ color: 0x2a1a0a });
+  // Canvas-gradient flame texture: yellow base → orange → deep red tip
+  private readonly _campfireFireMat = new THREE.MeshBasicMaterial({
+    map: Game.buildCampfireFlameTexture(),
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
 
   // Enchanting table aura — floating book + purple light, keyed by "wx,wy,wz"
   private readonly _enchantAuras = new Map<string, { group: THREE.Group; light: THREE.PointLight; phase: number; baseY: number }>();
@@ -256,6 +264,7 @@ export class Game {
     this.inventory.addItem("cobblestone", 32);
     this.inventory.addItem("wood", 16);
     this.inventory.addItem("torch", 8);
+    this.inventory.addItem("campfire", 2);
     this.inventory.addItem("apple", 8);
     this.inventory.addItem("wheat_seeds", 8);
     this.inventory.addItem("iron_bucket", 1);
@@ -2755,6 +2764,41 @@ export class Game {
     return tex;
   }
 
+  private static buildCampfireFlameTexture(): THREE.CanvasTexture {
+    const W = 32, H = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+    const imageData = ctx.createImageData(W, H);
+    const data = imageData.data;
+    let seed = 0xcafe1234;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
+    for (let cy = 0; cy < H; cy++) {
+      const t = (H - 1 - cy) / (H - 1);
+      const halfWidth = Math.sqrt(t) * (W * 0.50);
+      const jag = t < 0.30 ? (rand() - 0.5) * 4 * (1 - t / 0.30) : 0;
+      for (let cx = 0; cx < W; cx++) {
+        const dist = Math.abs(cx - (W / 2 - 0.5));
+        const hw = halfWidth + jag;
+        if (dist >= hw || hw <= 0) continue;
+        const edge = Math.max(0, 1 - dist / hw);
+        const gChannel = Math.max(0, Math.min(255, Math.round(55 + 200 * t)));
+        const bChannel = Math.max(0, Math.round(15 * t * t));
+        const alpha    = Math.round(Math.pow(edge, 0.5) * (0.20 + 0.80 * Math.sqrt(t)) * 230);
+        const idx = (cy * W + cx) * 4;
+        data[idx]     = 255;
+        data[idx + 1] = gChannel;
+        data[idx + 2] = bChannel;
+        data[idx + 3] = alpha;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+  }
+
   private static buildHaloTexture(): THREE.CanvasTexture {
     const S = 64;
     const canvas = document.createElement("canvas");
@@ -2899,8 +2943,12 @@ export class Game {
       group.add(log);
     }
 
-    // Two crossed fire planes (Minecraft-style crossed quads)
-    const halfW = 0.28, halfH = 0.38;
+    // Two crossed fire planes with canvas-gradient flame texture (yellow→orange→red tip)
+    const halfW = 0.30, halfH = 0.46;
+    const uvs = new Float32Array([
+      0, 0,  1, 0,  1, 1,  0, 1,   // plane A UVs
+      0, 0,  1, 0,  1, 1,  0, 1,   // plane B UVs
+    ]);
     const firePositions = new Float32Array([
       -halfW, 0,      0,   halfW, 0,      0,   halfW, halfH * 2, 0,   -halfW, halfH * 2, 0,
        0,     0,     -halfW,   0, 0,      halfW,   0, halfH * 2, halfW,    0, halfH * 2, -halfW,
@@ -2911,15 +2959,9 @@ export class Game {
     ]);
     const fireGeo = new THREE.BufferGeometry();
     fireGeo.setAttribute("position", new THREE.BufferAttribute(firePositions, 3));
+    fireGeo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     fireGeo.setIndex(new THREE.BufferAttribute(fireIndices, 1));
-    const fireMat = new THREE.MeshBasicMaterial({
-      color: 0xff6622,
-      transparent: true,
-      opacity: 0.92,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-    const fireMesh = new THREE.Mesh(fireGeo, fireMat);
+    const fireMesh = new THREE.Mesh(fireGeo, this._campfireFireMat);
     fireMesh.position.set(0, 0.12, 0);
     fireMesh.userData.flickerPhase = flickerPhase;
     group.add(fireMesh);
