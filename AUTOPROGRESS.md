@@ -1,5 +1,35 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-08 — Leaf canopy wind sway + pixel art for 7 crafting-ingredient items
+
+**What was done:**
+- **Leaf canopy GPU wind sway** (`src/Map.ts`): `makeLeafMaterial` now returns `{ mat, uniforms }` (matching `makeFloraMaterial` pattern). Added `_leafWindUniforms: { uTime }` field to `VoxelWorld`; `onBeforeCompile` injects a GLSL wind snippet that displaces each leaf vertex by `sin(pos.x * 1.3 + pos.z * 0.9 + uTime * 0.55) * 0.032` and a counter-phase Z + tiny Y-bob. Phase varies by world-space position so separate trees sway out of sync — natural organic feel. Previously the leaf canopy was completely static while grass and flora already swayed; now the entire world feels alive in the breeze.
+- **Pixel art for 7 crafting-ingredient items** (`src/SceneManager.ts`): Added cases to `drawItemPixelArt` for items that previously showed as plain coloured squares in the hotbar and when held:
+  - `blaze_rod`: orange/yellow vertical rod with fiery stripes and floating ember sparks
+  - `sugar`: white crystalline mound with shimmer highlights and blue glints
+  - `magma_cream`: orange blob with dark lava crack specks and gloss top
+  - `glistering_melon`: green melon slice with gold-nugget border ring and red flesh/seeds
+  - `sniper_ammo`: long tapered brass cartridge with copper tip and brass primer
+  - `shotgun_shell`: red plastic body with gold brass base and crimped top
+  - `energy_cell`: dark casing with glowing blue-white core panel and luminous edges
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors). No browser JS errors confirmed via Playwright headless.
+
+**Notes:**
+- Fresh session. Remote `auto-iterate` was ahead — checked out cleanly.
+- `npm install` needed before tsc (node_modules absent at session start).
+- Many previously-listed ideas are already done: campfire, moon phase, leaves emissive, boss war-cry shockwave ring, rain splashes/ripples, screen shake, hit flash colour tints — checked each before starting.
+- Playwright browser at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (NOT chromium_headless_shell-1194).
+
+**Ideas for next time:**
+- **Campfire smoke column**: tighter vertical ribbon of dark-grey sphere particles (radius 0.04, vy 0.9) rising straight up 1.5 units from campfire centre — more distinct smoke pillar vs current diffuse wisps
+- **Troll/Troll-King death crater**: at troll death spawn a dark `CircleGeometry(0.55)` stain + 2-3 indented slab marks to simulate ground impact
+- **Block texture detail — dirt/grass transition**: top row of dirt-side faces shade darker to simulate the grass→soil boundary (no new atlas tile — vertex color multiply)
+- **Day/night star twinkle**: per-star phase offset drives `±0.1` emissive flicker each frame — makes the Milky Way feel alive vs static dots
+- **Sun rays / god rays**: simple additive lens-flare streaks radiating from the sun disc when sun is near the horizon at dawn/dusk
+- **Sniper rifle / gun viewmodel**: build dedicated 3D mesh for sniper rifle and shotgun items (currently fall back to sword mesh since they're `category:"weapon"`)
+
+---
+
 ## 2026-06-08 — Enemy death ground stains + multi-material flash crash fix
 
 **What was done:**
