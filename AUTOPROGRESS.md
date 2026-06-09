@@ -1,5 +1,34 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-09 — Biome ambient dust particles (pollen / sand drift)
+
+**What was done:**
+- Added `DustMote` interface (`mesh, vx/vy/vz, life, maxLife, phase, peakOpacity`) to `src/Particles.ts`.
+- Added `_dustMotes: DustMote[]` and `_dustBiome: string` private fields to `ParticleSystem`.
+- Added private `spawnDustMote(px, py, pz, biome)`: spawns one mote at a random position within 2–9 units of the player. Per-biome geometry, colour, velocity, and opacity:
+  - **Forest**: pale yellow-white sphere (radius 0.016–0.024), floats upward (vy 0.06–0.16), gentle XZ drift — simulates drifting pollen. Pool of 28.
+  - **Desert**: flat tan/gold box (0.010–0.022 wide), drifts east on the wind (vx 0.16–0.40), barely falls — simulates sand grains on the breeze. Pool of 22.
+  - **Plains / default**: faint grey-white sphere, very slow random drift. Pool of 10.
+  - **Taiga**: skipped — Weather.ts already handles snow flurries.
+- Added public `updateBiomeDust(px, py, pz, biome, dt)`: flushes pool on biome change, spawns up to 2 new motes per frame until capacity, advances each mote's position + sine sway, and fades opacity in/out over first 10 % and last 15 % of each mote's life. Motes that drift >11 units from the player or expire are disposed and removed.
+- Updated `clear()` to dispose all `_dustMotes`.
+- Wired call into `Game.ts` update loop right after the biome detection block (line ~1815).
+- TypeScript compiles clean (`npx tsc -p tsconfig.emit.json` exits 0). Playwright test confirms forest pool caps at 28, desert at 22, biome-switch clears instantly.
+
+**Notes:**
+- Fresh session. `npm install` needed. Checked that snow (Weather.ts) already covers taiga — skipped to avoid duplication.
+- Dev server started on port 5176; test verified via `scripts/verify-dust.mjs`.
+
+**Ideas for next time:**
+- **Block ambient occlusion / per-vertex shading**: darken block corners where two faces meet — the single most significant remaining visual upgrade
+- **Crosshair hit indicator**: briefly expand + tint the CSS crosshair red on melee/ranged hit — pure CSS, zero Three.js overhead
+- **Enchanting table rune sparks**: small purple/cyan spark particles that fly from nearby bookshelves toward the table
+- **Troll death crater**: when the troll dies, leave a large `CircleGeometry` ground stain + indented slab marks simulating ground impact
+- **Sun rays / god rays at dawn/dusk**: 5-7 thin additive-blended planes radiating from the sun disc when near the horizon
+- **Campfire smoke column**: tighter vertical ribbon of dark-grey sphere particles (vy 0.9, radius 0.04) rising 1.5 units from campfire centre
+
+
+
 ## 2026-06-09 — Tiered sword emissive glow + raygun energy barrel + XP orb fix
 
 **What was done:**

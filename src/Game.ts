@@ -1814,6 +1814,10 @@ export class Game {
     this.scene.setBiome(biome);
     this.weather.setTaigaSnow(biome === "taiga");
 
+    // Biome ambient dust: pollen (forest), sand drift (desert), faint motes (plains)
+    const pp = this.player.position;
+    this.particles.updateBiomeDust(pp.x, pp.y, pp.z, biome, dt);
+
     // HUD
     this.ui.updatePlayerHealth(this.player.health, this.player.maxHealth);
     this.ui.updateDayClock(this.scene.dayTime, this.scene.moonPhase);

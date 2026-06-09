@@ -32,11 +32,22 @@ interface SmokeParticle {
   peakOpacity: number;
 }
 
+interface DustMote {
+  mesh: THREE.Mesh;
+  vx: number; vy: number; vz: number;
+  life: number;
+  maxLife: number;
+  phase: number;
+  peakOpacity: number;
+}
+
 export class ParticleSystem {
   private readonly particles: Particle[] = [];
   private readonly decals: Decal[] = [];
   private readonly _rings: ShockwaveRing[] = [];
   private readonly _smoke: SmokeParticle[] = [];
+  private readonly _dustMotes: DustMote[] = [];
+  private _dustBiome = "";
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -848,6 +859,121 @@ export class ParticleSystem {
     }
   }
 
+  // ─── Biome ambient dust ──────────────────────────────────────────────────────
+
+  private spawnDustMote(px: number, py: number, pz: number, biome: string): void {
+    const angle  = Math.random() * Math.PI * 2;
+    const radius = 2.0 + Math.random() * 7.0;
+    const x = px + Math.cos(angle) * radius;
+    const z = pz + Math.sin(angle) * radius;
+
+    let geo: THREE.BufferGeometry;
+    let color: number;
+    let vx: number, vy: number, vz: number;
+    let maxLife: number;
+    let peakOpacity: number;
+    let y: number;
+
+    if (biome === "forest") {
+      // Pollen: small spheres floating upward in dappled sunlight
+      geo          = new THREE.SphereGeometry(0.016 + Math.random() * 0.008, 4, 2);
+      color        = Math.random() < 0.55 ? 0xf4f0c0 : 0xffe8a0;
+      vx           = (Math.random() - 0.5) * 0.20;
+      vy           = 0.06 + Math.random() * 0.10;
+      vz           = (Math.random() - 0.5) * 0.20;
+      maxLife      = 6.0 + Math.random() * 5.0;
+      peakOpacity  = 0.28 + Math.random() * 0.18;
+      y            = py - 0.5 + Math.random() * 2.5;
+    } else if (biome === "desert") {
+      // Sand grains: flat boxes drifting on the wind
+      geo          = new THREE.BoxGeometry(
+        0.010 + Math.random() * 0.012,
+        0.007,
+        0.010 + Math.random() * 0.012,
+      );
+      color        = Math.random() < 0.6 ? 0xd4c484 : 0xc8aa60;
+      vx           = 0.16 + Math.random() * 0.24;   // east wind
+      vy           = (Math.random() - 0.5) * 0.028;
+      vz           = (Math.random() - 0.5) * 0.10;
+      maxLife      = 5.0 + Math.random() * 4.0;
+      peakOpacity  = 0.24 + Math.random() * 0.16;
+      y            = py - 0.8 + Math.random() * 1.6;
+    } else {
+      // Plains / other: very faint generic dust motes
+      geo          = new THREE.SphereGeometry(0.012, 4, 2);
+      color        = 0xddddd0;
+      vx           = (Math.random() - 0.5) * 0.10;
+      vy           = (Math.random() - 0.5) * 0.05;
+      vz           = (Math.random() - 0.5) * 0.10;
+      maxLife      = 4.0 + Math.random() * 4.0;
+      peakOpacity  = 0.12 + Math.random() * 0.08;
+      y            = py - 0.5 + Math.random() * 2.0;
+    }
+
+    const mat  = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0, depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    this.scene.add(mesh);
+    this._dustMotes.push({
+      mesh, vx, vy, vz, life: 0, maxLife,
+      phase: Math.random() * Math.PI * 2,
+      peakOpacity,
+    });
+  }
+
+  /** Update drifting ambient-dust motes around the player. Call each frame. */
+  updateBiomeDust(px: number, py: number, pz: number, biome: string, dt: number): void {
+    // On biome change flush old motes so colour/type updates immediately
+    if (this._dustBiome !== biome) {
+      for (const m of this._dustMotes) {
+        this.scene.remove(m.mesh);
+        m.mesh.geometry.dispose();
+        (m.mesh.material as THREE.Material).dispose();
+      }
+      this._dustMotes.length = 0;
+      this._dustBiome = biome;
+    }
+
+    const maxMotes = biome === "forest" ? 28 : biome === "desert" ? 22 : 10;
+    const WRAP_RADIUS_SQ = 11.0 * 11.0;
+
+    // Spawn at most 2 motes per frame until pool is full
+    const toSpawn = Math.min(2, maxMotes - this._dustMotes.length);
+    for (let s = 0; s < toSpawn; s++) this.spawnDustMote(px, py, pz, biome);
+
+    for (let i = this._dustMotes.length - 1; i >= 0; i--) {
+      const m = this._dustMotes[i];
+      m.life += dt;
+      m.phase += dt * 1.1;
+
+      // Gentle sine sway perpendicular to drift direction
+      const sway = Math.sin(m.phase) * (biome === "forest" ? 0.018 : 0.012);
+      m.mesh.position.x += (m.vx + sway) * dt;
+      m.mesh.position.y += m.vy * dt;
+      m.mesh.position.z += (m.vz + Math.cos(m.phase) * 0.010) * dt;
+
+      // Opacity: fade in first 10 %, hold, fade out last 15 %
+      const t = m.life / m.maxLife;
+      const op = t < 0.10 ? t / 0.10
+               : t > 0.85 ? (1 - t) / 0.15
+               : 1.0;
+      (m.mesh.material as THREE.MeshBasicMaterial).opacity = m.peakOpacity * Math.max(0, op);
+
+      // Wrap: if mote drifted too far, dispose and let pool refill spawn a fresh one
+      const dx = m.mesh.position.x - px;
+      const dy = m.mesh.position.y - py;
+      const dz = m.mesh.position.z - pz;
+      if (m.life >= m.maxLife || dx * dx + dy * dy + dz * dz > WRAP_RADIUS_SQ) {
+        this.scene.remove(m.mesh);
+        m.mesh.geometry.dispose();
+        (m.mesh.material as THREE.Material).dispose();
+        this._dustMotes.splice(i, 1);
+      }
+    }
+  }
+
   clear(): void {
     for (const p of this.particles) {
       this.scene.remove(p.mesh);
@@ -873,5 +999,12 @@ export class ParticleSystem {
       (s.mesh.material as THREE.Material).dispose();
     }
     this._smoke.length = 0;
+    for (const m of this._dustMotes) {
+      this.scene.remove(m.mesh);
+      m.mesh.geometry.dispose();
+      (m.mesh.material as THREE.Material).dispose();
+    }
+    this._dustMotes.length = 0;
+    this._dustBiome = "";
   }
 }
