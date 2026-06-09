@@ -208,11 +208,17 @@ export class ParticleSystem {
   }
 
   spawnXPOrbs(x: number, y: number, z: number, count: number): void {
+    // Orbs cycle through two green shades so a cluster looks varied
+    const colors = [0x44ff55, 0x22ee44, 0x66ffaa, 0x00ff66];
     for (let i = 0; i < count; i++) {
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.06, 4, 4),
-        new THREE.MeshBasicMaterial({ color: 0x44ff44, emissive: 0x22cc22 } as THREE.MeshBasicMaterialParameters),
-      );
+      const c = colors[i % colors.length];
+      const mat = new THREE.MeshLambertMaterial({
+        color: c,
+        emissive: new THREE.Color(c),
+        emissiveIntensity: 0.85,
+        transparent: true,
+      });
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), mat);
       mesh.position.set(x + (Math.random() - 0.5) * 0.4, y + 0.5, z + (Math.random() - 0.5) * 0.4);
       const speed = 1.5 + Math.random() * 2;
       const theta = Math.random() * Math.PI * 2;

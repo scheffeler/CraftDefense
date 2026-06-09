@@ -140,6 +140,15 @@ export class SceneManager {
   private _armBobSpeed = 0;
   private _armBobLastPos = new THREE.Vector3();
 
+  // Sword glow animation — set by buildSwordMesh for animated tiers (diamond only)
+  private _swordEdgeMat: THREE.MeshLambertMaterial | null = null;
+  private _swordBladeMat: THREE.MeshLambertMaterial | null = null;
+  private _swordEdgeBase = 0;
+  private _swordEdgePulse = 0;
+  private _swordBladeBase = 0;
+  private _swordBladePulse = 0;
+  private _swordGlowTime = 0;
+
   // Wave-start exposure pulse (0 = inactive)
   private _wavePulseTimer = 0;
 
@@ -554,6 +563,9 @@ export class SceneManager {
       this.armGroup.remove(this.armGroup.children[1]);
     }
     this._swingWeaponEquipped = false;
+    // Reset sword glow state — set again by buildSwordMesh if applicable
+    this._swordEdgeMat = null;
+    this._swordBladeMat = null;
     if (!itemId) return;
 
     const def = ITEMS[itemId];
@@ -644,6 +656,13 @@ export class SceneManager {
     const bodyMat = new THREE.MeshLambertMaterial({ color });
     const darkMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
 
+    // Raygun (color=0x00ccff) gets a glowing energy barrel; sniper stays matte
+    const isRaygun = color === 0x00ccff;
+    if (isRaygun) {
+      bodyMat.emissive.setHex(0x00eeff);
+      bodyMat.emissiveIntensity = 0.45;
+    }
+
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.5), bodyMat);
     barrel.position.set(0.06, 0.26, -0.16);
     g.add(barrel);
@@ -657,7 +676,11 @@ export class SceneManager {
     grip.rotation.x = 0.25;
     g.add(grip);
 
-    const scope = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.18), darkMat);
+    // Scope: glowing lens for raygun, dark metal otherwise
+    const scopeMat = isRaygun
+      ? new THREE.MeshLambertMaterial({ color: 0x0044aa, emissive: new THREE.Color(0x0088ff), emissiveIntensity: 0.7 })
+      : darkMat;
+    const scope = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.18), scopeMat);
     scope.position.set(0.06, 0.30, -0.05);
     g.add(scope);
 
@@ -1256,15 +1279,48 @@ export class SceneManager {
     const guard = b(0.20, 0.045, 0.045, color);
     guard.position.set(-0.05, 0.20, 0.0); guard.rotation.z = 0.3;
     g.add(guard);
-    const blade = b(0.055, 0.34, 0.022, color);
+
+    // Blade — emissive tint based on material tier
+    const bladeMat = new THREE.MeshLambertMaterial({ color });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.34, 0.022), bladeMat);
     blade.position.set(-0.10, 0.39, 0.0); blade.rotation.z = 0.3;
     g.add(blade);
-    // Subtle edge highlight
-    const edge = b(0.012, 0.32, 0.012, 0xffffff);
-    (edge.material as THREE.MeshLambertMaterial).emissive.setHex(0xffffff);
-    (edge.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.10;
+
+    // Edge highlight — color/intensity reflects material tier
+    // diamond=0x55ffff  gold=0xffdd44  iron=0xbbbbbb  stone=0x888070  wood=0xc8a060
+    type TierProps = { edgeC: number; edgeBase: number; edgePulse: number; bladeC: number; bladeBase: number; bladePulse: number };
+    const tier: TierProps = color === 0x55ffff
+      ? { edgeC: 0x00eeff, edgeBase: 0.42, edgePulse: 0.22, bladeC: 0x00aaff, bladeBase: 0.16, bladePulse: 0.10 }
+      : color === 0xffdd44
+      ? { edgeC: 0xffee44, edgeBase: 0.28, edgePulse: 0.00, bladeC: 0xffcc00, bladeBase: 0.08, bladePulse: 0.00 }
+      : color === 0xbbbbbb
+      ? { edgeC: 0xaaccff, edgeBase: 0.13, edgePulse: 0.00, bladeC: 0x000000, bladeBase: 0.00, bladePulse: 0.00 }
+      : color === 0x888070
+      ? { edgeC: 0x999999, edgeBase: 0.05, edgePulse: 0.00, bladeC: 0x000000, bladeBase: 0.00, bladePulse: 0.00 }
+      : { edgeC: 0xffd080, edgeBase: 0.04, edgePulse: 0.00, bladeC: 0x000000, bladeBase: 0.00, bladePulse: 0.00 };
+
+    const edgeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    edgeMat.emissive.setHex(tier.edgeC);
+    edgeMat.emissiveIntensity = tier.edgeBase;
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.32, 0.012), edgeMat);
     edge.position.set(-0.072, 0.39, 0.0); edge.rotation.z = 0.3;
     g.add(edge);
+
+    // Apply blade emissive for tiers that have it
+    if (tier.bladeBase > 0) {
+      bladeMat.emissive.setHex(tier.bladeC);
+      bladeMat.emissiveIntensity = tier.bladeBase;
+    }
+
+    // Store materials for animated tiers (only diamond pulses)
+    if (tier.edgePulse > 0) {
+      this._swordEdgeMat   = edgeMat;
+      this._swordBladeMat  = tier.bladePulse > 0 ? bladeMat : null;
+      this._swordEdgeBase  = tier.edgeBase;
+      this._swordEdgePulse = tier.edgePulse;
+      this._swordBladeBase  = tier.bladeBase;
+      this._swordBladePulse = tier.bladePulse;
+    }
 
     return g;
   }
@@ -1869,6 +1925,16 @@ export class SceneManager {
 
   private renderArm(dt: number): void {
     if (this.armSwingTimer > 0) this.armSwingTimer = Math.max(0, this.armSwingTimer - dt);
+
+    // Animated sword glow — advance timer and pulse diamond edge/blade emissive
+    if (this._swordEdgeMat) {
+      this._swordGlowTime += dt;
+      const pulse = Math.sin(this._swordGlowTime * 2.6) * 0.5 + 0.5; // 0..1
+      this._swordEdgeMat.emissiveIntensity = this._swordEdgeBase + this._swordEdgePulse * pulse;
+      if (this._swordBladeMat) {
+        this._swordBladeMat.emissiveIntensity = this._swordBladeBase + this._swordBladePulse * pulse;
+      }
+    }
 
     const worldPos  = new THREE.Vector3();
     const worldQuat = new THREE.Quaternion();

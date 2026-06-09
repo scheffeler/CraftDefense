@@ -1,5 +1,35 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-09 — Tiered sword emissive glow + raygun energy barrel + XP orb fix
+
+**What was done:**
+- **Tiered sword glow** (`src/SceneManager.ts`): `buildSwordMesh(color)` now maps blade color to tier-appropriate edge and blade emissive instead of always white at 0.10 intensity:
+  - *Diamond* (0x55ffff): edge emissive 0x00eeff at 0.42 base + 0.22 sine-pulse (≈0.42–0.64 over 2.4 s cycle), blade emissive 0x00aaff at 0.16 base + 0.10 pulse — the sword visibly breathes cyan in hand.
+  - *Gold* (0xffdd44): edge 0xffee44 at 0.28, blade 0xffcc00 at 0.08 — warm golden shimmer, static.
+  - *Iron* (0xbbbbbb): edge 0xaaccff at 0.13, no blade emissive — cool steel-blue highlight.
+  - *Stone* (0x888070): edge grey at 0.05 — barely perceptible, reinforces it's a crude weapon.
+  - *Wood* (0xc8a060): edge warm cream at 0.04 — just enough to catch light.
+- Added `_swordEdgeMat`, `_swordBladeMat`, `_swordEdgeBase/Pulse`, `_swordBladeBase/Pulse`, `_swordGlowTime` fields to `SceneManager`. `renderArm()` advances `_swordGlowTime` each frame and writes computed `emissiveIntensity` to the stored materials so the diamond pulse runs at 60fps.
+- `updateArmItem()` now resets `_swordEdgeMat = null` and `_swordBladeMat = null` before rebuilding so stale material refs don't persist when switching weapons.
+- **Raygun energy glow** (`src/SceneManager.ts`): `buildGunMesh(color)` now detects color === 0x00ccff (raygun) and adds `emissive: 0x00eeff, emissiveIntensity: 0.45` to body/barrel material, plus a separate glowing scope mesh (`emissive: 0x0088ff, emissiveIntensity: 0.70`). Sniper and other non-energy guns are unchanged.
+- **XP orb fix** (`src/Particles.ts`): `spawnXPOrbs` was using `MeshBasicMaterial` with an `emissive` field that `MeshBasicMaterial` doesn't support (silently ignored at runtime). Changed to `MeshLambertMaterial` with `emissive + emissiveIntensity: 0.85 + transparent: true` so orbs actually glow green and fade properly at end of life. Also added 4-color green variation across a cluster.
+
+**Notes:**
+- Oriented fresh session: remote `auto-iterate` was ahead. Checked out branch successfully.
+- `npx tsc -p tsconfig.emit.json` passes cleanly.
+- Existing code already had: fireflies at night, war cry shockwave, arm walk-bob, wave pulse, campfire, enchanting table aura, enemy death flash, leaf emissive, shadow blobs, moon phases.
+- Playwright screenshot testing was blocked by browser capability issues (headless shell vs full chromium), but the Three.js emissive pattern is identical to what's already working for enemy eye glow, campfire glow, enchanting table spine glow, etc.
+
+**Ideas for next time:**
+- **Crosshair hit indicator**: when player scores a melee or ranged hit on an enemy, briefly expand + tint the CSS crosshair red; pure CSS/HTML, zero Three.js overhead
+- **Block ambient occlusion / per-vertex shading**: darken corners of blocks where two faces meet — significant visual upgrade to the world
+- **Biome ambient dust/particles**: faint floating dust motes in forest (pollen), sand drift in desert, snow specks in taiga — pool of ~30 slow-drift particles around player
+- **Enchanting table rune sparks**: small purple/cyan spark particles that fly from nearby bookshelves toward the table
+- **Iron/diamond armor emissive**: equipped armor could have a faint emissive when armor bonus is active, visible in the player's shadow/ground
+- **Troll death crater**: when the troll dies, leave a ground-circle decal (cracked earth texture) larger than the normal death stain
+
+
+
 ## 2026-06-08 — Campfire decorative block
 
 **What was done:**
