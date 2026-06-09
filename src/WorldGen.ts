@@ -414,6 +414,10 @@ function generateInterior(world: VoxelWorld): void {
   }
   world.setBlock(24, G + 3, 30, "torch");
   world.setBlock(22, G + 1, 30, "chest");
+
+  // Campfires — one on each side of the courtyard south of the well
+  world.setBlock(27, G + 1, 36, "campfire");
+  world.setBlock(37, G + 1, 36, "campfire");
 }
 
 function generateSpawnMarkers(world: VoxelWorld): void {

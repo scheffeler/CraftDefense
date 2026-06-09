@@ -400,6 +400,16 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "torch", count: 4 },
   },
 
+  // --- Campfire ---
+  {
+    id: "campfire",
+    pattern: [
+      [r("wood"), r("flint"), r("wood")],
+      [r("wood"), r("wood"),  r("wood")],
+    ],
+    result: { itemId: "campfire", count: 1 },
+  },
+
   // --- Hoes ---
   {
     id: "wood_hoe",
