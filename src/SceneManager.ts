@@ -1016,6 +1016,26 @@ export class SceneManager {
         return true;
       }
 
+      case "campfire": {
+        // Log base — two crossed brown logs
+        rect(2, 11, 12, 2, "#5a3315"); // bottom log horizontal
+        rect(2, 12, 12, 1, "#3d2208"); // log shadow
+        rect(7, 9, 2, 4, "#6b4520");  // vertical log
+        rect(6, 9, 1, 4, "#7a5030");  // vertical log highlight
+        // Embers — dark ash pile in center
+        rect(5, 10, 6, 2, "#2a1a0a");
+        // Flame — bright yellow-orange rising tongue
+        rect(6, 6, 4, 4, "#ff9900");   // main flame body
+        rect(7, 4, 2, 3, "#ffbb00");   // upper flame
+        rect(5, 7, 2, 2, "#ff6600");   // left tongue
+        rect(9, 7, 2, 2, "#ff6600");   // right tongue
+        rect(7, 3, 2, 1, "#ffdd44");   // flame tip
+        // Glow highlight on flame
+        rect(7, 5, 1, 2, "#ffffff");
+        rect(8, 4, 1, 1, "#ffffcc");
+        return true;
+      }
+
       default:
         return false;
     }

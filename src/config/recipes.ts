@@ -662,6 +662,16 @@ export const RECIPES: Recipe[] = [
     result: { itemId: "iron_bucket", count: 1 },
   },
 
+  // --- Campfire (3 wood logs + 1 coal in a campfire shape) ---
+  {
+    id: "campfire",
+    pattern: [
+      [r("stick"),  r("coal_ore"), r("stick")],
+      [r("wood"),   r("wood"),     r("wood")  ],
+    ],
+    result: { itemId: "campfire", count: 1 },
+  },
+
   // --- Arrow Dispenser (7 cobblestone + 1 bow = auto-shooting turret) ---
   {
     id: "dispenser",
