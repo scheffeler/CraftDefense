@@ -1,5 +1,30 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-09 — Campfire decorative block
+
+**What was done:**
+- Added `"campfire"` to `BlockId` union and all required places: `BLOCK_DEFS` in `Map.ts`, `BLOCK_BEHAVIORS` in `blocks.ts`, chunk-render skip (like torch), and `initCampfireLights()` in `Game.ts`.
+- Crafting recipe: 2 sticks + 1 coal_ore + 3 wood → 1 campfire (matches Minecraft's campfire recipe spirit).
+- Player starts with 2 campfires in their inventory.
+- `addCampfireLight(wx, wy, wz)`: flat log base (`BoxGeometry 0.88×0.22×0.88`, dark brown), two crossed `THREE.Sprite` flames at 90° angles using a custom `buildCampfireFlameTexture()` (24×40 px, wider/taller and deeper orange-red than torch), `PointLight(0xff4400, 2.5, 9)` with unique per-campfire flicker phase stored in `userData`.
+- Campfire flicker loop: slower, deeper sway (4.1/7.3/11.9 Hz harmonics) than torches — intensity range ≈ 1.5–3.0 for an organic fire feel.
+- `removeCampfireLight`: properly disposes and removes both the PointLight and all flame sprites from the flicker list.
+- Inventory pixel-art sprite for campfire: log base + orange-red flame with yellow tip + ember glow center.
+- TypeScript compiles clean. Browser test confirmed: 2 lights + 2 meshes + 4 flame sprites created correctly, zero JS errors.
+
+**Notes:**
+- Fresh session: oriented on branch `claude/dreamy-cerf-fqdot5`, npm install required.
+- Campfire was highest-priority "next time" item, mentioned 3+ times in prior sessions.
+
+**Ideas for next time:**
+- **Moon phase visual**: change the shadow-disc offset each game-day for crescent/half/full cycle variety
+- **Leaves emissive at night**: traverse leaf blocks near player, add subtle emissive so canopy glows faintly after dark
+- **Boss war-cry shockwave ring**: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- **Campfire smoke particle**: thin grey alpha-blended quads drifting upward from campfire (similar to how torch flame was added, but upward drift)
+- **Biome ambient sound**: distinct audio loop per biome (desert wind, taiga crickets, forest birds)
+- **Hit flash colour**: non-lethal hit flash tinted by weapon type (sword=red, magic=purple)
+- **Weather: thunder lightning flash**: brief white-out of `renderer.toneMappingExposure` + crack sound on storm nights
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
