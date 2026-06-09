@@ -32,11 +32,22 @@ interface SmokeParticle {
   peakOpacity: number;
 }
 
+interface BiomeMote {
+  mesh: THREE.Mesh;
+  phase: number;   // sine-wave phase offset for unique undulation
+  speed: number;   // per-mote speed multiplier
+}
+
 export class ParticleSystem {
   private readonly particles: Particle[] = [];
   private readonly decals: Decal[] = [];
   private readonly _rings: ShockwaveRing[] = [];
   private readonly _smoke: SmokeParticle[] = [];
+
+  // Biome ambient particle motes — pooled, persistent, never cleared between waves
+  private _biomeMotes: BiomeMote[] = [];
+  private _biomeMoteGeo: THREE.SphereGeometry | null = null;
+  private _biomeTime = 0;
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -845,6 +856,109 @@ export class ParticleSystem {
         continue;
       }
       (d.mesh.material as THREE.MeshBasicMaterial).opacity = (d.peakOpacity ?? 0.22) * (1 - d.life / d.maxLife);
+    }
+  }
+
+  /** Pre-allocate 30 pooled ambient-mote meshes (call once, at game start). */
+  initBiomeMotes(): void {
+    if (this._biomeMotes.length > 0) return;
+    this._biomeMoteGeo = new THREE.SphereGeometry(0.022, 4, 3);
+    for (let i = 0; i < 30; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        fog: false,
+      });
+      const mesh = new THREE.Mesh(this._biomeMoteGeo, mat);
+      mesh.position.set(99999, 0, 99999); // off-screen until first update
+      this.scene.add(mesh);
+      this._biomeMotes.push({
+        mesh,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.7 + Math.random() * 0.6,
+      });
+    }
+  }
+
+  /**
+   * Update floating biome ambient motes each frame.
+   * Forest → golden pollen drifting upward.
+   * Desert → sandy dust motes blowing sideways.
+   * Taiga  → frost-crystal swirls spiralling slowly downward.
+   */
+  updateBiomeMotes(dt: number, px: number, py: number, pz: number, biome: string): void {
+    if (this._biomeMotes.length === 0) return;
+    this._biomeTime += dt;
+    const t = this._biomeTime;
+    const RADIUS = 8;
+
+    let color: number, peakOp: number;
+    let vyBase: number, vxBase: number;
+    let yMin: number, yMax: number;
+
+    if (biome === "desert") {
+      color = 0xe8d098; peakOp = 0.26; vyBase = 0.06; vxBase = 0.55; yMin = 0.2; yMax = 2.8;
+    } else if (biome === "taiga") {
+      color = 0xddeeff; peakOp = 0.44; vyBase = -0.22; vxBase = 0.10; yMin = 1.5; yMax = 4.8;
+    } else {
+      // forest (default)
+      color = 0xffdd88; peakOp = 0.36; vyBase = 0.20; vxBase = 0.0; yMin = 0.4; yMax = 3.6;
+    }
+
+    for (const m of this._biomeMotes) {
+      const pos = m.mesh.position;
+      const mat = m.mesh.material as THREE.MeshBasicMaterial;
+      const ph  = m.phase;
+      const spd = m.speed;
+
+      // Respawn mote if it has drifted out of the player cylinder
+      const dx = pos.x - px;
+      const dz = pos.z - pz;
+      const dy = pos.y - py;
+      const distXZ = Math.sqrt(dx * dx + dz * dz);
+      const needsRespawn = distXZ > RADIUS + 1.5 || dy < yMin - 1.5 || dy > yMax + 1.5 || pos.x > 9000;
+
+      if (needsRespawn) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = (0.3 + Math.random() * 0.7) * RADIUS;
+        pos.x = px + Math.cos(angle) * r;
+        pos.y = py + yMin + Math.random() * (yMax - yMin);
+        pos.z = pz + Math.sin(angle) * r;
+        mat.color.setHex(color);
+        mat.opacity = 0;
+        continue;
+      }
+
+      // Refresh color on biome change
+      if (mat.color.getHex() !== color) mat.color.setHex(color);
+
+      // Move mote according to biome behaviour
+      if (biome === "forest") {
+        // Pollen: float upward, lazy 3D sine drift
+        pos.y += vyBase * spd * dt;
+        pos.x += Math.sin(t * 0.6 + ph) * 0.09 * dt;
+        pos.z += Math.cos(t * 0.45 + ph * 1.3) * 0.07 * dt;
+      } else if (biome === "desert") {
+        // Dust: blow along +X with subtle vertical bob
+        pos.y += (vyBase + Math.sin(t * 1.3 + ph) * 0.045) * spd * dt;
+        pos.x += vxBase * spd * dt;
+        pos.z += Math.sin(t * 0.8 + ph) * 0.10 * dt;
+      } else {
+        // Taiga frost: spiral slowly downward
+        pos.y += vyBase * spd * dt;
+        pos.x += (vxBase + Math.sin(t * 1.2 + ph) * 0.14) * dt;
+        pos.z += Math.cos(t * 0.9 + ph) * 0.12 * dt;
+      }
+
+      // Opacity: radial bell-curve falloff, also fade at vertical edges
+      const dx2 = pos.x - px;
+      const dz2 = pos.z - pz;
+      const r2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
+      const radial = Math.max(0, 1 - Math.pow(r2 / RADIUS, 3));
+      const dy2 = pos.y - py;
+      const vert = (dy2 >= yMin && dy2 <= yMax) ? 1 : 0;
+      mat.opacity = peakOp * radial * vert;
     }
   }
 

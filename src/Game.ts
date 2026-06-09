@@ -233,6 +233,7 @@ export class Game {
     this.buildSystems();
     this.initTorchLights();
     this.initCampfireLights();
+    this.particles.initBiomeMotes();
     // Expose camera for screenshot tooling
     (window as any).__GAME_CAMERA__ = this.scene.camera;
     requestAnimationFrame(t => this.loop(t));
@@ -1393,6 +1394,13 @@ export class Game {
       }
     }
     this.particles.updateSmoke(dt);
+    this.particles.updateBiomeMotes(
+      dt,
+      this.player.position.x,
+      this.player.position.y,
+      this.player.position.z,
+      getBiomeAt(this.player.position.x, this.player.position.z),
+    );
 
     // Enchanting table aura — floating book bob + purple light pulse (always-on)
     if (this._enchantAuras.size > 0) {

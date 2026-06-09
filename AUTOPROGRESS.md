@@ -1,5 +1,28 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-09 — Biome ambient particle motes (pollen / dust / frost)
+
+**What was done:**
+- Added `BiomeMote` interface and `_biomeMotes: BiomeMote[]` + `_biomeMoteGeo: THREE.SphereGeometry` + `_biomeTime: number` to `ParticleSystem` in `src/Particles.ts`.
+- Added `initBiomeMotes()` — pre-allocates a pool of 30 tiny sphere mote meshes (`SphereGeometry(0.022, 4, 3)`, individual `MeshBasicMaterial` per mote for per-mote opacity, `depthWrite: false, fog: false`). Called once from `Game.start()`.
+- Added `updateBiomeMotes(dt, px, py, pz, biome)` — runs every frame (unconditionally, outside pointer-lock guard):
+  - **Forest**: golden-yellow pollen motes (`0xffdd88`, peakOp 0.36) float upward (`vy=0.20`) with lazy 3D sine XZ drift. Occupy y+0.4 to y+3.6 above the player.
+  - **Desert**: sandy-tan dust motes (`0xe8d098`, peakOp 0.26) blow sideways (`vx=0.55`) with a gentle vertical bob. Occupy y+0.2 to y+2.8.
+  - **Taiga**: ice-blue frost crystals (`0xddeeff`, peakOp 0.44) spiral slowly downward (`vy=-0.22`) with a gentle sideways swirl. Occupy y+1.5 to y+4.8 (above player head, like falling frost). Complements the existing large-scale taiga snow in `Weather.ts`.
+  - Motes respawn at a new random position inside the 8-unit player cylinder when they drift out of range. Opacity uses a radial bell-curve falloff (`1 - (r/RADIUS)^3`) so particles fade smoothly at the edges.
+- Called `initBiomeMotes()` in `Game.start()` after `initCampfireLights()`.
+- Called `updateBiomeMotes` right after `updateSmoke` (always-on section), computing biome via `getBiomeAt(player.position.x, player.position.z)`.
+- Verified: 30-mote pool initialised; forest biome shows golden pollen at correct positions and opacities (0.08–0.35); desert biome correctly switches to sandy-tan; opacity correctly fades to 0 on teleport (spawn frame).
+- TypeScript compiles clean (strict + noUnusedLocals, 0 errors).
+
+**Ideas for next time:**
+- **Crosshair hit indicator**: expand + tint the CSS crosshair red briefly on melee/ranged hit — pure HTML/CSS, zero Three.js overhead, very satisfying feedback
+- **Block ambient occlusion**: darken corners where two faces meet — significant world-render upgrade, would require a vertex-color pass during chunk rebuild
+- **Campfire smoke column**: tighter vertical ribbon of dark-grey sphere particles (radius 0.04, vy 0.9) rising straight up 1.5 units from campfire center — more distinct pillar vs current diffuse wisps
+- **Sun rays / god rays**: additive lens-flare streaks radiating from sun disc at dawn/dusk — `PlaneGeometry` billboards with very low additive-blend opacity, dramatic effect at horizon
+- **Sniper / shotgun viewmodel**: dedicated 3D mesh for sniper rifle and shotgun (currently fall back to sword mesh)
+- **Troll death crater**: dark `CircleGeometry(0.55)` stain + 2–3 indented box slabs at troll death position
+
 ## 2026-06-09 — Tiered sword emissive glow + raygun energy barrel + XP orb fix
 
 **What was done:**
