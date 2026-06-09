@@ -1,5 +1,32 @@
 # CraftDefense Auto-Iteration Progress
 
+## 2026-06-09 — Campfire decorative block with animated fire and warm PointLight
+
+**What was done:**
+- Added `campfire` as a new BlockId in `types.ts` and a transparent BLOCK_DEF in `Map.ts` (skipped in chunk geometry like torch — only the custom visual renders).
+- Pre-placed 2 campfires in the fortress courtyard at `(27, G+1, 36)` and `(37, G+1, 36)` in WorldGen.ts — flanking the well on the south side, giving the base a warm cozy feel.
+- Visual per campfire (Game.ts `addCampfireEffect`):
+  - **Log pile base**: two `BoxGeometry(0.82×0.12×0.18)` meshes rotated ±45° to make crossed logs.
+  - **Cross-plane fire mesh**: two perpendicular `BufferGeometry` planes (0.76w × 0.72h) sharing `_campfireFireMat` — `MeshBasicMaterial` with the same procedural flame canvas texture as torches, `alphaTest: 0.05` for clean edges, `DoubleSide`, starts at 45° Y-rotation so it's visible from all cardinal directions.
+  - **Warm PointLight**: `0xff6600`, intensity 2.5, radius 12, quadratic decay. Each campfire has an independent random flicker phase for organic non-synchronised movement.
+- Per-frame campfire update (main game loop): 3-harmonic sine flicker on light intensity (range ~1.2–3.2); fire mesh slowly rotates (1.2 rad/s + phase offset) and scale-wobbles in Y.
+- Craftable recipe: `[wood, flint, wood] / [wood, wood, wood]` → 1 campfire. Item added to config/items.ts.
+- Placement and removal wired to `onBlockPlaced` / `onBlockRemoved`. World scan at game start (`initTorchLights`) adds effects to all pre-placed campfires.
+- TypeScript builds clean. Campfire objects verified in browser (2 meshes × 3 children, 2 lights, correct world positions).
+
+**Notes:**
+- Oriented fresh session on branch `claude/dreamy-cerf-0ovkmq`. Project already had full 32-tile atlas, torch point lights, rain, shadow blobs, enemy visuals, death effects, etc.
+- Camera manipulation in headless Playwright is tricky because `Player.update()` resets `camera.position` every frame; the warm orange PointLight illumination was verified visible in night screenshots.
+- AUTOPROGRESS highest-priority item "campfire (3 sessions)" is now implemented.
+
+**Ideas for next time:**
+- **Smoke particles above campfire**: 2–3 grey billboard sprites that drift upward ~1.5 blocks and reset, fading by height — would add atmosphere above the fire
+- **Moon phase visual**: change the moon canvas texture each game day to show crescent/half/full cycle (requires ~4 canvas variants)
+- **Leaves emissive at night**: traverse leaf blocks near player and add tiny emissive glow so the canopy brightens faintly after dark
+- **Boss war-cry shockwave ring**: expand + fade `RingGeometry` particle when uruk_captain activates war cry
+- **Hit flash colour by weapon type**: change non-lethal hit flash from white to red (sword), blue (ice), purple (magic) for differentiation
+- **Player shadow improvements**: the ground shadow blob could taper/elongate based on light direction (sun angle)
+
 ## 2026-06-03 — TNT countdown floating sprite
 
 **What was done:**
